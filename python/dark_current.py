@@ -11,6 +11,7 @@ from query_eT import query_eT
 from findCCD import findCCD
 import statsmodels.api as smapi
 from statsmodels.formula.api import ols
+from matplotlib.backends.backend_pdf import PdfPages
 
 ccdType = 'ITL-3800C'
 dataTypeFiles = 'SR-RCV-01'
@@ -22,7 +23,7 @@ fCCD= findCCD(mirrorName='vendorCopy-prod',FType='fits', XtraOpts='IMGTYPE="DARK
 files_test = fCCD.find()
 print files_test
 
-ampHdu = 15
+ampHdu = 13
 print ' Working on amp #', ampHdu
 
 gainName = ['fe55_analysis', 'gain']
@@ -136,50 +137,70 @@ print 'biasPedsX = ', biasPedsX
 asImages = np.array(imagesList)
 medianCurrent = np.median(asImages, axis=0)
 print medianCurrent.shape
-fig1=plt.figure(1)
-plt.imshow(medianCurrent,cmap='hot',vmin=-0.1, vmax=0.1, origin='lower')
-plt.colorbar()
-plt.show()
 
-fig6=plt.figure(6)
-plt.imshow(bias[0:200,0:49]-pedRowsFixed[0:200,None],cmap='hot', vmin=-20, vmax=20, origin='lower')
-plt.colorbar()
-plt.show()
 
-fig2 = plt.figure(2)
-plt.hist(medianCurrent.flatten(),bins=50, range=[-0.1,0.1])
-fig2.suptitle(' pixel values')
-plt.show()
+with PdfPages('dark_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
 
-fig4=plt.figure(4)
-plt.plot(medianCurrent[0:1999,200],'r')
-plt.xlabel('row number')
-plt.show()
+    fig1=plt.figure(1)
+    plt.imshow(medianCurrent,cmap='hot',vmin=-0.1, vmax=0.1, origin='lower')
+    plt.colorbar()
+    plt.suptitle(' Image region')
+    pdf.savefig()
+    plt.close()
 
-fig5=plt.figure(5)
-plt.plot(biasPedsY)
-plt.xlabel('mean bias by overscan Y')
-plt.show()
+    fig6=plt.figure(6)
+    plt.imshow(bias[0:200,0:49]-pedRowsFixed[0:200,None],cmap='hot', vmin=-20, vmax=20, origin='lower')
+    plt.colorbar()
+    plt.suptitle(' Bias region - [0:200,0:49]')
+    pdf.savefig()
+    plt.close()
 
-fig5=plt.figure(6)
-plt.plot(biasPedsX)
-plt.xlabel('mean bias by overscan X')
-plt.show()
+    fig2 = plt.figure(2)
+    plt.hist(medianCurrent.flatten(),bins=50, range=[-0.1,0.1])
+    fig2.suptitle(' current - pixel values')
+    pdf.savefig()
+    plt.close()
 
-sorted = np.sort(np.absolute(medianCurrent.flatten()))
-index95 = int(len(sorted)*0.95)
-print 'num pixels = ', len(sorted), ' 95 = ', index95
-subset=sorted[index95-10:index95+30]
-print(subset)
-darkcurr95 = sorted[index95]
-segmentDark = darkEOT1[device][ampHdu-1][0]
+    fig4=plt.figure(4)
+    plt.plot(medianCurrent[0:1999,200],'r')
+    plt.xlabel('row number')
+    plt.suptitle(' Image current medians for row 200' )
+    pdf.savefig()
+    plt.close()
 
-for nxtValue in range(index95,len(sorted)):
-    if sorted[nxtValue] != darkcurr95:
-        print 'Next dark value at ', nxtValue, float(nxtValue)/float(len(sorted)), sorted[nxtValue]
-        break
+    fig7=plt.figure(7)
+    plt.plot(pedRowsFixed[1:100])
+    plt.xlabel('row number')
+    plt.suptitle(' Bias row means by row [1:100] ')
+    pdf.savefig()
+    plt.close()
 
-print 'darkcurr95 = ', darkcurr95, 'EO dark95 = ', segmentDark
+    fig5=plt.figure(5)
+    plt.plot(biasPedsY)
+    plt.xlabel('mean bias by overscan Y')
+    pdf.savefig()
+    plt.close()
+    
+    fig5=plt.figure(6)
+    plt.plot(biasPedsX)
+    plt.xlabel('mean bias by overscan X')
+    pdf.savefig()
+    plt.close()
+
+    sorted = np.sort(np.absolute(medianCurrent.flatten()))
+    index95 = int(len(sorted)*0.95)
+    print 'num pixels = ', len(sorted), ' 95 = ', index95
+    subset=sorted[index95-10:index95+30]
+    print(subset)
+    darkcurr95 = sorted[index95]
+    segmentDark = darkEOT1[device][ampHdu-1][0]
+
+    for nxtValue in range(index95,len(sorted)):
+        if sorted[nxtValue] != darkcurr95:
+            print 'Next dark value at ', nxtValue, float(nxtValue)/float(len(sorted)), sorted[nxtValue]
+            break
+
+    print 'darkcurr95 = ', darkcurr95, 'EO dark95 = ', segmentDark
 
     
 
