@@ -12,10 +12,24 @@ from findCCD import findCCD
 import statsmodels.api as smapi
 from statsmodels.formula.api import ols
 from matplotlib.backends.backend_pdf import PdfPages
+import argparse
 
-ccdType = 'ITL-3800C'
+
+## Command line arguments
+parser = argparse.ArgumentParser(description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
+
+##   The following are 'convenience options' which could also be specified in the filter string
+parser.add_argument('-s','--sensorID', default=None,help="(metadata) Sensor ID (default=%(default)s)")
+parser.add_argument('-c','--CCDType', default="ITL-3800C",help="(metadata) CCD vendor type (default=%(default)s)")
+parser.add_argument('-a','--amplifier', default=1,help="amplifier number (default=%(default)s)")
+parser.add_argument('-t','--type', default='dark',help="file kind (default=%(default)s)")
+args = parser.parse_args()
+
+
+ccdType = args.CCDType
 dataTypeFiles = 'SR-RCV-01'
-device = 'ITL-3800C-068'
+device = args.sensorID
+ampHdu = int(args.amplifier)
 
 fCCD= findCCD(mirrorName='vendorCopy-prod',FType='fits', XtraOpts='IMGTYPE="DARK"&&TESTTYPE="DARK"', testName='vendorIngest', CCDType=ccdType,
                   sensorId=device, dataType=dataTypeFiles)
@@ -23,7 +37,6 @@ fCCD= findCCD(mirrorName='vendorCopy-prod',FType='fits', XtraOpts='IMGTYPE="DARK
 files_test = fCCD.find()
 print files_test
 
-ampHdu = 13
 print ' Working on amp #', ampHdu
 
 gainName = ['fe55_analysis', 'gain']
@@ -54,13 +67,15 @@ darkEOT1  = eT.queryResultsDB(engine)
 #             "/Users/richard/LSST/Data/ITL-3800C-034/EOT-02/ITL-3800C-034_dark_dark_009_20160913074701.fits"
 #             ]
 
-files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_001_20161219091450.fits",
+#files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_001_20161219091450.fits",
 #             "/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_003_20161219091450.fits",
 #             "/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_005_20161219091450.fits",
 #             "/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_007_20161219091450.fits",
 #             "/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_009_20161219091450.fits"
-             ]
+#             ]
 
+files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_fe55_bias_000_20161219091441.fits"]   
+  
 
 imagesList = []
 biasPedsX = []
@@ -81,6 +96,7 @@ for file in files:
 #    pixels = pixeldata[int(datasec[0]):int(datasec[1]),int(datasec[2]):int(datasec[3])]
     pixels = pixeldata[int(datasec[2]):int(datasec[3]),int(datasec[0]):int(datasec[1])]
     print 'pixels shape = ', pixels.shape
+    print "pixels first 50 columns in row 1000", pixels[1000,0:50]
     
     biassec=hdulist[ampHdu].header['BIASSEC'][1:-1].replace(':',',').split(',')
 
@@ -124,6 +140,11 @@ for file in files:
     segmentGain = gainEOT1[device][ampHdu-1][0]
     print 'segmentGain = ', segmentGain
 
+    if expTime == 0.:
+        print "bias zero exposure - setting gain, expTime to 1"
+        expTime = 1.
+        segmentGain = 1.
+
     current = segmentGain*(pixels-pedRowsFixed[:,None])/expTime
     print 'current shape = ', current.shape
     
@@ -139,19 +160,26 @@ medianCurrent = np.median(asImages, axis=0)
 print medianCurrent.shape
 
 
-with PdfPages('dark_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
+with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
 
     fig1=plt.figure(1)
     plt.imshow(medianCurrent,cmap='hot',vmin=-0.1, vmax=0.1, origin='lower')
     plt.colorbar()
-    plt.suptitle(' Image region')
+    plt.suptitle(' Image region - currents')
+    pdf.savefig()
+    plt.close()
+
+    fig1=plt.figure(8)
+    plt.imshow(pixels,cmap='hot', origin='lower')
+    plt.colorbar()
+    plt.suptitle(' Image region - ADU')
     pdf.savefig()
     plt.close()
 
     fig6=plt.figure(6)
     plt.imshow(bias[0:200,0:49]-pedRowsFixed[0:200,None],cmap='hot', vmin=-20, vmax=20, origin='lower')
     plt.colorbar()
-    plt.suptitle(' Bias region - [0:200,0:49]')
+    plt.suptitle(' Bias region subtracted - [0:200,0:49] - ADUs')
     pdf.savefig()
     plt.close()
 
@@ -164,7 +192,7 @@ with PdfPages('dark_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
     fig4=plt.figure(4)
     plt.plot(medianCurrent[0:1999,200],'r')
     plt.xlabel('row number')
-    plt.suptitle(' Image current medians for row 200' )
+    plt.suptitle(' Image current medians for column 200' )
     pdf.savefig()
     plt.close()
 
