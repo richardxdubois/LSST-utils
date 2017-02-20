@@ -54,7 +54,7 @@ eT.setParams(schemaName=darkName[0], valueName=darkName[1])
 darkEOT1  = eT.queryResultsDB(engine)
 
 
-#files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_1_20170104201952.fits"]
+files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_1_20170104201952.fits"]
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_2_20170104202929.fits",
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_3_20170104203908.fits",
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_4_20170104204843.fits",
@@ -74,7 +74,7 @@ darkEOT1  = eT.queryResultsDB(engine)
 #             "/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_dark_dark_009_20161219091450.fits"
 #             ]
 
-files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_fe55_bias_000_20161219091441.fits"]   
+#files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_fe55_bias_000_20161219091441.fits"]   
   
 
 imagesList = []
@@ -113,6 +113,10 @@ for file in files:
     for rows in range(0,1999):
         pedRows[rows]= np.mean(bias[rows,:])
 
+    pixCols = np.array([0.]*508)
+    for cols in range(0,508):
+        pixCols[cols] = np.mean(pixels[:,cols])
+
     print 'First 20 pedRows = ', pedRows[0:20]
     print 'pedRows shape = ', pedRows.shape
 
@@ -128,11 +132,15 @@ for file in files:
     pedRowsFixed = pedRows
     for rows in outliers:
         pedRowsFixed[rows0] = rows[1]
-    
+
+# biasPedsY is column means for groups of columns 10 wide moving across the overscan
+        
     for b in range(5):
         biasPedsY.append(np.mean(pixeldata[int(biassec[2]):int(biassec[3]),(b)*10:(b+1)*10].flatten()))
 
-    for b in range(10):
+# biasPedsX is row means for groups of rows 200 wide moving up the overscan
+
+for b in range(10):
         biasPedsX.append(np.mean(pixeldata[b*200:(b+1)*200,int(biassec[0]):int(biassec[1])].flatten()))
 
         #    pixel_range = sigma_clipped_pixels.min(), sigma_clipped_pixels.max()
@@ -170,6 +178,13 @@ with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
     plt.close()
 
     fig1=plt.figure(8)
+    plt.imshow(pixels[0:100,300:500],cmap='hot', origin='lower', extent=[300,500, 0,100])
+    plt.colorbar()
+    plt.suptitle(' Image region zoomed - ADU')
+    pdf.savefig()
+    plt.close()
+
+    fig9=plt.figure(9)
     plt.imshow(pixels,cmap='hot', origin='lower')
     plt.colorbar()
     plt.suptitle(' Image region - ADU')
@@ -184,11 +199,21 @@ with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
     plt.close()
 
     fig2 = plt.figure(2)
-    plt.hist(medianCurrent.flatten(),bins=50, range=[-0.1,0.1])
+    range = [-0.1,0.1]
+    if expTime == 1.: range = [-10,10]
+    plt.hist(medianCurrent.flatten(),bins=50, range=range)
     fig2.suptitle(' current - pixel values')
     pdf.savefig()
     plt.close()
 
+    fig10=plt.figure(10)
+    plt.plot(pixCols)
+    fig10.suptitle(' Column means by column - ADU')
+    pdf.savefig()
+    plt.close()
+
+
+    
     fig4=plt.figure(4)
     plt.plot(medianCurrent[0:1999,200],'r')
     plt.xlabel('row number')
@@ -205,17 +230,18 @@ with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
 
     fig5=plt.figure(5)
     plt.plot(biasPedsY)
-    plt.xlabel('mean bias by overscan Y')
+    plt.xlabel('columns means bias by overscan for groups of 10 columns wide ')
     pdf.savefig()
     plt.close()
     
     fig5=plt.figure(6)
     plt.plot(biasPedsX)
-    plt.xlabel('mean bias by overscan X')
+    plt.xlabel('row means bias by overscan  for groups of rows 200 wide')
     pdf.savefig()
     plt.close()
 
-    sorted = np.sort(np.absolute(medianCurrent.flatten()))
+#    sorted = np.sort(np.absolute(medianCurrent.flatten()))
+    sorted = np.sort(medianCurrent.flatten())
     index95 = int(len(sorted)*0.95)
     print 'num pixels = ', len(sorted), ' 95 = ', index95
     subset=sorted[index95-10:index95+30]
@@ -223,12 +249,13 @@ with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
     darkcurr95 = sorted[index95]
     segmentDark = darkEOT1[device][ampHdu-1][0]
 
+    print 'darkcurr95 = ', darkcurr95, 'EO dark95 = ', segmentDark
+
     for nxtValue in range(index95,len(sorted)):
         if sorted[nxtValue] != darkcurr95:
             print 'Next dark value at ', nxtValue, float(nxtValue)/float(len(sorted)), sorted[nxtValue]
             break
 
-    print 'darkcurr95 = ', darkcurr95, 'EO dark95 = ', segmentDark
 
     
 
