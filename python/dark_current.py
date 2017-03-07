@@ -54,7 +54,7 @@ eT.setParams(schemaName=darkName[0], valueName=darkName[1])
 darkEOT1  = eT.queryResultsDB(engine)
 
 
-files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_1_20170104201952.fits"]
+#files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_1_20170104201952.fits"]
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_2_20170104202929.fits",
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_3_20170104203908.fits",
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_4_20170104204843.fits",
@@ -76,6 +76,8 @@ files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_1
 
 #files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_fe55_bias_000_20161219091441.fits"]   
   
+files = ["/Users/richard/LSST/Data/ETU2/ITL-3800C-041-Dev_dark_dark_000_4642D_20170219224445.fits"]   
+
 
 imagesList = []
 biasPedsX = []
@@ -87,7 +89,7 @@ for file in files:
     print 'Operating on ', file
     hdulist = fits.open(file)
     expTime = hdulist[0].header['EXPTIME']
-#    print textwrap.fill(str(hdulist[0].header),80)
+    print textwrap.fill(str(hdulist[ampHdu].header),80)
 #    print textwrap.fill(str(hdulist[2].header),80)
 
     datasec=hdulist[ampHdu].header['DATASEC'][1:-1].replace(':',',').split(',')
@@ -98,8 +100,12 @@ for file in files:
     print 'pixels shape = ', pixels.shape
     print "pixels first 50 columns in row 1000", pixels[1000,0:50]
     
-    biassec=hdulist[ampHdu].header['BIASSEC'][1:-1].replace(':',',').split(',')
+#    biassec=hdulist[ampHdu].header['BIASSEC'][1:-1].replace(':',',').split(',')
+# hardwwire biassec for rafts for now
 
+    biassec =  ['513', '562', '1', '2000']
+    print 'biassec = ', biassec
+    
     bias = np.array(pixeldata[int(biassec[2]):int(biassec[3]),int(biassec[0]):int(biassec[1])])
 
 # seeing a change in mean bias moving across the overscan region
@@ -141,7 +147,7 @@ for file in files:
 # biasPedsX is row means for groups of rows 200 wide moving up the overscan
 
 for b in range(10):
-        biasPedsX.append(np.mean(pixeldata[b*200:(b+1)*200,int(biassec[0]):int(biassec[1])].flatten()))
+    biasPedsX.append(np.mean(pixeldata[b*200:(b+1)*200,int(biassec[0]):int(biassec[1])].flatten()))
 
         #    pixel_range = sigma_clipped_pixels.min(), sigma_clipped_pixels.max()
 #    plt.hist(pixels.flatten(),bins=50,range=pixel_range)
@@ -241,20 +247,20 @@ with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
     plt.close()
 
 #    sorted = np.sort(np.absolute(medianCurrent.flatten()))
-    sorted = np.sort(medianCurrent.flatten())
-    index95 = int(len(sorted)*0.95)
-    print 'num pixels = ', len(sorted), ' 95 = ', index95
-    subset=sorted[index95-10:index95+30]
-    print(subset)
-    darkcurr95 = sorted[index95]
-    segmentDark = darkEOT1[device][ampHdu-1][0]
+sorted = np.sort(medianCurrent.flatten())
+index95 = int(len(sorted)*0.95)
+print 'num pixels = ', len(sorted), ' 95 = ', index95
+subset=sorted[index95-10:index95+30]
+print(subset)
+darkcurr95 = sorted[index95]
+segmentDark = darkEOT1[device][ampHdu-1][0]
 
-    print 'darkcurr95 = ', darkcurr95, 'EO dark95 = ', segmentDark
+print 'darkcurr95 = ', darkcurr95, 'EO dark95 = ', segmentDark
 
-    for nxtValue in range(index95,len(sorted)):
-        if sorted[nxtValue] != darkcurr95:
-            print 'Next dark value at ', nxtValue, float(nxtValue)/float(len(sorted)), sorted[nxtValue]
-            break
+for nxtValue in range(index95,len(sorted)):
+    if sorted[nxtValue] != darkcurr95:
+        print 'Next dark value at ', nxtValue, float(nxtValue)/float(len(sorted)), sorted[nxtValue]
+        break
 
 
     
