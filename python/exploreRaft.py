@@ -3,9 +3,9 @@ import connection
 
 class exploreRaft():
 
-    def __init__(self):
+    def __init__(self, db='Prod'):
 
-        self.connect = connection.Connection('richard', db='Dev', exp='LSST-CAMERA', prodServer=True)
+        self.connect = connection.Connection('richard', db=db, exp='LSST-CAMERA', prodServer=True)
 
     def raftContents(self, raftName=None):
         kwds = {'experimentSN':raftName, 'htype':'LCA-11021_RTM', 'noBatched':'true'}
@@ -57,11 +57,38 @@ class exploreRaft():
 
         return parentRTM
 
+    def REB_parent(self, REB_name=None):
+    
+# now find raft for a REB
+
+        kwds = {'experimentSN': REB_name, 'htype':'LCA-13574', 'noBatched':'true'}   # need to fix REB htype!
+
+        response = self.connect.getContainingHardware(**kwds)
+
+        for child in response:
+            if 'RTM' in child['parent_experimentSN']:
+                parentRTM = child['parent_experimentSN']
+                break
+
+        return parentRTM
+
+    def REB_CCD(self, REB_name=None):
+
+        raft = self.REB_parent(REB_name)
+        ccd_list = self.raftContents(raft)
+
+        ccd_in_reb = []
+        for ccd in ccd_list:
+            if REB_name == ccd[2]: ccd_in_reb.append(ccd[0])
+
+        return ccd_in_reb
+
+    
 if __name__ == "__main__":
 
     raftName = 'LCA-11021_RTM-004_ETU2-Dev'
 
-    eR = exploreRaft()
+    eR = exploreRaft(db='Dev')
 
     ccd_list = eR.raftContents(raftName)
 
@@ -72,4 +99,10 @@ if __name__ == "__main__":
     parentRaft = eR.CCD_parent(CCD_name,'ITL-CCD')
 
     print CCD_name, "'s parent raft = ", parentRaft
+
+    reb_parent = eR.REB_parent('LCA-13574-003')
+    print 'parent raft of LCA-13574-003 is ', reb_parent
+
+    reb_ccds = eR.REB_CCD('LCA-13574-003')
+    print 'CCDs on REB LCA-13574-003 are ', reb_ccds
 

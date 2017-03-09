@@ -31,11 +31,10 @@ dataTypeFiles = 'SR-RCV-01'
 device = args.sensorID
 ampHdu = int(args.amplifier)
 
-fCCD= findCCD(mirrorName='vendorCopy-prod',FType='fits', XtraOpts='IMGTYPE="DARK"&&TESTTYPE="DARK"', testName='vendorIngest', CCDType=ccdType,
-                  sensorId=device, dataType=dataTypeFiles)
+# fCCD= findCCD(mirrorName='vendorCopy-prod',FType='fits', XtraOpts='IMGTYPE="DARK"&&TESTTYPE="DARK"', testName='vendorIngest', CCDType=ccdType,sensorId=device, dataType=dataTypeFiles)
 
-files_test = fCCD.find()
-print files_test
+#files_test = fCCD.find()
+#print files_test
 
 print ' Working on amp #', ampHdu
 
@@ -53,6 +52,9 @@ eT.setParams(schemaName=darkName[0], valueName=darkName[1])
 
 darkEOT1  = eT.queryResultsDB(engine)
 
+# TS-3
+#files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_bias_000_20170104200232.fits"]
+
 
 #files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_1_20170104201952.fits"]
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_2_20170104202929.fits",
@@ -60,7 +62,7 @@ darkEOT1  = eT.queryResultsDB(engine)
 #           "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_4_20170104204843.fits",
 #            "/Users/richard/LSST/Data/ITL-3800C-034/EOT-1/ITL-3800C-034_dark_dark_5_20170104205822.fits" ]
 
-#files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-02/ITL-3800C-034_dark_dark_001_20160913074701.fits",
+#files = ["/Users/richard/LSST/Data/ITL-3800C-034/EOT-02/ITL-3800C-034_dark_dark_001_20160913074701.fits"]
 #             "/Users/richard/LSST/Data/ITL-3800C-034/EOT-02/ITL-3800C-034_dark_dark_003_20160913074701.fits",
 #             "/Users/richard/LSST/Data/ITL-3800C-034/EOT-02/ITL-3800C-034_dark_dark_005_20160913074701.fits",
 #             "/Users/richard/LSST/Data/ITL-3800C-034/EOT-02/ITL-3800C-034_dark_dark_007_20160913074701.fits",
@@ -76,8 +78,13 @@ darkEOT1  = eT.queryResultsDB(engine)
 
 #files = ["/Users/richard/LSST/Data/ITL-3800C-068/EOT-02/ITL-3800C-068_fe55_bias_000_20161219091441.fits"]   
   
-files = ["/Users/richard/LSST/Data/ETU2/ITL-3800C-041-Dev_dark_dark_000_4642D_20170219224445.fits"]   
+#files = ["/Users/richard/LSST/Data/ETU2/ITL-3800C-041-Dev_dark_dark_000_4642D_20170219224445.fits"]   
 
+#files = ["/Users/richard/LSST/Data/ITL-3800C-145/ETU2/ITL-3800C-145-Dev_fe55_bias_000_4689D_20170302045344.fits"]
+
+files = ["/Users/richard/LSST/Data/ITL-3800C-145/ETU2/ITL-3800C-145-Dev_fe55_bias_000_4689D_20170302045344.fits"]
+
+#files = ["/Users/richard/LSST/Data/ITL-3800C-145/ETU2/ITL-3800C-145-Dev_fe55_bias_000_4701D_20170307003226.fits"]
 
 imagesList = []
 biasPedsX = []
@@ -206,7 +213,7 @@ with PdfPages(args.type + '_' + device + '_amp_' + str(ampHdu) + '.pdf') as pdf:
 
     fig2 = plt.figure(2)
     range = [-0.1,0.1]
-    if expTime == 1.: range = [-10,10]
+    if expTime == 1.: range = [-200,100]
     plt.hist(medianCurrent.flatten(),bins=50, range=range)
     fig2.suptitle(' current - pixel values')
     pdf.savefig()
