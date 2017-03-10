@@ -1,11 +1,12 @@
-import commands
-import connection
+#import commands
+#import connection
+from  eTraveler.clientAPI.connection import Connection
 
 class exploreRaft():
 
     def __init__(self, db='Prod'):
 
-        self.connect = connection.Connection('richard', db=db, exp='LSST-CAMERA', prodServer=True)
+        self.connect = Connection('richard', db=db, exp='LSST-CAMERA', prodServer=True)
 
     def raftContents(self, raftName=None):
         kwds = {'experimentSN':raftName, 'htype':'LCA-11021_RTM', 'noBatched':'true'}
