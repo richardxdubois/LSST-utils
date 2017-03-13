@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser(description='Find archived data in the LSST  da
 parser.add_argument('-r','--raftID', default=None,help="(metadata) Raft ID (default=%(default)s)")
 parser.add_argument('--run', default=None,help="(raft run number (default=%(default)s)")
 parser.add_argument('-s','--schema', default=None,help="(metadata) schema (default=%(default)s)")
+parser.add_argument('-X','--XtraOpts',default=None,help="any extra 'datacat find' options (default=%(default)s)")
 args = parser.parse_args()
 
 
@@ -51,7 +52,7 @@ for row in ccd_list:
     except:
         pass
 
-    gN = get_read_noise(testName='fe55_raft_acq', CCDType='ITL-CCD', sensorId=ccd, run=args.run, db_connect='devdb_connect.txt')
+    gN = get_read_noise(testName='fe55_raft_acq', CCDType='ITL-CCD', sensorId=ccd, run=args.run, db_connect='devdb_connect.txt',XtraOpts=args.XtraOpts)
     RTM_noise_list = gN.get_noise()
     for row in RTM_noise_list:
         test_table[row[0]][2] = row[2] 

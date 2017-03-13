@@ -8,23 +8,23 @@ from findCCD_v2 import findCCD_v2
 
 class get_read_noise():
 
-    def __init__(self, testName=None, CCDType=None,sensorId=None,  run= None, db_connect='db_connect.txt'):
+    def __init__(self, testName=None, CCDType=None,sensorId=None,  XtraOpts = None, run= None, db_connect='db_connect.txt'):
 
        self.testName = testName
        self.CCDType = CCDType
        self.sensorId =sensorId
        self.run = run
+       self.XtraOpts = XtraOpts
        self.db_connect = db_connect
        
 
     def get_noise(self):
         
-       fCCD= findCCD_v2(FType='fits', testName=self.testName, CCDType=self.CCDType,sensorId=self.sensorId, dataType='SR-RTM-EOT-03', run= self.run, db_connect=self.db_connect)
+       fCCD= findCCD_v2(FType='fits', testName=self.testName, CCDType=self.CCDType,sensorId=self.sensorId, dataType='SR-RTM-EOT-03', run= self.run, db_connect=self.db_connect, XtraOpts=self.XtraOpts)
 
-       files_test = fCCD.find()
+       files = fCCD.find()
 
-       files = ["/Users/richard/LSST/Data/ITL-3800C-145/ETU2/ITL-3800C-145-Dev_fe55_bias_000_4714D_20170309232824.fits"]
-
+#       files = ["/Users/richard/LSST/Data/ITL-3800C-145/ETU2/ITL-3800C-145-Dev_fe55_bias_000_4714D_20170309232824.fits"]
 
        # see LSSTTD-437 for treatment of bias using bias files, not (only) the overscan region.
 
@@ -49,6 +49,8 @@ class get_read_noise():
                sigma = np.std(bias_sub)
 
                noise_list.append([amp, pedestal, sigma])
+
+           break   # just do one file
 
        return noise_list
 
