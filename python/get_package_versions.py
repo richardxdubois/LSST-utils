@@ -20,15 +20,15 @@ eT.connectDB()
 
 # specify run number
 
-print 'Finding package versions for run number: ', args.run
+print 'Finding package versions for run number: ', args.run, args.schema
 
 runData = eT.getRunResults(args.run, schemaName=args.schema )
 
 versions = []
-for s in runData['schemas']:
-    pdict = runData['schemas'][s]
-    for p in pdict:
-        for instance in pdict[p]:
+for s in runData['steps']:
+    schdict = runData['steps'][s]
+    for p in schdict:
+        for instance in schdict[p]:
             if instance[args.key1] == 'string': continue
             versions.append([instance[args.key1], instance[args.key2]])
     break
