@@ -30,7 +30,7 @@ ccd_list = eR.raftContents(raft)
 
 for row in ccd_list:
     ccd = row[0].split('-Dev')[0]
-    print ccd
+    print row
     print 'Amplifier           Vendor EOT-02         TS3 EOT-1            TS8'
     
     test_table = {}
@@ -38,14 +38,21 @@ for row in ccd_list:
     returnDataVendor  = eT.getResultsJH(schemaName=schema, htype='ITL-CCD', travelerName='SR-EOT-02', experimentSN=ccd)
 
     expDict = returnDataVendor[ccd]
+    stepDict = expDict['steps']['read_noise_offline']
 
-    for d in returnDataVendor[ccd]['instances']:
+    schemaList = stepDict[schema]
+    for d in schemaList:
         if d['schemaInstance'] == 0: continue
         test_table[d['amp']] = [d['read_noise'], -99., -99.]
 
     try:
         returnDataTS3  = eT.getResultsJH(schemaName=schema, htype='ITL-CCD', travelerName='SR-EOT-1', experimentSN=ccd)
-        for d in returnDataTS3[ccd]['instances']:
+
+        expDict = returnDataVendor[ccd]
+
+        stepDict = expDict['steps']['read_noise_offline']
+        schemaList = stepDict[schema]
+        for d in schemaList:
             if d['schemaInstance'] == 0: continue
             test_table[d['amp']][1] = d['read_noise']
 
