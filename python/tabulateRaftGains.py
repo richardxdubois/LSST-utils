@@ -12,6 +12,8 @@ parser.add_argument('-r','--raftID', default=None,help="(metadata) Raft ID (defa
 parser.add_argument('--run', default=None,help="(raft run number (default=%(default)s)")
 parser.add_argument('-s','--schema', default=None,help="(metadata) schema (default=%(default)s)")
 parser.add_argument('-X','--XtraOpts',default=None,help="any extra 'datacat find' options (default=%(default)s)")
+parser.add_argument('-d','--db',default='db_connect.txt',help="database connect file (default=%(default)s)")
+parser.add_argument('-e','--eTdb',default='Prod',help="eTraveler database (default=%(default)s)")
 args = parser.parse_args()
 
 
@@ -20,8 +22,8 @@ schema = args.schema
 
 print 'Searching ', raft, ' for ', schema
 
-eR = exploreRaft(db='Dev')
-eT = getResults( dbConnectFile='devdb_connect.txt')
+eR = exploreRaft(db=args.eTdb)
+eT = getResults( dbConnectFile=args.db)
 
 eT.connectDB()
 

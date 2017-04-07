@@ -13,6 +13,8 @@ parser.add_argument('-r','--raftID', default=None,help="(metadata) Raft ID (defa
 parser.add_argument('--run', default=None,help="(raft run number (default=%(default)s)")
 parser.add_argument('-s','--schema', default=None,help="(metadata) schema (default=%(default)s)")
 parser.add_argument('-X','--XtraOpts',default=None,help="any extra 'datacat find' options (default=%(default)s)")
+parser.add_argument('-d','--db',default='db_connect.txt',help="database connect file (default=%(default)s)")
+parser.add_argument('-e','--eTdb',default='Prod',help="eTraveler database (default=%(default)s)")
 args = parser.parse_args()
 
 
@@ -21,22 +23,23 @@ schema = args.schema
 
 print 'Searching ', raft, ' for ', schema
 
-eR = exploreRaft(db='Dev')
-eT = getResults( dbConnectFile='db_connect.txt')
+eR = exploreRaft(db=args.eTdb)
+eT = getResults( dbConnectFile=args.db)
 
 eT.connectDB()
 
 ccd_list = eR.raftContents(raft)
 
 for row in ccd_list:
-    ccd = row[0].split('-Dev')[0]
+#    ccd = row[0].split('-Dev')[0]
+    ccd = str(row[0])
     print row
     print 'Amplifier           Vendor EOT-02         TS3 EOT-1            TS8'
     
     test_table = {}
     
     returnDataVendor  = eT.getResultsJH(schemaName=schema, htype='ITL-CCD', travelerName='SR-EOT-02', experimentSN=ccd)
-
+ 
     expDict = returnDataVendor[ccd]
     stepDict = expDict['steps']['read_noise_offline']
 
@@ -59,10 +62,18 @@ for row in ccd_list:
     except:
         pass
 
-    gN = get_read_noise(testName='fe55_raft_acq', CCDType='ITL-CCD', sensorId=ccd, run=args.run, db_connect='devdb_connect.txt',XtraOpts=args.XtraOpts)
-    RTM_noise_list = gN.get_noise()
-    for row in RTM_noise_list:
-        test_table[row[0]][2] = row[2] 
+
+    returnDataTS8  = eT.getRunResults(args.run,itemFilter=('sensor_id', ccd))
+    
+    for step in returnDataTS8['steps']:
+        stepDict = returnDataTS8['steps'][step]
+
+        for schemaList in stepDict:
+            if schemaList == 'read_noise_raft':
+                for d in stepDict[schemaList]:
+                    if d['schemaInstance'] == 0: continue
+                    test_table[d['amp']][2] = d['read_noise']
+
     
     for amp in test_table:
         print "%8i              %6.2f              %6.2f             %6.2f" % (amp, test_table[amp][0], test_table[amp][1], test_table[amp][2])
