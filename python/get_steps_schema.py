@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser(description='Find archived data in the LSST  da
 
 ##   The following are 'convenience options' which could also be specified in the filter string
 parser.add_argument('-r', '--run', default=None,help="(raft run number (default=%(default)s)")
-parser.add_argument('--db', default='devdb_connect.txt',help="db connect file for getResults ")
+parser.add_argument('--db', default='db_connect.txt',help="db connect file for getResults ")
 args = parser.parse_args()
 
 print 'Discover step and schema names for run ', args.run
