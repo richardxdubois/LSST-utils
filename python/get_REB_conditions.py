@@ -33,13 +33,11 @@ cursor = mysql_connection.cursor()
 # LCA-13574 is the REB.
 
 sql = "select hw.lsstId, res.activityId, act.rootActivityId, ip.label, res.value, ip.id from IntResultManual res join Activity act on res.activityId=act.id JOIN Hardware hw ON act.hardwareId=hw.id join Process pr on act.processId=pr.id join InputPattern ip on  res.inputPatternId=ip.id where pr.name='" + args.stepName + "' and ip.id=1685 order by res.activityId asc"
-print sql
 
 result = engine.execute(sql)
 table_dict = {}
 label_dict = {}
 new_reb = ''
-print result
 
 for res in result:
     reb = res['lsstId']
