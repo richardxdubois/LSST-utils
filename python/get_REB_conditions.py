@@ -6,10 +6,11 @@ import argparse
 parser = argparse.ArgumentParser(description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
 
 ##   The following are 'convenience options' which could also be specified in the filter string
-parser.add_argument('-s','--stepName', default="SR-REB-VER-01_step6",help="step name in traveler (default=%(default)s)")
+parser.add_argument('-s','--stepName', default="SR-REB-INS-03_step4",help="step name in traveler (default=%(default)s)")
 parser.add_argument('--minREB', default=0,help="min REB number (default=%(default)s)")
 parser.add_argument('--maxREB', default=1000,help="max REB number (default=%(default)s)")
 parser.add_argument('--db', default='db_connect.txt',help="db connect file (default=%(default)s)")
+args = parser.parse_args()
 
 kwds = {}
 with open(args.db) as f:
@@ -31,12 +32,14 @@ cursor = mysql_connection.cursor()
 
 # LCA-13574 is the REB.
 
-sql = "select hw.lsstId, res.activityId, act.rootActivityId, ip.label, res.value from IntResultManual res join Activity act on res.activityId=act.id JOIN Hardware hw ON act.hardwareId=hw.id join Process pr on act.processId=pr.id join InputPattern ip on  res.inputPatternId=ip.id where pr.name='SR-REB-INS-03_step4' and ip.id=1685 order by res.activityId asc"
+sql = "select hw.lsstId, res.activityId, act.rootActivityId, ip.label, res.value, ip.id from IntResultManual res join Activity act on res.activityId=act.id JOIN Hardware hw ON act.hardwareId=hw.id join Process pr on act.processId=pr.id join InputPattern ip on  res.inputPatternId=ip.id where pr.name='" + args.stepName + "' and ip.id=1685 order by res.activityId asc"
+print sql
 
 result = engine.execute(sql)
 table_dict = {}
 label_dict = {}
 new_reb = ''
+print result
 
 for res in result:
     reb = res['lsstId']
