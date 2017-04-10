@@ -1,11 +1,22 @@
 import sqlalchemy
+import argparse
+
+
+## Command line arguments
+parser = argparse.ArgumentParser(description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
+
+##   The following are 'convenience options' which could also be specified in the filter string
+parser.add_argument('-s','--stepName', default="SR-REB-VER-01_step6",help="step name in traveler (default=%(default)s)")
+parser.add_argument('--minREB', default=0,help="min REB number (default=%(default)s)")
+parser.add_argument('--maxREB', default=1000,help="max REB number (default=%(default)s)")
+parser.add_argument('--db', default='db_connect.txt',help="db connect file (default=%(default)s)")
 
 kwds = {}
-kwds['username'] = 'rd_lsst_cam_ro'
-kwds['password'] = '2chmu#2do'
-kwds['host'] = 'mysql-node03.slac.stanford.edu'
-kwds['port'] = '3306'
-kwds['database'] = 'rd_lsst_cam'
+with open(args.db) as f:
+    for line in f:
+        (key, val) = line.split()
+        kwds[key] = val
+
 
 # extract manually submited currents from REB testing
 
@@ -29,6 +40,9 @@ new_reb = ''
 
 for res in result:
     reb = res['lsstId']
+    reb_num = int(reb.split("-")[-1])
+    if reb_num < int(args.minREB) or reb_num > int(args.maxREB): continue
+
     if reb not in table_dict: table_dict[reb]={}
     value = res['value']
     label = res['label'].split('at')[-1]

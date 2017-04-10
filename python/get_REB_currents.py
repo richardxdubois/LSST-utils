@@ -9,16 +9,15 @@ parser = argparse.ArgumentParser(description='Find archived data in the LSST  da
 parser.add_argument('-s','--stepName', default="SR-REB-VER-01_step6",help="step name in traveler (default=%(default)s)")
 parser.add_argument('--minREB', default=0,help="min REB number (default=%(default)s)")
 parser.add_argument('--maxREB', default=1000,help="max REB number (default=%(default)s)")
+parser.add_argument('--db', default='db_connect.txt',help="db connect file (default=%(default)s)")
 args = parser.parse_args()
 
-
-
 kwds = {}
-kwds['username'] = 'rd_lsst_cam_ro'
-kwds['password'] = '2chmu#2do'
-kwds['host'] = 'mysql-node03.slac.stanford.edu'
-kwds['port'] = '3306'
-kwds['database'] = 'rd_lsst_cam'
+with open(args.db) as f:
+    for line in f:
+        (key, val) = line.split()
+        kwds[key] = val
+
 
 # extract manually submited currents from REB testing
 
