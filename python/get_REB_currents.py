@@ -1,4 +1,17 @@
 import sqlalchemy
+import argparse
+
+
+## Command line arguments
+parser = argparse.ArgumentParser(description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
+
+##   The following are 'convenience options' which could also be specified in the filter string
+parser.add_argument('-s','--stepName', default="SR-REB-VER-01_step6",help="step name in traveler (default=%(default)s)")
+parser.add_argument('--minREB', default=0,help="min REB number (default=%(default)s)")
+parser.add_argument('--maxREB', default=1000,help="max REB number (default=%(default)s)")
+args = parser.parse_args()
+
+
 
 kwds = {}
 kwds['username'] = 'rd_lsst_cam_ro'
@@ -20,15 +33,20 @@ cursor = mysql_connection.cursor()
 
 # LCA-13574 is the REB.
 
-sql = "select hw.lsstId, res.activityId, act.rootActivityId, ip.label, res.value from StringResultManual res join Activity act on res.activityId=act.id JOIN Hardware hw ON act.hardwareId=hw.id join Process pr on act.processId=pr.id join InputPattern ip on  res.inputPatternId=ip.id where pr.name='SR-REB-VER-01_step6' order by res.activityId asc"
+sql = "select hw.lsstId, res.activityId, act.rootActivityId, ip.label, res.value from StringResultManual res join Activity act on res.activityId=act.id JOIN Hardware hw ON act.hardwareId=hw.id join Process pr on act.processId=pr.id join InputPattern ip on  res.inputPatternId=ip.id where pr.name='" + args.stepName + "' order by res.activityId asc"
 
 result = engine.execute(sql)
 table_dict = {}
 label_dict = {}
 new_reb = ''
 
+print 'min, max REB ', args.minREB, args.maxREB
+
 for res in result:
     reb = res['lsstId']
+    reb_num = int(reb.split("-")[-1])
+    if reb_num < int(args.minREB) or reb_num > int(args.maxREB): continue
+        
     if reb not in table_dict: table_dict[reb]={}
     value = res['value']
     label = res['label'].split('at')[-1]
