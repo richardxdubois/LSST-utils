@@ -10,7 +10,10 @@ class findCCD_v2():
 
     def __init__(self, mirrorName='BNL-prod', FType=None, XtraOpts=None, testName=None, CCDType=None, sensorId=None, run=None, outputFile=None, dataType=None, site='slac.lca.archive', Print=False, db='Prod', prodServer='Prod'):
 
-        if None in (mirrorName, testName, sensorId, run):
+        if mirrorName == 'vendor': chk_list = (sensorId)
+        else: chk_list = (mirrorName, testName, sensorId, run)
+            
+        if None in chk_list:
             print 'Error: missing input to findCCD'
             raise ValueError
             
@@ -45,8 +48,7 @@ class findCCD_v2():
             'BNL-test': 'BNL-test/test/',
             'vendorCopy-prod': 'SLAC-prod/prod/',
             'vendorCopy-test': 'SLAC-test/test/',
-            'vendor-prod': 'vendorData/',
-            'vendor-test': 'vendorData/',
+            'vendor': 'vendorData/',
             'SAWG-BNL': 'BNL-SAWG/SAWG/'
             }
 
@@ -61,12 +63,13 @@ class findCCD_v2():
         if (self.mirrorName == 'vendorCopy'):
             site = "SLAC"
         elif (self.mirrorName == 'vendor'):              
-            folder = folder + sourceMap[source] + self.CCDType  + '/' + self.sensorId + '/' + self.db + '/'
+            folder = folder + sourceMap['vendor'] + self.CCDType.split('-')[0]  + '/' + self.sensorId + '/' + self.db + '/'
+            use_latest_activity = True
             site = "slac.lca.archive"
             use_query_eT = False
         elif (self.mirrorName == 'SAWG-BNL'):
             folder = folder + 'mirror/' + sourceMap[self.mirrorName] + self.CCDType  + '/' + self.sensorId + '/' + self.testName
-            use_latest_activity = False
+            use_latest_activity = True
             use_query_eT = False
 
         folderList = []
@@ -160,7 +163,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 
-	fCCD= findCCD_v2(mirrorName=args.mirrorName, FType=args.FType, XtraOpts=args.XtraOpts, testName=args.testName, sensorId=args.sensorID, outputFile=args.outputFile, Print=args.Print, run=args.run, db=args.db, prodServer=args.server )
+	fCCD= findCCD_v2(mirrorName=args.mirrorName, FType=args.FType, XtraOpts=args.XtraOpts, testName=args.testName, sensorId=args.sensorID, outputFile=args.outputFile, Print=args.Print, run=args.run, db=args.db, prodServer=args.server, site=args.site )
 
 	files = fCCD.find()
 
