@@ -3,14 +3,14 @@ from DataCatalog import *
 import subprocess
 import shlex
 import os
-from getResults import getResults
+from  eTraveler.clientAPI.connection import Connection
 
 
 class findCCD_v2():
 
-    def __init__(self, mirrorName='BNL-prod', FType=None, XtraOpts=None, testName=None, CCDType=None, sensorId=None, run=None, outputFile=None, dataType=None, site='slac.lca.archive', Print=False, db_connect='db_connect.txt'):
+    def __init__(self, mirrorName='BNL-prod', FType=None, XtraOpts=None, testName=None, CCDType=None, sensorId=None, run=None, outputFile=None, dataType=None, site='slac.lca.archive', Print=False, db='Prod', prodServer='Prod'):
 
-        if None in (mirrorName, testName, sensorId, dataType, CCDType):
+        if None in (mirrorName, testName, sensorId, run):
             print 'Error: missing input to findCCD'
             raise ValueError
             
@@ -18,23 +18,22 @@ class findCCD_v2():
         self.FType = FType
         self.XtraOpts = XtraOpts
         self.testName = testName
-        self.CCDType = CCDType
+        
         self.sensorId = sensorId
         self.outputFile = outputFile
         self.dataType = dataType
         self.site = site
         self.Print = Print
         self.run = run
-        self.db_connect = db_connect
+        self.db = db
+        self.prodServer = prodServer
 
-        schemaName =  self.testName
-        valueName =  self.testName
-        ccdType = self.CCDType
-        dataType = self.dataType
-
-        self.eT = getResults( dbConnectFile= self.db_connect)
-
-        self.engine = self.eT.connectDB()
+        if 'ITL' in self.sensorId: self.CCDType = "ITL-CCD"
+        if 'E2V' in self.sensorId: self.CCDType = "e2v-CCD"
+        pS = True
+        if self.prodServer == 'Dev': pS = False
+        
+        self.connect = Connection(operator='richard', db=db, exp='LSST-CAMERA', prodServer=pS)
 
 
 
@@ -59,15 +58,10 @@ class findCCD_v2():
         site = self.site
         use_query_eT = True
 
-        if (self.mirrorName == 'vendorCopy-prod' or self.mirrorName == 'vendorCopy-test'):
-    #		query = "TESTTYPE IS NOT NULL"
+        if (self.mirrorName == 'vendorCopy'):
             site = "SLAC"
-        elif (self.mirrorName == 'vendor-prod'):
-            folder = folder + sourceMap[self.mirrorName] + self.CCDType  + '/' + self.sensorId + '/Prod/'
-            site = "slac.lca.archive"
-            use_query_eT = False
-        elif (self.mirrorName == 'vendor-test'):
-            folder = folder + sourceMap[self.mirrorName] + self.CCDType  + '/' + self.sensorId + '/Dev/'
+        elif (self.mirrorName == 'vendor'):              
+            folder = folder + sourceMap[source] + self.CCDType  + '/' + self.sensorId + '/' + self.db + '/'
             site = "slac.lca.archive"
             use_query_eT = False
         elif (self.mirrorName == 'SAWG-BNL'):
@@ -78,14 +72,16 @@ class findCCD_v2():
         folderList = []
 
         if use_query_eT is True:
-            filePaths  = self.eT.getFilepaths(self.run, self.testName)
+            kwds = {'run':self.run, 'stepName':self.testName}
+            filePaths  = self.connect.getRunFilepaths(**kwds)
 # get the unique directory paths
 
             for test in filePaths:
                 for f in filePaths[test]:
-                    dirpath = os.path.dirname(f) + '/'
+
+                    dirpath = os.path.dirname(f['virtualPath']) + '/'
                     if dirpath not in folderList:
-                        if self.sensorId in os.path.basename(f): folderList.append(dirpath)
+                        if self.sensorId in os.path.basename(f['virtualPath']): folderList.append(dirpath)
         else:
             folderList.append(folder)
         
@@ -142,13 +138,11 @@ if __name__ == "__main__":
 	parser.add_argument('-A','--activityId',default=None,help="find data by test activityId")
 	parser.add_argument('-s','--sensorID', default=None,help="(metadata) Sensor ID (default=%(default)s)")
 	parser.add_argument('-T','--testName', default=None,help="(metadata) test type (default=%(default)s)")
-	parser.add_argument('-c','--CCDType', default="ITL",help="(metadata) CCD vendor type (default=%(default)s)")
 	parser.add_argument('-S','--site', default="slac.lca.archive",help="File location (default=%(default)s) ")
 	parser.add_argument('-F','--FType', default=None,help="File type (default=%(default)s)")
-	parser.add_argument('-q','--qType', default=None,help="query type - report or blank (default all) ")
-	parser.add_argument('-d','--dataType', default=None,help="test type (SR-EOT-1, etc) ")
 	parser.add_argument('-r','--run', default=None,help="optional run number ")
-	parser.add_argument('--db', default='devdb_connect.txt',help="db connect file for getResults ")
+	parser.add_argument('--db', default='Prod',help="Prod or Dev eT db ")
+	parser.add_argument('--server', default='Prod',help="Prod or Dev eT server ")
 
 	## Limit dataCatalog search to specified parts of the catalog
 	parser.add_argument('-m','--mirrorName',default='BNL-prod',help="mirror name to search, i.e. in dataCat /LSST/mirror/<mirrorName> (default=%(default)s)")
@@ -166,7 +160,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 
-	fCCD= findCCD_v2(mirrorName=args.mirrorName, FType=args.FType, XtraOpts=args.XtraOpts, testName=args.testName, CCDType=args.CCDType, sensorId=args.sensorID, outputFile=args.outputFile, dataType=args.dataType, site=args.site, Print=args.Print, run=args.run, db_connect=args.db )
+	fCCD= findCCD_v2(mirrorName=args.mirrorName, FType=args.FType, XtraOpts=args.XtraOpts, testName=args.testName, sensorId=args.sensorID, outputFile=args.outputFile, Print=args.Print, run=args.run, db=args.db, prodServer=args.server )
 
 	files = fCCD.find()
 

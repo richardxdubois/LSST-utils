@@ -1,5 +1,5 @@
-from getResults import getResults
 from exploreRaft import exploreRaft
+from  eTraveler.clientAPI.connection import Connection
 
 import argparse
 
@@ -10,35 +10,37 @@ parser = argparse.ArgumentParser(description='Find archived data in the LSST  da
 ##   The following are 'convenience options' which could also be specified in the filter string
 parser.add_argument('-r','--raftID', default=None,help="(metadata) Raft ID (default=%(default)s)")
 parser.add_argument('--run', default=None,help="(raft run number (default=%(default)s)")
-parser.add_argument('-s','--schema', default=None,help="(metadata) schema (default=%(default)s)")
-parser.add_argument('-X','--XtraOpts',default=None,help="any extra 'datacat find' options (default=%(default)s)")
-parser.add_argument('-d','--db',default='db_connect.txt',help="database connect file (default=%(default)s)")
-parser.add_argument('-e','--eTdb',default='Prod',help="eTraveler database (default=%(default)s)")
+parser.add_argument('-d','--db',default='Prod',help="database to use (default=%(default)s)")
+parser.add_argument('-e','--eTserver',default='Prod',help="eTraveler server (default=%(default)s)")
 args = parser.parse_args()
 
 
 raft = args.raftID
-schema = args.schema
+if args.eTserver == 'Prod': pS = True
+else: pS = False
 
-print 'Searching ', raft, ' for ', schema
+print 'Searching ', raft, ' for ', args.db , 'database and server is ', args.eTserver
 
-eR = exploreRaft(db=args.eTdb)
-eT = getResults( dbConnectFile=args.db)
+eR = exploreRaft(db=args.db, prodServer=args.eTserver)
 
-eT.connectDB()
+connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS)
+kwds = {'run':args.run}
 
 ccd_list = eR.raftContents(raft)
 
 
 for row in ccd_list:
     ccd = str(row[0])
-    print ccd
-    print row
-    print 'Amplifier           TS8 Fe55 Gain         TS8 PTC Gain'
     
     test_table = {}
-    returnData  = eT.getRunResults(args.run,itemFilter=('sensor_id', ccd))
-    
+    kwds["itemFilter"]=('sensor_id', ccd)
+    returnData = connect.getRunResults(**kwds)
+    run = returnData['run']
+
+    print ccd
+    print 'run # ', run, ' ', row
+    print 'Amplifier           TS8 Fe55 Gain         TS8 PTC Gain'
+
     for step in returnData['steps']:
         stepDict = returnData['steps'][step]
 
