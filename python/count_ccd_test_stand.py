@@ -28,8 +28,15 @@ for ccd in returnData:
     ccd_list_all.append(ccd)
     
     try:
-        returnDataTS3  = connect.getResultsJH(htype=args.htype, stepName = 'fe55_acq', travelerName='SR-EOT-1', experimentSN=ccd)
-        ccd_list.append(ccd)
+        returnDataTS3  = connect.getResultsJH(htype=args.htype, stepName = 'test_report', travelerName='SR-EOT-1', experimentSN=ccd)
+
+        expDict = returnDataTS3[ccd]
+        
+        try:
+            stepDict = expDict['steps']['test_report']
+            ccd_list.append(ccd)
+        except:
+            pass
     except:
         pass
 
