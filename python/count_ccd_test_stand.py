@@ -40,7 +40,7 @@ for ccd in returnData:
     except:
         pass
 
-print len(ccd_list_all), len(ccd_list), '\n \n', ccd_list
+print 'Type ', args.htype,  len(ccd_list_all), 'total. Found ', len(ccd_list), 'with SR-EOT-1', '\n \n', ccd_list
     
         
 
