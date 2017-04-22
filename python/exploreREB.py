@@ -26,7 +26,7 @@ class exploreREB():
 
     def ASPIC_parent(self, ASPIC_name=None, htype='LCA-11721'):
     
-# now find raft for a CCD
+# now find ASPIC for a REB
 
         kwds = {'experimentSN': ASPIC_name, 'htype':htype, 'noBatched':'true'}
 
