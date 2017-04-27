@@ -11,7 +11,8 @@ parser = argparse.ArgumentParser(description='Find archived data in the LSST  da
 parser.add_argument('-r','--raftID', default=None,help="(metadata) Raft ID (default=%(default)s)")
 parser.add_argument('--run', default=None,help="(raft run number (default=%(default)s)")
 parser.add_argument('-d','--db',default='Prod',help="database to use (default=%(default)s)")
-parser.add_argument('-e','--eTserver',default='Prod',help="eTraveler server (default=%(default)s)")
+parser.add_argument('-e','--eTserver',default='Dev',help="eTraveler server (default=%(default)s)")
+parser.add_argument('--appSuffix','--appSuffix',default='jrb',help="eTraveler server (default=%(default)s)")
 args = parser.parse_args()
 
 
@@ -23,7 +24,7 @@ print 'Searching ', raft, ' for ', args.db , 'database and server is ', args.eTs
 
 eR = exploreRaft(db=args.db, prodServer=args.eTserver)
 
-connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS)
+connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
 kwds = {'run':args.run}
 
 ccd_list = eR.raftContents(raft)

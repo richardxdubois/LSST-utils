@@ -1,4 +1,3 @@
-from getResults import getResults
 from exploreRaft import exploreRaft
 from  eTraveler.clientAPI.connection import Connection
 
@@ -14,7 +13,8 @@ parser.add_argument('--run', default=None,help="(raft run number (default=%(defa
 parser.add_argument('-s','--schema', default=None,help="(metadata) schema (default=%(default)s)")
 parser.add_argument('-X','--XtraOpts',default=None,help="any extra 'datacat find' options (default=%(default)s)")
 parser.add_argument('-d','--db',default='Prod',help="eT database (default=%(default)s)")
-parser.add_argument('-e','--eTserver',default='Prod',help="eTraveler server (default=%(default)s)")
+parser.add_argument('-e','--eTserver',default='Dev',help="eTraveler server (default=%(default)s)")
+parser.add_argument('--appSuffix','--appSuffix',default='jrb',help="eTraveler server (default=%(default)s)")
 args = parser.parse_args()
 
 
@@ -26,7 +26,7 @@ else: pS = False
 print 'Searching ', raft, ' for ', schema
 
 eR = exploreRaft(db=args.db, prodServer=args.eTserver)
-connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS)
+connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
 
 ccd_list = eR.raftContents(raft)
 runs_used = [-99]*3

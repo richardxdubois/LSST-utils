@@ -1,5 +1,3 @@
-from getResults import getResults
-from exploreRaft import exploreRaft
 from  eTraveler.clientAPI.connection import Connection
 
 import argparse
@@ -11,13 +9,14 @@ parser = argparse.ArgumentParser(description='Find archived data in the LSST  da
 ##   The following are 'convenience options' which could also be specified in the filter string
 parser.add_argument('-t','--htype', default=None,help="hardware type (default=%(default)s)")
 parser.add_argument('-d','--db',default='Prod',help="eT database (default=%(default)s)")
-parser.add_argument('-e','--eTserver',default='Prod',help="eTraveler server (default=%(default)s)")
+parser.add_argument('-e','--eTserver',default='Dev',help="eTraveler server (default=%(default)s)")
+parser.add_argument('--appSuffix','--appSuffix',default='jrb',help="eTraveler server (default=%(default)s)")
 args = parser.parse_args()
 
 
 if args.eTserver == 'Prod': pS = True
 else: pS = False
-connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS)
+connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
 
    
 returnData  = connect.getResultsJH(htype=args.htype, stepName = 'vendorIngest', travelerName='SR-RCV-01')
