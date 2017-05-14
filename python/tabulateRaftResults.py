@@ -8,7 +8,6 @@ import argparse
 parser = argparse.ArgumentParser(description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
 
 ##   The following are 'convenience options' which could also be specified in the filter string
-parser.add_argument('-r','--raftID', default=None,help="(metadata) Raft ID (default=%(default)s)")
 parser.add_argument('--run', default=None,help="(raft run number (default=%(default)s)")
 parser.add_argument('-s','--schema', default=None,help="(metadata) schema (default=%(default)s)")
 parser.add_argument('-X','--XtraOpts',default=None,help="any extra 'datacat find' options (default=%(default)s)")
@@ -18,46 +17,52 @@ parser.add_argument('--appSuffix','--appSuffix',default='jrb',help="eTraveler se
 args = parser.parse_args()
 
 
-raft = args.raftID
 schema = args.schema
 if args.eTserver == 'Prod': pS = True
 else: pS = False
 
-print 'Searching ', raft, ' for ', schema
 
 eR = exploreRaft(db=args.db, prodServer=args.eTserver)
 connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
 
+connectProd = Connection(operator='richard', exp='LSST-CAMERA')
+
+rsp = connect.getRunSummary(run=args.run)
+raft = rsp['experimentSN']
+
+print 'Searching ', raft, ' for ', schema
+
 ccd_list = eR.raftContents(raft)
 runs_used = [-99]*3
+print ccd_list
 
 for row in ccd_list:
-#    ccd = row[0].split('-Dev')[0]
+    ccdProd = row[0].split('-Dev')[0]
     ccd = str(row[0])
     
     test_table = {}
     htype = 'ITL-CCD'
     if 'E2V' in ccd: htype = 'e2v-CCD'
     
-    returnDataVendor  = connect.getResultsJH(htype=htype, stepName = 'read_noise_offline', travelerName='SR-EOT-02', experimentSN=ccd)
+    returnDataVendor  = connectProd.getResultsJH(htype=htype, stepName = 'read_noise_offline', travelerName='SR-EOT-02', experimentSN=ccdProd)
     
-    expDict = returnDataVendor[ccd]
+    expDict = returnDataVendor[ccdProd]
     runs_used[0] = expDict['runNumber']
     stepDict = expDict['steps']['read_noise_offline']
 
-    schemaList = stepDict[schema]
+    schemaList = stepDict['read_noise']
     for d in schemaList:
         if d['schemaInstance'] == 0: continue
         test_table[d['amp']] = [d['read_noise'], -99., -99.]
 
     try:
-        returnDataTS3  = connect.getResultsJH(htype=htype, stepName = 'read_noise_offline', travelerName='SR-EOT-1', experimentSN=ccd)
-
-        expDict = returnDataTS3[ccd]
+        returnDataTS3  = connectProd.getResultsJH(htype=htype, stepName = 'read_noise', travelerName='SR-EOT-1', experimentSN=ccdProd)
+ 
+        expDict = returnDataTS3[ccdProd]
         runs_used[1] = expDict['runNumber']
 
-        stepDict = expDict['steps']['read_noise_offline']
-        schemaList = stepDict[schema]
+        stepDict = expDict['steps']['read_noise']
+        schemaList = stepDict['read_noise']
         for d in schemaList:
             if d['schemaInstance'] == 0: continue
             test_table[d['amp']][1] = d['read_noise']
@@ -69,14 +74,12 @@ for row in ccd_list:
     returnDataTS8  = connect.getRunResults(run=args.run,itemFilter=('sensor_id', ccd))
     runs_used[2] = args.run
     
-    for step in returnDataTS8['steps']:
-        stepDict = returnDataTS8['steps'][step]
+    stepDict = returnDataTS8['steps']['read_noise_raft']
 
-        for schemaList in stepDict:
-            if schemaList == 'read_noise_raft':
-                for d in stepDict[schemaList]:
-                    if d['schemaInstance'] == 0: continue
-                    test_table[d['amp']][2] = d['read_noise']
+    schemaList = stepDict['read_noise_raft']
+    for d in schemaList:
+        if d['schemaInstance'] == 0: continue
+        test_table[d['amp']][2] = d['read_noise']
 
     print "run #'s used: Vendor, TS3, TS8 ", runs_used
     print row
