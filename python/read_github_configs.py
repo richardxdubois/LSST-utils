@@ -22,8 +22,7 @@ print inspect.getargspec(repo.get_file_contents)
 #sha = get_sha_for_tag(repo, "0.0.5")
 #print sha
 
-#file_contents = repo.get_file_contents('BNL/TS8-Setup1/etc/rtm2/TS8Subsystem_e2v_Rafts.properties')
-file_contents = repo.get_file_contents('BNL/TS8-Setup1/etc/rtm2/TS8Subsystem_e2v_Rafts.properties', "0.0.5")
+file_contents = repo.get_file_contents('BNL/TS8-Setup1/etc/rtm2/TS8Subsystem_e2v_Rafts.properties')
 
 f = base64.b64decode(file_contents.content)
 temp_file = open('temp','w')
