@@ -21,17 +21,19 @@ if args.eTserver == 'Prod': pS = True
 else: pS = False
 connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
 
-for run in range(4963,5010):
-    runInfo  = connect.getRunSummary(run=run)
-    if runInfo["experimentSN"] == args.raft:
-        print args.raft, run
-        act = connect.getRunActivities(run=run)
-
-        for step in act:
-            step_name = step['stepName']
-            print step_name, step['status']
-            
+for run in range(4940,5012):
+    try:
+        runInfo  = connect.getRunSummary(run=run)
         
+        if runInfo['experimentSN'] == args.raft:
+            print args.raft, run
+            act = connect.getRunActivities(run=run)
+        
+            for step in act:
+                step_name = step['stepName']
+                if step_name == "ready_acq": print step_name, step['status']
+    except:
+        pass
     
         
 
