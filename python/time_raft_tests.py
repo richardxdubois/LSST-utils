@@ -23,13 +23,14 @@ connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServ
 
 # get the list of CCDs we've received vendor data for of this type
 
-
+step_times = {}
 for run in range(4389,4400):
 
-    rsp = self.connect.getRunSummary(run=self.run)
+    rsp = connect.getRunSummary(run=run)
     raft = rsp['experimentSN']
     if raft <> args.raft: continue
-
+    print 'found raft run = ', run
+        
     rsp = connect.getRunActivities(run=run)
 
     for step in rsp:
