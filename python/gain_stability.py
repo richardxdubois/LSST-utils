@@ -1,9 +1,10 @@
-from exploreRaft import exploreRaft
 from  eTraveler.clientAPI.connection import Connection
 import datetime
 import argparse
 import numpy as np
 import operator
+import statsmodels.api as smapi
+from statsmodels.formula.api import ols
 
 
 ## Command line arguments
@@ -22,8 +23,6 @@ if args.eTserver == 'Prod': pS = True
 else: pS = False
 
 
-eR = exploreRaft(db=args.db, prodServer=args.eTserver)
-
 connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
 
 rsp = connect.getRunSummary(run=args.run)
@@ -32,7 +31,7 @@ raft = rsp['experimentSN']
 rspRunAct = connect.getRunActivities(run=run)
 
 
-print 'Searching ', raft, ' for ', args.db , 'database and server is ', args.eTserver
+print 'Run, raft ', run, raft, ' for ', args.db , 'database and server is ', args.eTserver
 
 gain_table = {}
 start = 0
@@ -49,7 +48,7 @@ for i in range(1,5):
 
             begin = datetime.datetime.strptime(actStep['begin'],'%Y-%m-%dT%H:%M:%S.%f')
             if start == 0: start = begin
-            dT = begin - start
+            dT = (begin - start).seconds
             break
 
         stepDict = returnData['steps'][step]
@@ -64,13 +63,25 @@ for i in range(1,5):
 
                     shots.append((d['gain'], d['gain_error'], dT))
                 break
-frac = []          
+frac = []
+
+print '      amp           mean gain        std          std/mean (%)    fit slope    fit intercept   deltaT (sec) \n'
+
 for amp in gain_table:
-    mean = np.mean([element[0] for element in gain_table[amp]])
+    mean_list = [element[0] for element in gain_table[amp]]
+    t = [element[2] for element in gain_table[amp]]
+    mean = np.mean(mean_list)
     std = np.std([element[1] for element in gain_table[amp]])
     frac_std = std/mean*100.
     frac.append((frac_std))
-    print amp, mean, std, frac_std
+
+    model = ols('data ~ x',dict(x=t, data=mean_list))
+    regression = model.fit()
+
+    dt = t[-1] - t[0]
+    res = regression.params
+
+    print "%8i          %6.3f          %6.3E         %6.3f       %6.3E      %6.3f      %6.2f" % (amp, mean, std, frac_std, res['x'], res['Intercept'], dt)
 
 index, value = max(enumerate(frac), key=operator.itemgetter(1))
 print 'Largest width = ', value, ' % for amp ', index+1
