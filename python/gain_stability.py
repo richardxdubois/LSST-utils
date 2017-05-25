@@ -45,10 +45,12 @@ for i in range(1,5):
         for actStep in rspRunAct:
             step_name = actStep['stepName']
             if step_name <> step: continue
+            if actStep['status'] <> 'success': continue
 
             begin = datetime.datetime.strptime(actStep['begin'],'%Y-%m-%dT%H:%M:%S.%f')
             if start == 0: start = begin
             dT = (begin - start).seconds
+            print i, j, begin, dT
             break
 
         stepDict = returnData['steps'][step]
@@ -85,6 +87,8 @@ for amp in gain_table:
 
 index, value = max(enumerate(frac), key=operator.itemgetter(1))
 print 'Largest width = ', value, ' % for amp ', index+1
+
+print t
 
 
     
