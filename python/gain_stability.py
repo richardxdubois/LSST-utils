@@ -3,6 +3,7 @@ from  eTraveler.clientAPI.connection import Connection
 import datetime
 import argparse
 import numpy as np
+import operator
 
 
 ## Command line arguments
@@ -63,12 +64,16 @@ for i in range(1,5):
 
                     shots.append((d['gain'], d['gain_error'], dT))
                 break
-            
+frac = []          
 for amp in gain_table:
-    
     mean = np.mean([element[0] for element in gain_table[amp]])
     std = np.std([element[1] for element in gain_table[amp]])
-    print amp, mean, std, std/mean*100.
+    frac_std = std/mean*100.
+    frac.append((frac_std))
+    print amp, mean, std, frac_std
+
+index, value = max(enumerate(frac), key=operator.itemgetter(1))
+print 'Largest width = ', value, ' % for amp ', index+1
 
 
     
