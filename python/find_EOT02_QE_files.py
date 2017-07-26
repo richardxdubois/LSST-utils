@@ -11,7 +11,7 @@ class find_EOT02_QE():
         connect = Connection(operator='richard', db=db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+appSuffix)
 
 
-        returnData  = connect.getResultsJH(htype=args.htype, stepName = 'qe_offline', travelerName='SR-EOT-02')
+        returnData  = connect.getResultsJH(htype=args.htype, stepName = 'qe_analysis', travelerName='SR-EOT-1')
 
         ccd_list = {}
 
@@ -21,9 +21,9 @@ class find_EOT02_QE():
             expDict = returnData[ccd]
 
             try:
-                stepDict = expDict['steps']['qe_offline']
+                stepDict = expDict['steps']['qe_analysis']
                 run = expDict['runNumber']
-                fCCD = findCCD(FType='fits', testName='qe_offline', sensorId=ccd, run=run, site='SLAC')
+                fCCD = findCCD(FType='fits', testName='qe_analysis', sensorId=ccd, run=run)
                 files = fCCD.find()
                 ccd_list[ccd] = files
 
