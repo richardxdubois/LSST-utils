@@ -17,40 +17,50 @@ parser.add_argument('-d','--db',default='Prod',help="database to use (default=%(
 parser.add_argument('-e','--eTserver',default='Dev',help="eTraveler server (default=%(default)s)")
 parser.add_argument('--appSuffix','--appSuffix',default='jrb',help="eTraveler server (default=%(default)s)")
 parser.add_argument('-o','--output',default='read_noise.pdf',help="output plot file (default=%(default)s)")
+parser.add_argument('-i', '--infile', default="", help="input file name for list of wav files (default=%(default)s)")
+
 args = parser.parse_args()
+raft_list = {}
+
+if args.infile <> "":
+    with open(args.infile) as f:
+        for line in f:
+            (raft, run) = line.split()
+            raft_list[raft] = run
+else:
+    raft_list[args.raftID] = args.run
 
 
-raft = args.raftID
 if args.eTserver == 'Prod': pS = True
 else: pS = False
 
-print 'Searching ', raft, ' for ', args.db , 'database and server is ', args.eTserver
-
 eR = exploreRaft(db=args.db, prodServer=args.eTserver)
-
-connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS, appSuffix='-'+args.appSuffix)
-kwds = {'run':args.run}
-
-ccd_list = eR.raftContents(raft)
-
+connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS,
+                     appSuffix='-' + args.appSuffix)
 noise = []
 
-for row in ccd_list:
-    ccd = str(row[0])
-    
-    test_table = {}
-    kwds["itemFilter"]=('sensor_id', ccd)
-    returnData = connect.getRunResults(**kwds)
-    run = returnData['run']
+for r in raft_list:
 
-    for step in returnData['steps']:
-        stepDict = returnData['steps'][step]
+    print 'Searching ', r, ' for ', raft_list[r] , 'database and server is ', args.eTserver
 
-        for schemaList in stepDict:
-            if schemaList == 'read_noise_raft':
-                for d in stepDict[schemaList]:
-                    if d['schemaInstance'] == 0: continue
-                    noise.append(d['read_noise'])
+
+    ccd_list = eR.raftContents(r)
+
+    for row in ccd_list:
+        ccd = str(row[0])
+
+        test_table = {}
+        returnData = connect.getRunResults(run=raft_list[r], itemFilter=('sensor_id',ccd))
+        run = returnData['run']
+
+        for step in returnData['steps']:
+            stepDict = returnData['steps'][step]
+
+            for schemaList in stepDict:
+                if schemaList == 'read_noise_raft':
+                    for d in stepDict[schemaList]:
+                        if d['schemaInstance'] == 0: continue
+                        noise.append(d['read_noise'])
 
 with PdfPages(args.output) as pdf:
 
