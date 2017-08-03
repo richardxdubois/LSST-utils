@@ -65,6 +65,10 @@ for r in raft_list:
 with PdfPages(args.output) as pdf:
 
     plt.hist(noise)
+    plt.xlabel('Read Noise (e-)')
+    plt.title('Read Noise RTM2 + RTM4')
+    plt.xlim(0.,10.)
+    plt.axvline(9.,color='r')
 
     pdf.savefig()
     plt.close()

@@ -43,7 +43,7 @@ class find_CCD_image_files():
             expDict = returnData[ccd]
             stepDict = expDict['steps'][stepName]
             run = expDict['runNumber']
-            fCCD = findCCD(FType='fits', testName=fCCDName, sensorId=ccd, run=run, mirrorName=mirrorName, XtraOpts='IMGTYPE=="DARK"')
+            fCCD = findCCD(FType='fits', testName=fCCDName, sensorId=ccd, run=run, mirrorName=mirrorName, XtraOpts='IMGTYPE=="BIAS"',db=self.db)
             files = fCCD.find()
 
         except:
@@ -67,7 +67,7 @@ class find_CCD_image_files():
             expDict = returnData[raft]
             run = expDict['runNumber']
 
-            rO = raft_observation(run=run, step=stepName,imgtype='BIAS')
+            rO = raft_observation(run=run, step=stepName,imgtype='BIAS', db=self.db)
             obs_dict = rO.find()
 
 
@@ -118,7 +118,12 @@ if __name__ == "__main__":
 
     files = f.get_files(args.sensorID)
 
-    print 'Sensor ', '\n \n', files
+    print 'Sensor ', '\n \n'
+
+    for t in files:
+        print t
+        for fl in files[t]:
+            print fl
     
         
 
