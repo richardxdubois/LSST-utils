@@ -39,7 +39,6 @@ for ccd in returnData:
     expDict = returnData[ccd]
 
     run = expDict["runNumber"]
-    rsp = connect.getRunActivities(run=run)
 
     label = expDict["hardwareLabels"]
     (grp1, grade1) = label[0].split(':')
@@ -51,12 +50,9 @@ for ccd in returnData:
     if len(label) == 2:
         (grp2, grade2) = label[1].split(':')
 
-    for step in rsp:
-        if step['status'] <> 'success': continue
-        step_name = step['stepName']
-        begin = datetime.datetime.strptime(step['begin'], '%Y-%m-%dT%H:%M:%S.%f')
-        ccd_list[begin] = [ccd, grade1, grade2]
-        break
+    beginTime = expDict['begin']
+    begin = datetime.datetime.strptime(beginTime, '%Y-%m-%d %H:%M:%S.%f')
+    ccd_list[begin] = [ccd, grade1, grade2]
 
 print 'Found ', len(ccd_list), ' ', args.htype
 
@@ -91,7 +87,7 @@ with PdfPages(args.output) as pdf:
         print g, len(p.keys())
         ax.fill_between(p.keys(), p.values(), label=g)
     plt.xticks(rotation=30)
-    plt.legend()
+    plt.legend(loc='upper left')
     plt.suptitle(args.htype)
     plt.tight_layout()
 
