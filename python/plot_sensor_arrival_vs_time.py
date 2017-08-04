@@ -51,7 +51,7 @@ for ccd in returnData:
         (grp2, grade2) = label[1].split(':')
 
     beginTime = expDict['begin']
-    begin = datetime.datetime.strptime(beginTime, '%Y-%m-%d %H:%M:%S.%f')
+    begin = datetime.datetime.strptime(beginTime, '%Y-%m-%dT%H:%M:%S.%f')
     ccd_list[begin] = [ccd, grade1, grade2]
 
 print 'Found ', len(ccd_list), ' ', args.htype
