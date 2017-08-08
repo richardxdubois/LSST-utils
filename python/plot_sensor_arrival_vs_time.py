@@ -33,6 +33,7 @@ returnData = connect.getFilepathsJH(htype=args.htype, stepName="Scan-and-Ingest-
 
 ccd_list = {}
 gradeLabels = []
+t_diff = []
 
 for ccd in returnData:
 
@@ -53,6 +54,17 @@ for ccd in returnData:
     beginTime = expDict['begin']
     begin = datetime.datetime.strptime(beginTime, '%Y-%m-%dT%H:%M:%S.%f')
     ccd_list[begin] = [ccd, grade1, grade2]
+
+    runListCCD = connect.getComponentRuns(experimentSN=ccd, htype=args.htype)
+
+    for rcv_run in sorted(runListCCD):
+        travRun = runListCCD[rcv_run]
+        travName = travRun['travelerName']
+        if travName == 'SR-RCV-01':
+            rcv_begin = travRun['begin']
+            td_rcv = datetime.datetime.strptime(rcv_begin,'%Y-%m-%dT%H:%M:%S.%f')
+            t_diff.append((begin - td_rcv).days)
+            break
 
 print 'Found ', len(ccd_list), ' ', args.htype
 
@@ -82,10 +94,12 @@ with PdfPages(args.output) as pdf:
 
     fig, ax = plt.subplots()
 
+
     for g in gradeLabels:
         p = grade_plots[g]
         print g, len(p.keys())
-        ax.fill_between(p.keys(), p.values(), label=g)
+        ax.fill_between(p.keys(), p.values())
+
     plt.xticks(rotation=30)
     plt.legend(loc='upper left')
     plt.suptitle(args.htype)
@@ -93,3 +107,10 @@ with PdfPages(args.output) as pdf:
 
     pdf.savefig()
     plt.close()
+
+    plt.hist(t_diff, bins=100)
+    plt.xlabel('Time Difference (days)')
+    plt.suptitle('Time between Vendor Data and Receipt at BNL')
+    pdf.savefig()
+    plt.close()
+
