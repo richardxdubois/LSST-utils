@@ -4,6 +4,7 @@ import argparse
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import collections
+import csv
 
 ## Command line arguments
 parser = argparse.ArgumentParser(
@@ -16,7 +17,21 @@ parser.add_argument('-e', '--eTserver', default='Dev', help="eTraveler server (d
 parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
                     help="eTraveler server (default=%(default)s)")
 parser.add_argument('-o','--output',default='sensor_arrivals.pdf',help="output plot file (default=%(default)s)")
+parser.add_argument('-p','--plan',default='',help="input csv file with planned deliveries (default=%(default)s)")
+
 args = parser.parse_args()
+
+plan = collections.OrderedDict()
+
+with open(args.plan,'rU') as f:
+    reader = csv.reader(f)
+    for row in reader:
+
+        deliver_date = row[3]
+        count = row[6]
+        deliver = datetime.datetime.strptime(deliver_date, '%m/%d/%y').date()
+        plan[deliver] = count
+
 
 if args.eTserver == 'Prod':
     pS = True
@@ -98,8 +113,9 @@ with PdfPages(args.output) as pdf:
     for g in gradeLabels:
         p = grade_plots[g]
         print g, len(p.keys())
-        ax.fill_between(p.keys(), p.values())
+        ax.fill_between(p.keys(), p.values(), label=g)
 
+    ax.plot(plan.keys(),plan.values(),label='Plan',color='k')
     plt.xticks(rotation=30)
     plt.legend(loc='upper left')
     plt.suptitle(args.htype)
