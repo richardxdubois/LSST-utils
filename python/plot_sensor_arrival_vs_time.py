@@ -44,19 +44,21 @@ hardwareLabels = ['SR_Grade:SR_SEN_Prototype', 'SR_Grade:SR_SEN_Engineering', 'S
                   'SR_Contract:SR_SEN_Fall_Out-Option_2', 'SR_Contract:SR_SEN_First_Article', 'SR_Contract:SR_SEN_M12', 'SR_Contract:SR_SEN_Off_Contract',
                   'SR_Contract:SR_SEN_Option_1', 'SR_Contract:SR_SEN_Phase_A', 'SR_Contract:SR_SEN_Phase_B', 'SR_Contract:SR_SEN_Prototype']
 
-returnData = connect.getFilepathsJH(htype=args.htype, stepName="Scan-and-Ingest-Vendor-Data", travelerName='SR-GEN-RCV-02', hardwareLabels=hardwareLabels)
+hardwareLabels = ['SR_Grade:', 'SR_Contract:']
+
+#returnData = connect.getFilepathsJH(htype=args.htype, stepName="Scan-and-Ingest-Vendor-Data", travelerName='SR-GEN-RCV-02', hardwareLabels=hardwareLabels)
+returnData = connect.getHardwareInstances(htype=args.htype,hardwareLabels=hardwareLabels)
+
 
 ccd_list = {}
 gradeLabels = []
 t_diff = []
 
-for ccd in returnData:
+for inst in returnData:
 
-    expDict = returnData[ccd]
+    ccd = inst['experimentSN']
 
-    run = expDict["runNumber"]
-
-    label = expDict["hardwareLabels"]
+    label = inst['hardwareLabels']
     (grp1, grade1) = label[0].split(':')
     if grade1 not in gradeLabels:
         gradeLabels.append(grade1)
@@ -66,20 +68,44 @@ for ccd in returnData:
     if len(label) == 2:
         (grp2, grade2) = label[1].split(':')
 
-    beginTime = expDict['begin']
+# Some sensors were received with SR-RCV-2 and then later it changed to SR-GEN-RCV-02
+
+    try:
+        runListOld = connect.getComponentRuns(experimentSN=ccd, htype=args.htype, travelerName='SR-RCV-2')
+        for rcv_run in sorted(runListOld):
+            travRun = runListOld[rcv_run]
+            beginTime = travRun['begin']
+            print ccd, beginTime
+            break
+    except:
+        try:
+            runListGen = connect.getComponentRuns(experimentSN=ccd, htype=args.htype, travelerName='SR-GEN-RCV-02')
+            for rcv_run in sorted(runListGen):
+                travRun = runListGen[rcv_run]
+                beginTime = travRun['begin']
+                break
+        except:
+            print 'No receive traveler found for ', ccd
+            break
+        pass
+
     begin = datetime.datetime.strptime(beginTime, '%Y-%m-%dT%H:%M:%S.%f')
     ccd_list[begin] = [ccd, grade1, grade2]
 
-    runListCCD = connect.getComponentRuns(experimentSN=ccd, htype=args.htype)
+# get the time difference between vendor data arrival and receipt of the sensor at BNL
 
-    for rcv_run in sorted(runListCCD):
-        travRun = runListCCD[rcv_run]
-        travName = travRun['travelerName']
-        if travName == 'SR-RCV-01':
+    try:
+        runListCCD = connect.getComponentRuns(experimentSN=ccd, htype=args.htype,travelerName='SR-RCV-01')
+
+        for rcv_run in sorted(runListCCD):
+            travRun = runListCCD[rcv_run]
             rcv_begin = travRun['begin']
             td_rcv = datetime.datetime.strptime(rcv_begin,'%Y-%m-%dT%H:%M:%S.%f')
             t_diff.append((begin - td_rcv).days)
             break
+    except:
+        print 'no SR-RCV-01 traveler for ', ccd
+        pass
 
 print 'Found ', len(ccd_list), ' ', args.htype
 
