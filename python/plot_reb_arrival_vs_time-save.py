@@ -29,10 +29,6 @@ else:
 connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS,
                      appSuffix='-' + args.appSuffix)
 
-hardwareLabels = ['SR_Grade:SR_SEN_Prototype', 'SR_Grade:SR_SEN_Engineering', 'SR_Grade:SR_SEN_Mechanical', 'SR_Grade:SR_SEN_Rejected', 'SR_Grade:SR_SEN_Reserve', 'SR_Grade:SR_SEN_Science',
-                  'SR_Contract:SR_SEN_Fall_Out-Option_2', 'SR_Contract:SR_SEN_First_Article', 'SR_Contract:SR_SEN_M12', 'SR_Contract:SR_SEN_Off_Contract',
-                  'SR_Contract:SR_SEN_Option_1', 'SR_Contract:SR_SEN_Phase_A', 'SR_Contract:SR_SEN_Phase_B', 'SR_Contract:SR_SEN_Prototype']
-
 returnData = connect.getHardwareInstances(htype=args.htype)
 
 reb_list = {}
@@ -41,21 +37,36 @@ all_rebs = {}
 for inst in returnData:
 
     reb = inst['experimentSN']
-
-#    runListREB = connect.getComponentRuns(experimentSN=reb, htype=args.htype, travelerName='SR-REB-VER-04')
+    found = False
+    beginTime = ' '
 
     try:
-        runListREB = connect.getComponentRuns(experimentSN=reb, htype=args.htype, travelerName='SR-REB-STR-01')
+        runListREB = connect.getComponentRuns(experimentSN=reb, htype=args.htype, travelerName='SR-GEN-RCV-02')
         for rcv_run in sorted(runListREB):
             travRun = runListREB[rcv_run]
-            begin_time = travRun['begin']
-            begin = datetime.datetime.strptime(begin_time, '%Y-%m-%dT%H:%M:%S.%f')
+            beginTime = travRun['begin']
+            if beginTime == '':
+                continue
+            found = True
             break
 
+    except Exception, msg:
+        try:
+            runListOld = connect.getComponentRuns(experimentSN=reb, htype=args.htype,
+                                                  travelerName='SR-RCV-2')
+            for rcv_run in sorted(runListOld):
+                travRun = runListOld[rcv_run]
+                beginTime = travRun['begin']
+                if beginTime == '':
+                    continue
+                found = True
+                break
+        except Exception, msg:
+            # these are all REJECTED status
+            print 'No receive traveler found for ', reb
+    if found:
+        begin = datetime.datetime.strptime(beginTime, '%Y-%m-%dT%H:%M:%S.%f')
         reb_list[begin] = [reb]
-    except:
-        print 'No traveler found for ', reb
-        continue
 
 print 'Found ', len(reb_list), ' ', args.htype
 
