@@ -47,7 +47,7 @@ parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
 parser.add_argument('-o', '--output', default='raft_temp_dependence.pdf',
                     help="output plot file (default=%(default)s)")
 parser.add_argument('-i', '--infile', default="",
-                    help="input file name for list of wav files (default=%(default)s)")
+                    help="input file name for list of runs, temps (default=%(default)s)")
 
 args = parser.parse_args()
 
