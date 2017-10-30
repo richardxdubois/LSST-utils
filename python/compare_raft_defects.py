@@ -10,9 +10,9 @@ import astropy.io.fits as fits
 
 import argparse
 
-class compare_raft_defects():
 
-    def __init__(self, run1 = None, run2 = None, db='Prod',
+class compare_raft_defects():
+    def __init__(self, run1=None, run2=None, db='Prod',
                  prodServer='Dev', appSuffix='-jrb'):
 
         self.run1 = run1
@@ -28,12 +28,11 @@ class compare_raft_defects():
         if self.prodServer == 'Dev':
             pS = False
 
-
         self.connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS,
-                             appSuffix= appSuffix)
+                                  appSuffix=appSuffix)
 
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
-                       mirrorName="INT-prod")
+                            mirrorName="INT-prod")
 
         self.eR = exploreRaft()
 
@@ -42,13 +41,14 @@ class compare_raft_defects():
 
         self.ccd_list = self.eR.raftContents(self.raft)
         if self.debug:
-            self.ccd_list = [('ITL-3800C-022',0,0)]
-
+            self.ccd_list = [('ITL-3800C-022', 0, 0)]
 
     def comp_defects(self, hdu1, hdu2):
 
-        print 'Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd, ' Run 1 ', self.run1, ' Run 2', self.run2, ' \n'
-        for amp in range(1,16):
+        print 'Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd, ' Run 1 ', self.run1,\
+            ' Run 2', self.run2, ' \n'
+        print ' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px'
+        for amp in range(1, 16):
             pixeldata_run1 = np.array(hdu1[amp].data)
             pixeldata_run2 = np.array(hdu2[amp].data)
             sum_run1 = np.sum(pixeldata_run1)
@@ -56,7 +56,7 @@ class compare_raft_defects():
             diff_pix = pixeldata_run1 - pixeldata_run2
 
             badc = np.where(diff_pix != 0)
-            print 'amp ', amp, ' defect counts - sum run1 ', sum_run1, ' sum run2 ', sum_run2, ' # diff px ', len(badc[0])
+            print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, len(badc[0]))
 
     def get_files_run(self, run, defect_name):
 
@@ -66,16 +66,18 @@ class compare_raft_defects():
             for ccd_tup in self.ccd_list:
                 ccd = ccd_tup[0]
 
-                f= self.fCCD.find(sensorId=ccd,run=run)
+                f = self.fCCD.find(sensorId=ccd, run=run)
                 for g in f:
                     if 'mask' in g:
                         file_list[ccd] = g
 
         if self.debug:
             if run == '5730':
-                file_list = {'ITL-3800C-022':'/Users/richard/LSST/Data/ETU2/ITL-3800C-022_bright_pixel_mask-5730.fits'}
+                file_list = {
+                    'ITL-3800C-022': '/Users/richard/LSST/Data/ETU2/ITL-3800C-022_bright_pixel_mask-5730.fits'}
             else:
-                file_list = {'ITL-3800C-022': '/Users/richard/LSST/Data/ETU2/ITL-3800C-022_bright_pixel_mask-5731.fits'}
+                file_list = {
+                    'ITL-3800C-022': '/Users/richard/LSST/Data/ETU2/ITL-3800C-022_bright_pixel_mask-5731.fits'}
 
         return file_list
 
@@ -101,9 +103,7 @@ class compare_raft_defects():
                 comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
 
 
-
 if __name__ == "__main__":
-
     ## Command line arguments
     parser = argparse.ArgumentParser(
         description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
@@ -125,4 +125,3 @@ if __name__ == "__main__":
     defects = compare_raft_defects(run1=args.run1, run2=args.run2)
 
     tab_defects = defects.tabulate_defects()
-
