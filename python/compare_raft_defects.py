@@ -13,7 +13,7 @@ import argparse
 
 class compare_raft_defects():
     def __init__(self, run1=None, run2=None, db='Prod',
-                 prodServer='Dev', appSuffix='-jrb'):
+                 prodServer='Dev', appSuffix='-jrb', debug = False):
 
         self.run1 = run1
         self.run2 = run2
@@ -22,7 +22,7 @@ class compare_raft_defects():
 
         self.db = db
         self.prodServer = prodServer
-        self.debug = True
+        self.debug = debug
 
         pS = True
         if self.prodServer == 'Dev':
