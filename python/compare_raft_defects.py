@@ -12,13 +12,14 @@ import argparse
 
 
 class compare_raft_defects():
-    def __init__(self, run1=None, run2=None, db='Prod',
-                 prodServer='Dev', appSuffix='-jrb', debug = False):
+    def __init__(self, run1=None, run2=None, defect_list='bright_defects_raft', debug = False,  db='Prod',
+                 prodServer='Dev', appSuffix='-jrb'):
 
         self.run1 = run1
         self.run2 = run2
         self.current_defect = ''
         self.current_ccd = ''
+        self.defect_list = defect_list
 
         self.db = db
         self.prodServer = prodServer
@@ -40,7 +41,7 @@ class compare_raft_defects():
         self.raft = returnData['experimentSN']
 
         self.ccd_list = self.eR.raftContents(self.raft)
-        if self.debug:
+        if self.debug == True:
             self.ccd_list = [('ITL-3800C-022', 0, 0)]
 
     def comp_defects(self, hdu1, hdu2):
@@ -62,7 +63,7 @@ class compare_raft_defects():
 
         file_list = {}
 
-        if not self.debug:
+        if self.debug == False:
             for ccd_tup in self.ccd_list:
                 ccd = ccd_tup[0]
 
@@ -71,7 +72,7 @@ class compare_raft_defects():
                     if 'mask' in g:
                         file_list[ccd] = g
 
-        if self.debug:
+        if self.debug == True:
             if run == '5730':
                 file_list = {
                     'ITL-3800C-022': '/Users/richard/LSST/Data/ETU2/ITL-3800C-022_bright_pixel_mask-5730.fits'}
@@ -83,9 +84,8 @@ class compare_raft_defects():
 
     def tabulate_defects(self):
 
-        defects_list = ['bright_defects_raft']
 
-        for d in defects_list:
+        for d in self.defect_list:
 
             self.current_defect = d
 
@@ -111,7 +111,9 @@ if __name__ == "__main__":
     ##   The following are 'convenience options' which could also be specified in the filter string
     parser.add_argument('--run1', default=None, help="(first raft run number (default=%(default)s)")
     parser.add_argument('--run2', default=None, help="(second raft run number (default=%(default)s)")
-    parser.add_argument('-d', '--db', default='Prod', help="database to use (default=%(default)s)")
+    parser.add_argument('--defects', default='bright_defects_raft', help="(comma delimited list of defect types (default=%(default)s)")
+    parser.add_argument('--db', default='Prod', help="Prod or Dev eT db ")
+    parser.add_argument('--debug', default='no', help="debug flag(default=%(default)s)")
     parser.add_argument('-e', '--eTserver', default='Dev', help="eTraveler server (default=%(default)s)")
     parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
                         help="eTraveler server (default=%(default)s)")
@@ -122,6 +124,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    defects = compare_raft_defects(run1=args.run1, run2=args.run2)
+    dl = args.defects
+    defect_list = dl.split(',')
+    if args.debug == 'yes':
+        debug = True
+    else:
+        debug = False
+
+    defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list = defect_list, debug=debug)
 
     tab_defects = defects.tabulate_defects()
