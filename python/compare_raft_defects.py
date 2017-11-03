@@ -112,6 +112,7 @@ class compare_raft_defects():
                 f2 = r2_files[ccd]
                 hdu2 = fits.open(f2)
 
+                print '\n ', f1, '\n', f2
                 comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
 
 
