@@ -113,7 +113,7 @@ if __name__ == "__main__":
     parser.add_argument('--run1', default=None, help="(first raft run number (default=%(default)s)")
     parser.add_argument('--run2', default=None, help="(second raft run number (default=%(default)s)")
     parser.add_argument('--defects', default='bright_defects_raft', help="(comma delimited list of defect types (default=%(default)s)")
-    parser.add_argument('-m',''--mirror', default='INT-prod', help="mirror BNL-prod, INT-prod ")
+    parser.add_argument('-m','--mirror', default='INT-prod', help="mirror BNL-prod, INT-prod ")
     parser.add_argument('--db', default='Prod', help="Prod or Dev eT db ")
     parser.add_argument('--debug', default='no', help="debug flag(default=%(default)s)")
     parser.add_argument('-e', '--eTserver', default='Dev', help="eTraveler server (default=%(default)s)")
