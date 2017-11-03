@@ -50,7 +50,7 @@ class compare_raft_defects():
         print 'Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd, ' Run 1 ', self.run1,\
             ' Run 2', self.run2, ' \n'
         print ' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px'
-        for amp in range(1, 16):
+        for amp in range(1, 17):
             pixeldata_run1 = np.array(hdu1[amp].data)
             pixeldata_run2 = np.array(hdu2[amp].data)
             sum_run1 = np.sum(pixeldata_run1)
