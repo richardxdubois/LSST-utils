@@ -13,13 +13,14 @@ import argparse
 
 class compare_raft_defects():
     def __init__(self, run1=None, run2=None, defect_list='bright_defects_raft', debug = False,  db='Prod',
-                 prodServer='Dev', appSuffix='-jrb'):
+                 prodServer='Dev', appSuffix='-jrb', mirror='INT-prod'):
 
         self.run1 = run1
         self.run2 = run2
         self.current_defect = ''
         self.current_ccd = ''
         self.defect_list = defect_list
+        self.mirror = mirror
 
         self.db = db
         self.prodServer = prodServer
@@ -33,7 +34,7 @@ class compare_raft_defects():
                                   appSuffix=appSuffix)
 
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
-                            mirrorName="INT-prod")
+                            mirrorName=self.mirror)
 
         self.eR = exploreRaft()
 
@@ -112,6 +113,7 @@ if __name__ == "__main__":
     parser.add_argument('--run1', default=None, help="(first raft run number (default=%(default)s)")
     parser.add_argument('--run2', default=None, help="(second raft run number (default=%(default)s)")
     parser.add_argument('--defects', default='bright_defects_raft', help="(comma delimited list of defect types (default=%(default)s)")
+    parser.add_argument('-m',''--mirror', default='INT-prod', help="mirror BNL-prod, INT-prod ")
     parser.add_argument('--db', default='Prod', help="Prod or Dev eT db ")
     parser.add_argument('--debug', default='no', help="debug flag(default=%(default)s)")
     parser.add_argument('-e', '--eTserver', default='Dev', help="eTraveler server (default=%(default)s)")
@@ -131,6 +133,7 @@ if __name__ == "__main__":
     else:
         debug = False
 
-    defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list = defect_list, debug=debug)
+    defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list = defect_list, debug=debug,
+                                   mirror=args.mirror)
 
     tab_defects = defects.tabulate_defects()
