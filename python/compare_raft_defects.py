@@ -50,6 +50,9 @@ class compare_raft_defects():
         print 'Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd, ' Run 1 ', self.run1,\
             ' Run 2', self.run2, ' \n'
         print ' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px'
+
+        tot1 = tot2 = tot_diff = 0
+
         for amp in range(1, 17):
             pixeldata_run1 = np.array(hdu1[amp].data)
             pixeldata_run2 = np.array(hdu2[amp].data)
@@ -58,7 +61,15 @@ class compare_raft_defects():
             diff_pix = pixeldata_run1 - pixeldata_run2
 
             badc = np.where(diff_pix != 0)
-            print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, len(badc[0]))
+            diff_pix = len(badc[0])
+            print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix)
+
+            tot1 += sum_run1
+            tot2 += sum_run2
+            tot_diff += diff_pix
+
+        print '\n Totals'
+        print "       %5i        %5i       %5i" % (tot1, tot2, tot_diff)
 
     def get_files_run(self, run, defect_name):
 
