@@ -81,7 +81,7 @@ class compare_raft_defects():
 
                 f = self.fCCD.find(sensorId=ccd, run=run, testName=defect_name)
                 for g in f:
-                    if 'mask' in g:
+                    if 'mask' in g and ccd in g:
                         file_list[ccd] = g
 
         if self.debug == True:
