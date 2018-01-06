@@ -13,7 +13,7 @@ import argparse
 
 class compare_raft_defects():
     def __init__(self, run1=None, run2=None, defect_list='bright_defects_raft', debug = False,  db='Prod',
-                 prodServer='Dev', appSuffix='-jrb', mirror='INT-prod'):
+                 prodServer='Dev', appSuffix='-jrb', mirror='prod'):
 
         self.run1 = run1
         self.run2 = run2
@@ -74,12 +74,19 @@ class compare_raft_defects():
     def get_files_run(self, run, defect_name):
 
         file_list = {}
+        returnData = self.connect.getRunSummary(run=run)
+        subsystem = returnData['subsystem']
+        mirror = 'BNL'
+        if subsystem == 'Integration and Test':
+            mirror = 'INT'
+        mirror = mirror + '-' + self.mirror
+
 
         if self.debug == False:
             for ccd_tup in self.ccd_list:
                 ccd = ccd_tup[0]
 
-                f = self.fCCD.find(sensorId=ccd, run=run, testName=defect_name)
+                f = self.fCCD.find(sensorId=ccd, run=run, testName=defect_name, mirrorName=mirror)
                 for g in f:
                     if 'mask' in g and ccd in g:
                         file_list[ccd] = g
