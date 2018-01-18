@@ -42,13 +42,15 @@ class compare_raft_defects():
 
 
         if self.debug == True:
-            self.ccd_list = [('ITL-3800C-022', 0, 0)]
             self.run1 = 5730
             self.run2 = 5731
 
         returnData = self.connect.getRunSummary(run=self.run2)
         self.raft = returnData['experimentSN']
         self.ccd_list = self.eR.raftContents(self.raft)
+
+        if self.debug == True:
+            self.ccd_list = [('ITL-3800C-022', 0, 0)]
 
 
     def comp_defects(self, hdu1, hdu2):
@@ -73,9 +75,9 @@ class compare_raft_defects():
             diff_pix = pixeldata_run1 - pixeldata_run2
 
             badc = np.where(diff_pix != 0)
-            diff_pix = len(badc[0])
-            if self.printit:
-                print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix)
+            diff_pix_count = len(badc[0])
+#            if self.printit:
+            print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count)
 
             tot1 += sum_run1
             tot2 += sum_run2
