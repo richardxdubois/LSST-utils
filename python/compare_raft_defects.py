@@ -36,7 +36,7 @@ class compare_raft_defects():
                                   appSuffix=appSuffix, debug=False)
 
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
-                            mirrorName=self.mirror)
+                            mirrorName=self.mirror,prodServer=self.prodServer,appSuffix=appSuffix)
 
         self.eR = exploreRaft(prodServer=self.prodServer,appSuffix=appSuffix)
 
