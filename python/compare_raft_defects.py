@@ -87,7 +87,6 @@ class compare_raft_defects():
             print '\n Totals'
             print "       %5i        %5i       %5i" % (tot1, tot2, tot_diff)
 
-        print badc
         return badc
 
     def get_files_run(self, run, defect_name):
@@ -158,7 +157,7 @@ class compare_raft_defects():
 
         self.printit = False
         comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
-
+        return comp
 
 
 
