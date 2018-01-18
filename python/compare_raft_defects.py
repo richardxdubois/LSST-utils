@@ -204,7 +204,7 @@ if __name__ == "__main__":
         with PdfPages(args.output) as pdf:
 
             plt.scatter(view_defects[1],view_defects[0])
-            plt.title('Defect Differences' + ccd + ' amp ' + args.amp)
+            plt.title('Defect Differences' + args.ccd + ' amp ' + args.amp)
             plt.xlabel('column')
             plt.ylabel('row')
 
