@@ -21,39 +21,50 @@ class compare_raft_defects():
         self.current_ccd = ''
         self.defect_list = defect_list
         self.mirror = mirror
+        self.amp = -1
 
         self.db = db
         self.prodServer = prodServer
         self.debug = debug
+        self.printit = True
 
         pS = True
         if self.prodServer == 'Dev':
             pS = False
 
-        self.connect = Connection(operator='richard', db=args.db, exp='LSST-CAMERA', prodServer=pS,
-                                  appSuffix=appSuffix)
+        self.connect = Connection(operator='richard', db=self.db, exp='LSST-CAMERA', prodServer=pS,
+                                  appSuffix=appSuffix, debug=False)
 
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
                             mirrorName=self.mirror)
 
-        self.eR = exploreRaft()
+        self.eR = exploreRaft(prodServer=self.prodServer,appSuffix=appSuffix)
 
-        returnData = self.connect.getRunSummary(run=run1)
-        self.raft = returnData['experimentSN']
 
-        self.ccd_list = self.eR.raftContents(self.raft)
         if self.debug == True:
             self.ccd_list = [('ITL-3800C-022', 0, 0)]
+            self.run1 = 5730
+            self.run2 = 5731
+
+        returnData = self.connect.getRunSummary(run=self.run2)
+        self.raft = returnData['experimentSN']
+        self.ccd_list = self.eR.raftContents(self.raft)
+
 
     def comp_defects(self, hdu1, hdu2):
 
-        print 'Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd, ' Run 1 ', self.run1,\
-            ' Run 2', self.run2, ' \n'
-        print ' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px'
+        if self.printit:
+            print 'Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd, ' Run 1 ', self.run1,\
+                ' Run 2', self.run2, ' \n'
+            print ' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px'
 
         tot1 = tot2 = tot_diff = 0
 
-        for amp in range(1, 17):
+
+        for amp in range(1,17):
+            if self.amp != -1 and amp != self.amp:
+                continue
+
             pixeldata_run1 = np.array(hdu1[amp].data)
             pixeldata_run2 = np.array(hdu2[amp].data)
             sum_run1 = np.sum(pixeldata_run1)
@@ -62,14 +73,18 @@ class compare_raft_defects():
 
             badc = np.where(diff_pix != 0)
             diff_pix = len(badc[0])
-            print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix)
+            if self.printit:
+                print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix)
 
             tot1 += sum_run1
             tot2 += sum_run2
             tot_diff += diff_pix
 
-        print '\n Totals'
-        print "       %5i        %5i       %5i" % (tot1, tot2, tot_diff)
+        if self.printit:
+            print '\n Totals'
+            print "       %5i        %5i       %5i" % (tot1, tot2, tot_diff)
+
+        return badc
 
     def get_files_run(self, run, defect_name):
 
@@ -122,6 +137,26 @@ class compare_raft_defects():
                 print '\n ', f1, '\n', f2
                 comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
 
+    def examine_defects(self, ccd, amp):
+
+        self.current_ccd = ccd
+        self.amp = amp
+
+        self.current_defect = self.defect_list[0]
+
+        r1_files = self.get_files_run(run=self.run1, defect_name=self.current_defect)
+        r2_files = self.get_files_run(run=self.run2, defect_name=self.current_defect)
+
+        f1 = r1_files[ccd]
+        hdu1 = fits.open(f1)
+        f2 = r2_files[ccd]
+        hdu2 = fits.open(f2)
+
+        self.printit = False
+        comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
+
+
+
 
 if __name__ == "__main__":
     ## Command line arguments
@@ -135,13 +170,15 @@ if __name__ == "__main__":
     parser.add_argument('-m','--mirror', default='prod', help="mirror BNL-prod, INT-prod ")
     parser.add_argument('--db', default='Prod', help="Prod or Dev eT db ")
     parser.add_argument('--debug', default='no', help="debug flag(default=%(default)s)")
-    parser.add_argument('-e', '--eTserver', default='Dev', help="eTraveler server (default=%(default)s)")
-    parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
+    parser.add_argument('-e', '--eTserver', default='Prod', help="eTraveler server (default=%(default)s)")
+    parser.add_argument('--appSuffix', '--appSuffix', default='',
                         help="eTraveler server (default=%(default)s)")
     parser.add_argument('-o', '--output', default='raft_temp_dependence.pdf',
                         help="output plot file (default=%(default)s)")
     parser.add_argument('-i', '--infile', default="",
                         help="input file name for list of runs, temps (default=%(default)s)")
+    parser.add_argument('-a','--amp', default=-1, help="optional amp to examine ")
+    parser.add_argument('-c','--ccd', default='NONE', help="optional CCD to examine ")
 
     args = parser.parse_args()
 
@@ -153,6 +190,10 @@ if __name__ == "__main__":
         debug = False
 
     defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list = defect_list, debug=debug,
-                                   mirror=args.mirror)
+                                   mirror=args.mirror,prodServer=args.eTserver, appSuffix=args.appSuffix)
 
-    tab_defects = defects.tabulate_defects()
+    if args.amp == -1:
+        tab_defects = defects.tabulate_defects()
+    else:
+        view_defects = defects.examine_defects(amp=int(args.amp),ccd=args.ccd )
+        print view_defects
