@@ -78,7 +78,6 @@ class compare_raft_defects():
             diff_pix_count = len(badc[0])
 #            if self.printit:
             print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count)
-            print badc
 
             tot1 += sum_run1
             tot2 += sum_run2
@@ -88,6 +87,7 @@ class compare_raft_defects():
             print '\n Totals'
             print "       %5i        %5i       %5i" % (tot1, tot2, tot_diff)
 
+        print badc
         return badc
 
     def get_files_run(self, run, defect_name):
