@@ -60,6 +60,7 @@ class compare_raft_defects():
 
         tot1 = tot2 = tot_diff = 0
 
+        badc = {}
 
         for amp in range(1,17):
             if self.amp != -1 and amp != self.amp:
