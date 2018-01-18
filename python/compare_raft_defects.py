@@ -176,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--eTserver', default='Prod', help="eTraveler server (default=%(default)s)")
     parser.add_argument('--appSuffix', '--appSuffix', default='',
                         help="eTraveler server (default=%(default)s)")
-    parser.add_argument('-o', '--output', default='raft_temp_dependence.pdf',
+    parser.add_argument('-o', '--output', default='raft_defects.pdf',
                         help="output plot file (default=%(default)s)")
     parser.add_argument('-i', '--infile', default="",
                         help="input file name for list of runs, temps (default=%(default)s)")
@@ -200,3 +200,14 @@ if __name__ == "__main__":
     else:
         view_defects = defects.examine_defects(amp=int(args.amp),ccd=args.ccd )
         print view_defects
+
+        with PdfPages(args.output) as pdf:
+
+            plt.scatter(view_defects[0],view_defects[1])
+            plt.title('Defect Differences')
+            plt.xlabel('row')
+            plt.ylabel('column')
+
+            pdf.savefig()
+            plt.close()
+
