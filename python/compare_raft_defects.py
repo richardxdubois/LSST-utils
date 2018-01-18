@@ -203,10 +203,10 @@ if __name__ == "__main__":
 
         with PdfPages(args.output) as pdf:
 
-            plt.scatter(view_defects[0],view_defects[1])
+            plt.scatter(view_defects[1],view_defects[0])
             plt.title('Defect Differences')
-            plt.xlabel('row')
-            plt.ylabel('column')
+            plt.xlabel('column')
+            plt.ylabel('row')
 
             pdf.savefig()
             plt.close()
