@@ -217,12 +217,12 @@ if __name__ == "__main__":
             plt.close()
 
             plt.scatter(badc_run1[1],badc_run1[0])
-            plt.title('Defect Run ', + args.run1 +  ': ' + args.ccd + ' amp ' + args.amp)
+            plt.title('Defect Run ' + args.run1 +  ': ' + args.ccd + ' amp ' + args.amp)
             plt.xlabel('column')
             plt.ylabel('row')
 
             plt.scatter(badc_run2[1], badc_run2[0])
-            plt.title('Defect Run ', + args.run2 + ': ' + args.ccd + ' amp ' + args.amp)
+            plt.title('Defect Run ' + args.run2 + ': ' + args.ccd + ' amp ' + args.amp)
             plt.xlabel('column')
             plt.ylabel('row')
 
