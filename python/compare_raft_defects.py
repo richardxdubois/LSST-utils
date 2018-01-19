@@ -75,6 +75,9 @@ class compare_raft_defects():
             diff_pix = pixeldata_run1 - pixeldata_run2
 
             badc = np.where(diff_pix != 0)
+            defect_1 = np.where(pixeldata_run1 != 0)
+            defect_2 = np.where(pixeldata_run2 != 0)
+
             diff_pix_count = len(badc[0])
 #            if self.printit:
             print "%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count)
@@ -87,7 +90,7 @@ class compare_raft_defects():
             print '\n Totals'
             print "       %5i        %5i       %5i" % (tot1, tot2, tot_diff)
 
-        return badc
+        return (badc, defect_1, defect_2)
 
     def get_files_run(self, run, defect_name):
 
@@ -199,15 +202,30 @@ if __name__ == "__main__":
         tab_defects = defects.tabulate_defects()
     else:
         view_defects = defects.examine_defects(amp=int(args.amp),ccd=args.ccd )
-        print view_defects
+        badc_diff = view_defects[0]
+        badc_run1 = view_defects[1]
+        badc_run2 = view_defects[2]
+        print badc_diff
 
         with PdfPages(args.output) as pdf:
 
-            plt.scatter(view_defects[1],view_defects[0])
+            plt.scatter(badc_diff[1],badc_diff[0])
             plt.title('Defect Differences: ' + args.ccd + ' amp ' + args.amp)
             plt.xlabel('column')
             plt.ylabel('row')
-
             pdf.savefig()
+            plt.close()
+
+            plt.scatter(badc_run1[1],badc_run1[0])
+            plt.title('Defect Run ', + args.run1 +  ': ' + args.ccd + ' amp ' + args.amp)
+            plt.xlabel('column')
+            plt.ylabel('row')
+
+            plt.scatter(badc_run2[1], badc_run2[0])
+            plt.title('Defect Run ', + args.run2 + ': ' + args.ccd + ' amp ' + args.amp)
+            plt.xlabel('column')
+            plt.ylabel('row')
+
+        pdf.savefig()
             plt.close()
 
