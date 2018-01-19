@@ -84,7 +84,7 @@ class compare_raft_defects():
 
             tot1 += sum_run1
             tot2 += sum_run2
-            tot_diff += diff_pix
+            tot_diff += diff_pix_count
 
         if self.printit:
             print '\n Totals'
