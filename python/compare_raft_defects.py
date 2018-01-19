@@ -226,6 +226,6 @@ if __name__ == "__main__":
             plt.xlabel('column')
             plt.ylabel('row')
 
-        pdf.savefig()
+            pdf.savefig()
             plt.close()
 
