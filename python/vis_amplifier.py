@@ -7,19 +7,21 @@ import matplotlib.pyplot as plt
 
 class vis_amplifier():
 
-    def __init__(self, testName=None, CCDType=None, sensorId=None, XtraOpts = 'IMGTYPE=="FLAT"', run= None, amp=None):
+    def __init__(self, testName=None, CCDType=None, sensorId=None, XtraOpts = 'IMGTYPE=="FLAT"', run= None,
+                 amp=None, mirror='BNL-Prod'):
 
        self.testName = testName
        self.CCDType = CCDType
        self.sensorId =sensorId
        self.run = run
        self.amp = amp
-       self.XtraOpts = XtraOpts       
+       self.XtraOpts = XtraOpts
+       self.mirror = mirror
 
     def make_plt(self):
         
        fCCD= findCCD(FType='fits', testName=self.testName, sensorId=self.sensorId, run= self.run,
-                     XtraOpts=self.XtraOpts, appSuffix='',prodServer='Prod',mirrorName='BNL-Prod')
+                     XtraOpts=self.XtraOpts, appSuffix='',prodServer='Prod',mirrorName=mirror)
 
        files = fCCD.find()
 
@@ -60,12 +62,13 @@ if __name__ == "__main__":
     parser.add_argument('-a','--amplifier', default=1,help="amplifier number (default=%(default)s)")
     parser.add_argument('-t','--type', default='dark',help="file kind (default=%(default)s)")
     parser.add_argument('-r','--run', default=None,help="run number (default=%(default)s)")
+    parser.add_argument('-m','--mirror', default='BNL-Prod',help="DC mirror ")
     parser.add_argument('-o','--output', default='amplifier.pdf',help="output pdf file ")
     args = parser.parse_args()
 
     
 
-    vA = vis_amplifier(testName=args.type, sensorId=args.sensorID, run=args.run, amp=args.amplifier)
+    vA = vis_amplifier(testName=args.type, sensorId=args.sensorID, run=args.run, amp=args.amplifier, mirror=args.mirror)
 
     bias_sub = vA.make_plt()
 
