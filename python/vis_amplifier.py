@@ -21,7 +21,7 @@ class vis_amplifier():
     def make_plt(self):
         
        fCCD= findCCD(FType='fits', testName=self.testName, sensorId=self.sensorId, run= self.run,
-                     XtraOpts=self.XtraOpts, appSuffix='',prodServer='Prod',mirrorName=mirror)
+                     XtraOpts=self.XtraOpts, appSuffix='',prodServer='Prod',mirrorName=self.mirror)
 
        files = fCCD.find()
 
@@ -68,7 +68,8 @@ if __name__ == "__main__":
 
     
 
-    vA = vis_amplifier(testName=args.type, sensorId=args.sensorID, run=args.run, amp=args.amplifier, mirror=args.mirror)
+    vA = vis_amplifier(testName=args.type, sensorId=args.sensorID, run=args.run, amp=args.amplifier,
+                       mirror=args.mirror)
 
     bias_sub = vA.make_plt()
 
