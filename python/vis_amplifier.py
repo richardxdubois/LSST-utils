@@ -71,6 +71,8 @@ if __name__ == "__main__":
 
     with PdfPages(args.output) as pdf:
         plt.imshow(bias_sub, cmap='hot', origin='lower')
+        v = [0,50,600,750]
+        plt.axis(v)
         plt.colorbar()
         plt.suptitle(' Image region - flat')
         pdf.savefig()
