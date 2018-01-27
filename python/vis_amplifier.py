@@ -45,7 +45,8 @@ class vis_amplifier():
 
         pedestal = np.mean(bias.flatten())
         #       bias_sub = pixeldata[0:2047,0:511] - pedestal
-        bias_sub = pixeldata[600:750, 0:50] - pedestal
+#        bias_sub = pixeldata[600:750, 0:50] - pedestal
+        bias_sub = pixeldata - pedestal
 
         return bias_sub
 
