@@ -1,19 +1,18 @@
 from  eTraveler.clientAPI.connection import Connection
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-import datetime
-import collections
 import numpy as np
 from findCCD import findCCD
 from exploreRaft import exploreRaft
 import astropy.io.fits as fits
+from connector import connector
 
 import argparse
 
 
 class compare_raft_defects():
     def __init__(self, run1=None, run2=None, defect_list='bright_defects_raft', debug = False,  db='Prod',
-                 prodServer='Dev', appSuffix='-jrb', mirror='prod'):
+                 prodServer='Prod', appSuffix='', mirror='prod'):
 
         self.run1 = run1
         self.run2 = run2
@@ -32,8 +31,7 @@ class compare_raft_defects():
         if self.prodServer == 'Dev':
             pS = False
 
-        self.connect = Connection(operator='richard', db=self.db, exp='LSST-CAMERA', prodServer=pS,
-                                  appSuffix=appSuffix, debug=False)
+        self.connector = connector(db=self.db, prodServer=pS)
 
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
                             mirrorName=self.mirror,prodServer=self.prodServer,appSuffix=appSuffix)
@@ -95,7 +93,8 @@ class compare_raft_defects():
     def get_files_run(self, run, defect_name):
 
         file_list = {}
-        returnData = self.connect.getRunSummary(run=run)
+        connect = self.connector.run_selector(run)
+        returnData = connect.getRunSummary(run=run)
         subsystem = returnData['subsystem']
         mirror = 'BNL'
         if subsystem == 'Integration and Test':
