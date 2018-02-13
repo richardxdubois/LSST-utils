@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(
 
 ##   The following are 'convenience options' which could also be specified in the filter string
 parser.add_argument('--run', default=None, help="(raft run number (default=%(default)s)")
-parser.add_argument('-s', '--schema', default=None, help="(metadata) schema (default=%(default)s)")
+parser.add_argument('--defect', '--defect', default='dark', help="(metadata) schema (default=%(default)s)")
 parser.add_argument('-X', '--XtraOpts', default=None,
                     help="any extra 'datacat find' options (default=%(default)s)")
 parser.add_argument('-d', '--db', default='Prod', help="eT database (default=%(default)s)")
@@ -19,7 +19,6 @@ parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
                     help="eTraveler server (default=%(default)s)")
 args = parser.parse_args()
 
-schema = args.schema
 if args.eTserver == 'Prod':
     pS = True
 else:
@@ -36,13 +35,23 @@ connectProd = connector.run_selector('1234')
 rsp = connectProd.getRunSummary(run=run_list[0])
 raft = rsp['experimentSN']
 
-print 'Searching ', raft, ' for ', schema
+print 'Searching ', raft
 
 ccd_list = eR.raftContents(raft)
 runs_used = [-99] * (2 + len(run_list))
 print ccd_list
 
-result_name = 'dark_pixels'
+result_name = args.defect + '_pixels'
+vendor_step = args.defect + '_defects_offline'
+vendor_schema = args.defect + '_defects'
+
+ts3_step = args.defect + '_defects'
+ts3_schema = args.defect + '_defects'
+
+raft_step = args.defect + '_defects_raft'
+raft_schema = args.defect + '_defects_raft'
+
+
 
 for row in ccd_list:
     ccdProd = row[0].split('-Dev')[0]
@@ -52,28 +61,28 @@ for row in ccd_list:
     htype = 'ITL-CCD'
     if 'E2V' in ccd: htype = 'e2v-CCD'
 
-    returnDataVendor = connectProd.getResultsJH(htype=htype, stepName='dark_defects_offline',
+    returnDataVendor = connectProd.getResultsJH(htype=htype, stepName=vendor_step,
                                                 travelerName='SR-EOT-02', experimentSN=ccdProd)
 
     expDict = returnDataVendor[ccdProd]
     runs_used[0] = expDict['runNumber']
-    stepDict = expDict['steps']['dark_defects_offline']
+    stepDict = expDict['steps'][vendor_step]
 
-    schemaList = stepDict['dark_defects']
+    schemaList = stepDict[vendor_schema]
     for d in schemaList:
         if d['schemaInstance'] == 0: continue
         test_table[d['amp']] = [d[result_name], -99., -99., -99., -99.]
 
     try:
-        returnDataTS3 = connectProd.getResultsJH(htype=htype, stepName='dark_defects',
+        returnDataTS3 = connectProd.getResultsJH(htype=htype, stepName=ts3_step,
                                                  travelerName='SR-EOT-1',
                                                  experimentSN=ccdProd)
 
         expDict = returnDataTS3[ccdProd]
         runs_used[1] = expDict['runNumber']
 
-        stepDict = expDict['steps']['dark_defects']
-        schemaList = stepDict['dark_defects']
+        stepDict = expDict['steps'][ts3_step]
+        schemaList = stepDict[ts3_schema]
         for d in schemaList:
             if d['schemaInstance'] == 0: continue
             test_table[d['amp']][1] = d[result_name]
@@ -91,9 +100,9 @@ for row in ccd_list:
         returnDataTS8 = raft_connect.getRunResults(run=run, itemFilter=('sensor_id', ccd_name))
         runs_used[raft_run] = run
 
-        stepDict = returnDataTS8['steps']['dark_defects_raft']
+        stepDict = returnDataTS8['steps'][raft_step]
 
-        schemaList = stepDict['dark_defects_raft']
+        schemaList = stepDict[raft_schema]
         for d in schemaList:
             if d['schemaInstance'] == 0: continue
             test_table[d['amp']][raft_run] = d[result_name]
