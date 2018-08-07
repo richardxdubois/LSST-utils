@@ -4,6 +4,14 @@ import argparse
 import collections
 import pandas
 
+"""
+label_unlabeled_sensors:
+
+Read an excel spreadsheet containing Project endorsed grades for e2v and ITL sensors. Already-labeled 
+sensors are not affected.
+"""
+
+
 ## Command line arguments
 parser = argparse.ArgumentParser(
     description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
@@ -17,6 +25,9 @@ parser.add_argument('--do_one', default='no', help="do only the first ccd as a t
 parser.add_argument('--account', default='richard', help="account to use")
 parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
                     help="eTraveler server (default=%(default)s)")
+parser.add_argument('-i', '--input',
+                    default='/Users/richard/LSST/Data/Sensor_Plots_for_Watchlist-20180709.xlsx',
+                    help="output plot file (default=%(default)s)")
 parser.add_argument('-o', '--output', default='unlabeled_sensors.pdf',
                     help="output plot file (default=%(default)s)")
 parser.add_argument('-p', '--plan', default='',
@@ -36,7 +47,7 @@ ccd_params = {}
 ccd_params['ITL'] = ['ITL-CCD', '3800C']
 ccd_params['e2v'] = ['e2v-CCD', 'CCD250']
 
-excel_assign = pandas.read_excel(io="/Users/richard/LSST/Data/Sensor_Plots_for_Watchlist-20180709.xlsx",
+excel_assign = pandas.read_excel(io=args.input,
                                  sheet_name=args.htype.upper(), header=0)
 sensor_frame = excel_assign.set_index('Sensor ID', drop=False)
 
@@ -80,7 +91,8 @@ for inst in returnData:
 
         if args.doit == 'yes':
             rc = connect.modifyHardwareLabel(experimentSN=ccd, htype=ccd_params[args.htype][0], label=grade,
-                group='SR_Grade', adding='true', reason='match Vincent Riot spreadsheet 2018-07-17')
+                group='SR_Grade', adding='true', reason='match Vincent Riot spreadsheet 2018-07-29')
+            print "Updated ", ccd, " as grade ", grade
             if args.do_one == 'yes':
                 break
 
