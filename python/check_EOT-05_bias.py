@@ -30,6 +30,7 @@ file = file.replace("SR-CCD-EOT-05_Preflight-Check", "preflight_acq")
 print 'Operating on ', file
 hdulist = fits.open(file)
 expTime = hdulist[0].header['EXPTIME']
+print "Exposure time = ", expTime
 
 for ampHdu in range(1,17):
     datasec = hdulist[ampHdu].header['DATASEC'][1:-1].replace(':', ',').split(',')
@@ -39,13 +40,17 @@ for ampHdu in range(1,17):
     bias_restricted = np.array(pixeldata[1500:1900,520:550])
     bias_full = np.array(pixeldata[int(biassec[2]):int(biassec[3]), int(biassec[0]):
                                                                     int(biassec[1])])
+    image_full = np.array(pixeldata[int(datasec[2]):int(datasec[3]), int(datasec[0]):
+                                                                    int(datasec[1])])
 
     # seeing a change in mean bias moving across the overscan region
 
-    bias_full_median = np.mean(bias_full.flatten())
-    bias_full_restricted = np.mean(bias_restricted.flatten())
+    image_full_mean = np.mean(image_full.flatten())
+    bias_full_mean = np.mean(bias_full.flatten())
+    bias_restricted_mean = np.mean(bias_restricted.flatten())
 
-    print 'ccd = ', ccd, ' amp = ', ampHdu, ' bias_full_median = ', bias_full_median, \
-                                    ' bias_restricted_median = ', bias_full_restricted
+    print 'ccd = ', ccd, ' amp = ', ampHdu, ' bias_full = ', bias_full_mean, \
+                                    ' bias_restr = ', bias_restricted_mean, \
+                                    " img_full = ", image_full_mean
 
 
