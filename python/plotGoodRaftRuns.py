@@ -54,6 +54,8 @@ class plotGoodRaftRuns():
 
     def write_run_plot(self, run=None, site_type=None, raft=None):
 
+        print 'Operating on run ', run
+
         g = get_EO_analysis_results(db=self.db, server=self.server)
 
         raft_list, data = g.get_tests(site_type=site_type, test_type="gain", run=run)
@@ -102,6 +104,21 @@ class plotGoodRaftRuns():
                                                         run=run)
         res_bc = g.get_results(test_type='bright_columns', data=data_bc, device=raft)
 
+        raft_list_traps, data_tp = g.get_tests(site_type=site_type, test_type="num_traps", run=run)
+        res_tp = g.get_results(test_type='num_traps', data=data_tp, device=raft)
+
+        raft_list_qe, data_qe = g.get_tests(site_type=site_type, test_type="QE", run=run)
+        res_qe = g.get_results(test_type='QE', data=data_qe, device=raft)
+
+        raft_list_drkC, data_drkC = g.get_tests(site_type=site_type, test_type="dark_current_95CL", run=run)
+        res_drkC = g.get_results(test_type='dark_current_95CL', data=data_drkC, device=raft)
+
+        raft_list_fw, data_fw = g.get_tests(site_type=site_type, test_type="full_well", run=run)
+        res_fw = g.get_results(test_type='full_well', data=data_fw, device=raft)
+
+        raft_list_nonl, data_nonl = g.get_tests(site_type=site_type, test_type="max_frac_dev", run=run)
+        res_nonl = g.get_results(test_type='max_frac_dev', data=data_nonl, device=raft)
+
         test_list = []
         test_list_ptc = []
         test_list_psf = []
@@ -116,6 +133,21 @@ class plotGoodRaftRuns():
         test_list_dc = []
         test_list_bp = []
         test_list_bc = []
+        test_list_tp = []
+
+        test_list_drkC = []
+        test_list_fw = []
+        test_list_nonl = []
+
+        # treat qe specially since all filters are in the same list
+
+        test_list_qe_u = []
+        test_list_qe_g = []
+        test_list_qe_r = []
+        test_list_qe_i = []
+        test_list_qe_z = []
+        test_list_qe_y = []
+
 
         for ccd in res:
             test_list.extend(res[ccd])
@@ -132,6 +164,18 @@ class plotGoodRaftRuns():
             test_list_bc.extend(res_bc[ccd])
             test_list_dp.extend(res_dp[ccd])
             test_list_dc.extend(res_dc[ccd])
+            test_list_tp.extend(res_tp[ccd])
+
+            test_list_drkC.extend(res_drkC[ccd])
+            test_list_fw.extend(res_fw[ccd])
+            test_list_nonl.extend(res_nonl[ccd])
+
+            test_list_qe_u.append(res_qe[ccd][0])
+            test_list_qe_g.append(res_qe[ccd][1])
+            test_list_qe_r.append(res_qe[ccd][2])
+            test_list_qe_i.append(res_qe[ccd][3])
+            test_list_qe_z.append(res_qe[ccd][4])
+            test_list_qe_y.append(res_qe[ccd][5])
 
 
 
@@ -139,7 +183,14 @@ class plotGoodRaftRuns():
         source = ColumnDataSource(data=dict(x=range(0,len(test_list)), gain=test_list, ptc=test_list_ptc,
                                 psf=test_list_psf, rn=test_list_rn, cls=test_list_cls,
                                 chs=test_list_chs, clp=test_list_clp, chp=test_list_chp,
-                                bp=test_list_bp, bc=test_list_bc, dp=test_list_dp, dc=test_list_dc))
+                                bp=test_list_bp, bc=test_list_bc, dp=test_list_dp, dc=test_list_dc,
+                                tp=test_list_tp, drkC=test_list_drkC,
+                                fw=test_list_fw, nonl=test_list_nonl))
+
+        source_qe = ColumnDataSource(data=dict(x=range(0,len(test_list_qe_u)), u=test_list_qe_u,
+                                g=test_list_qe_g, r=test_list_qe_r,i=test_list_qe_i,z=test_list_qe_z,
+                                y=test_list_qe_y))
+
 
         TOOLS = "pan,wheel_zoom,box_zoom,reset,save,box_select,lasso_select"
 
@@ -158,7 +209,18 @@ class plotGoodRaftRuns():
         bc = figure(tools=TOOLS, title="Bright Columns", x_axis_label='amp', y_axis_label='Bright Columns')
         dp = figure(tools=TOOLS, title="Dark Pixels", x_axis_label='amp', y_axis_label='Dark Pixels')
         dc = figure(tools=TOOLS, title="Dark Columns", x_axis_label='amp', y_axis_label='Dark Columns')
+        tp = figure(tools=TOOLS, title="Traps", x_axis_label='amp', y_axis_label='Traps')
 
+        drkC = figure(tools=TOOLS, title="Dark Current", x_axis_label='amp', y_axis_label='Current')
+        fw = figure(tools=TOOLS, title="Full Well", x_axis_label='amp', y_axis_label='Full Well')
+        nonl = figure(tools=TOOLS, title="Non-linearity", x_axis_label='amp', y_axis_label='Max dev')
+
+        qe_u = figure(tools=TOOLS, title="QE: u band", x_axis_label='sensor', y_axis_label='QE')
+        qe_g = figure(tools=TOOLS, title="QE: g band", x_axis_label='sensor', y_axis_label='QE')
+        qe_r = figure(tools=TOOLS, title="QE: r band", x_axis_label='sensor', y_axis_label='QE')
+        qe_i = figure(tools=TOOLS, title="QE: i band", x_axis_label='sensor', y_axis_label='QE')
+        qe_z = figure(tools=TOOLS, title="QE: z band", x_axis_label='sensor', y_axis_label='QE')
+        qe_y = figure(tools=TOOLS, title="QE: y band", x_axis_label='sensor', y_axis_label='QE')
 
         # add a line renderer with legend and line thickness
         p.circle('x', 'gain', source=source, legend="Gain: Run " + str(run), line_width=2)
@@ -175,24 +237,40 @@ class plotGoodRaftRuns():
         bc.circle('x','bc', source=source, legend="Bright Columns: Run " + str(run), line_width=2)
         dp.circle('x','dp', source=source, legend="Dark Pixels: Run " + str(run), line_width=2)
         dc.circle('x','dc', source=source, legend="Dark Columns: Run " + str(run), line_width=2)
+        tp.circle('x','tp', source=source, legend="Traps: Run " + str(run), line_width=2)
+
+        drkC.circle('x','drkC', source=source, legend="Dark Current: Run " + str(run), line_width=2)
+        fw.circle('x','fw', source=source, legend="Full Well: Run " + str(run), line_width=2)
+        nonl.circle('x','nonl', source=source, legend="Non-linearity: Run " + str(run), line_width=2)
+
+        qe_u.circle('x','u', source=source_qe, legend="QE u band: Run " + str(run), line_width=2)
+        qe_g.circle('x','g', source=source_qe, legend="QE g band: Run " + str(run), line_width=2)
+        qe_r.circle('x','r', source=source_qe, legend="QE r band: Run " + str(run), line_width=2)
+        qe_i.circle('x','i', source=source_qe, legend="QE i band: Run " + str(run), line_width=2)
+        qe_z.circle('x','z', source=source_qe, legend="QE z band: Run " + str(run), line_width=2)
+        qe_y.circle('x','y', source=source_qe, legend="QE y band: Run " + str(run), line_width=2)
 
 
         # NEW: put the subplots in a gridplot
         grid = gridplot([[p, ptc], [psf, rn]])
         grid_cti = gridplot([[cls, chs], [clp, chp]])
-        grid_def = gridplot([[bp, bc], [dp, dc]])
+        grid_def = gridplot([[bp, bc, None], [dp, dc, tp]])
+        grid_qe = gridplot([[qe_u, qe_g, qe_r], [qe_i, qe_z, qe_y]])
+        grid_misc = gridplot([[fw, drkC], [nonl, None]])
 
         raft_text = "Plots for I&T Raft run " + str(run) + " " + raft
 
-        pre = PreText(text=raft_text, width=500, height=100)
+        pre = PreText(text=raft_text, width=1000, height=100)
 
         tab1 = Panel(child=grid, title="Gains, PSF, Noise")
         tab2 = Panel(child=grid_cti, title="CTI")
         tab3 = Panel(child=grid_def, title="Defects")
+        tab4 = Panel(child=grid_qe, title="QE 6-band")
+        tab5 = Panel(child=grid_misc, title="Dark C, Full well, Non-lin")
 
-        tabs = Tabs(tabs=[ tab1, tab2, tab3 ])
+        tabs = Tabs(tabs=[ tab1, tab2, tab3, tab4, tab5 ])
 
-        l= layout([widgetbox(pre), tabs])
+        l= layout([widgetbox(pre), tabs], sizing_mode='scale_both')
 
         o_file = self.base_dir + raft + "-" + str(run) + ".html"
         output_file(o_file)
@@ -238,7 +316,9 @@ if __name__ == "__main__":
 
     pG = plotGoodRaftRuns(db='Prod', server='Prod', base_dir=args.output)
 
-    runs_bnl = [4418, 5761, 6147, 7660]
+    runs_bnl = [4390, 4417, 4418, 4576, 4613, 4625, 4626, 5508, 5511, 5634, 5635, 5675, 5761, 6131, 6147,\
+                6317, 6350, 6829, 6854, 7192, 7195, 7479, 7652, 7653, 7659, 7660, 7661, 7678,\
+                7983, 7984, 8028, 8404]
     run_list, raft_list = pG.make_run_pages(site_type="BNL-Raft", runs=runs_bnl)
 
     data_table_bnl = pG.write_table(run_list=run_list, raft_list=raft_list)
@@ -258,8 +338,8 @@ if __name__ == "__main__":
     dash_file = args.output + 'bokehDashboard.html'
     output_file(dash_file)
 
-    intro_text = "EO Test Results for Good Raft Runs"
-    pre_intro = PreText(text=intro_text, width=500, height=10)
+    intro_text = "EO Test Results for Good Raft Runs (scroll if more than 10 entries)"
+    pre_intro = PreText(text=intro_text, width=550, height=10)
 
 
     type_text = "BNL-Raft"

@@ -18,9 +18,7 @@ parser = argparse.ArgumentParser(
 ##   The following are 'convenience options' which could also be specified in the filter string
 parser.add_argument('-t', '--htype', default='LCA-11021_RTM', help="hardware type (default=%(default)s)")
 parser.add_argument('-d', '--db', default='Prod', help="eT database (default=%(default)s)")
-parser.add_argument('-e', '--eTserver', default='Dev', help="eTraveler server (default=%(default)s)")
-parser.add_argument('--appSuffix', '--appSuffix', default='jrb',
-                    help="eTraveler server (default=%(default)s)")
+parser.add_argument('-e', '--eTserver', default='Prod', help="eTraveler server (default=%(default)s)")
 parser.add_argument('-o', '--output', default='unlabeled_sensors.pdf',
                     help="output plot file (default=%(default)s)")
 
@@ -30,10 +28,8 @@ if args.eTserver == 'Prod':
     pS = True
 else:
     pS = False
-connect_prod = Connection(operator='richard', db='Prod', exp='LSST-CAMERA', prodServer=pS,
-                     appSuffix='-' + args.appSuffix)
-connect_dev = Connection(operator='richard', db='Dev', exp='LSST-CAMERA', prodServer=pS,
-                     appSuffix='-' + args.appSuffix)
+connect_prod = Connection(operator='richard', db='Prod', exp='LSST-CAMERA', prodServer=pS)
+connect_dev = Connection(operator='richard', db='Dev', exp='LSST-CAMERA', prodServer=pS)
 
 eR_prod = exploreRaft(db='Prod')
 eR_dev = exploreRaft(db='Dev')
@@ -74,8 +70,12 @@ print raft_list
 for raft in raft_list:
     print 'Matching raft: ', raft
     for raft_dev in raft_list_dev:
+        ccd_type = eR_prod.raft_type(raft=raft) + "-CCD"
         nc = 0
+        nc_sn = 0
         nr = 0
+        nr_sn = 0
+
         if raft in raft_dev:
             if len(raft_list_dev[raft_dev]) == 0:
                 print 'Dev raft ', raft_dev, ' has no content'
@@ -85,6 +85,19 @@ for raft in raft_list:
                 c_dev = raft_list_dev[raft_dev][idx]
                 if c[0] in c_dev[0]:
                     nc += 1
+                    returnCCD_dev = connect_dev.getHardwareInstances(htype=ccd_type, experimentSN=c_dev[0])
+                    try:
+                        ccd_manu_l = returnCCD_dev[0]
+                        ccd_manu = ccd_manu_l['manufacturerId']
+                        nc_sn += 1
+                    except KeyError:
+                        pass
                 if c[2] in c_dev[2]:
                     nr += 1
-            print raft, raft_dev, nc, nr
+                    returnREB_dev = connect_dev.getHardwareInstances(htype='LCA-13574', experimentSN=c_dev[2])
+                    try:
+                        reb_manu = returnREB_dev[0]['manufacturerId']
+                        nr_sn += 1
+                    except KeyError:
+                        pass
+            print raft, raft_dev, nc, nc_sn, nr, nr_sn
