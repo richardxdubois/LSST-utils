@@ -1,3 +1,4 @@
+from __future__ import print_function
 from get_EO_analysis_results import get_EO_analysis_results
 from  eTraveler.clientAPI.connection import Connection
 import numpy as np
@@ -17,7 +18,7 @@ class bokehServerSelectionTest():
 
     def write_run_plot(self, run=None, site_type=None):
 
-        print 'Operating on run ', run
+        print ('Operating on run ', run)
 
         g = get_EO_analysis_results(db=self.db, server=self.server)
 
@@ -58,7 +59,7 @@ from bokeh.layouts import row, column
 from bokeh.models import BoxSelectTool, LassoSelectTool, Spacer
 from bokeh.plotting import figure, curdoc
 
-print 'firing up the bokeh server with a scatterplot'
+print ('firing up the bokeh server with a scatterplot')
 
 TOOLS="pan,wheel_zoom,box_select,lasso_select,reset"
 
