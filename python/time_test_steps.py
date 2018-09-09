@@ -9,7 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 parser = argparse.ArgumentParser(description='Find archived data in the LSST  data Catalog. These include CCD test stand and vendor data files.')
 
 ##   The following are 'convenience options' which could also be specified in the filter string
-parser.add_argument('-t','--htype', default=None,help="hardware type (default=%(default)s)")
+parser.add_argument('-t','--htype', default="ITL-CCD",help="hardware type (default=%(default)s)")
 parser.add_argument('-d','--db',default='Prod',help="eT database (default=%(default)s)")
 parser.add_argument('-e','--eTserver',default='Dev',help="eTraveler server (default=%(default)s)")
 parser.add_argument('--appSuffix','--appSuffix',default='jrb',help="eTraveler server (default=%(default)s)")
@@ -47,7 +47,7 @@ for ccd in returnData:
     rsp = connect.getRunActivities(run=run)
 
     for step in rsp:
-        if step['status'] <> 'success': continue
+        if step['status'] != 'success': continue
         step_name = step['stepName']
         if step_name not in step_times: step_times[step_name] = []
         begin = datetime.datetime.strptime(step['begin'],'%Y-%m-%dT%H:%M:%S.%f')
