@@ -111,9 +111,13 @@ class renderFocalPlane():
             else:
                 raft_list = self.emulate_raft_list
 
+        for j in range(21):
+            self.installed_raft_names[j] = ""
+            self.raft_is_there[j] = False
+
         for i in range(len(self.raft_slot_names)):
             for raft in range(len(raft_list)):
-                if self.raft_slot_names[i] == self.emulate_raft_list[raft][1]:
+                if self.raft_slot_names[i] == raft_list[raft][1]:
                     self.raft_is_there[i] = True
                     self.installed_raft_names[i] = raft_list[raft][0]
                     if self.emulate is True:
