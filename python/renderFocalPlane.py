@@ -5,7 +5,8 @@ from exploreFocalPlane import exploreFocalPlane
 from exploreRaft import exploreRaft
 from  eTraveler.clientAPI.connection import Connection
 
-from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid, LogColorMapper
+from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid, LogColorMapper, ColorBar, \
+    LogTicker, BasicTicker
 from bokeh.plotting import figure, output_file, show, save, curdoc
 from bokeh.palettes import Viridis6 as palette
 from bokeh.layouts import row, layout
@@ -155,13 +156,15 @@ class renderFocalPlane():
 
         TOOLS = "pan,wheel_zoom,reset,hover,save"
         color_mapper = LogColorMapper(palette=palette)
+        color_bar = ColorBar(color_mapper=color_mapper, ticker=LogTicker(), label_standoff=12,
+                            border_line_color=None, location=(0,0))
 
         fig_title = "Focal Plane"
         if self.single_raft_mode is True:
             fig_title = self.installed_raft_names[10]
 
         p = figure(
-            title=fig_title, tools=TOOLS,
+            title=fig_title, tools=TOOLS, toolbar_location="below",
             tooltips=[
                 ("Raft", "@raft_name"), ("Raft slot", "@raft_slot"), ("CCD slot", "@ccd_slot"),
                 ("CCD name", "@ccd_name"), ("Amp","@amp_number"),
@@ -170,6 +173,7 @@ class renderFocalPlane():
             x_axis_location=None, y_axis_location=None,)
         p.grid.grid_line_color = None
         p.hover.point_policy = "follow_mouse"
+        p.add_layout(color_bar,"right")
 
         if self.single_raft_mode is False:
             p.rect(x=[0], y=[0], width=15., height=15., color="red", fill_alpha=0.1)
@@ -236,12 +240,15 @@ class renderFocalPlane():
                                   ccd_name=ccd_name, ccd_slot=ccd_slot,
                                   amp_number=amp_number, test_q=test_q))
 
+        cm = p.select_one(LogColorMapper)
+        cm.update(low=min(test_q), high=max(test_q))
+
         p.rect(x='x', y='y', source=self.source, height=self.amp_width, width=self.ccd_width/2.,
             color="black",
             fill_alpha=0.7, fill_color={ 'field': 'test_q', 'transform': color_mapper})
 
         h_q, bins = np.histogram(np.array(test_q), bins=50)
-        h = figure(title=testq, tools=TOOLS)
+        h = figure(title=testq, tools=TOOLS, toolbar_location="below")
         h.quad(top=h_q, bottom=0, left=bins[:-1], right=bins[1:], fill_color='blue', fill_alpha=0.2)
 
 
