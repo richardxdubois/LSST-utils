@@ -4,7 +4,7 @@ from bokeh.models import ColumnDataSource, DataRange1d, Plot, LinearAxis, Grid, 
 from bokeh.plotting import figure, output_file, show, save, curdoc
 from bokeh.palettes import Viridis6 as palette
 from bokeh.layouts import row, layout
-from bokeh.models.widgets import TextInput, Dropdown, Slider
+from bokeh.models.widgets import TextInput, Dropdown, Slider, Button
 
 
 rFP = renderFocalPlane()
@@ -31,17 +31,20 @@ menu = [('Gain', 'gain'), ('Gain Error', 'gain_error'), ('PSF', 'psf_sigma'),
 drop = Dropdown(label="Select test", button_type="warning", menu=menu)
 
 #slider = Slider(start=0, end=10, value=10, step=.1, title="Stuff")
-text_input = TextInput(value=str(run_list[0]), title="Select Run")
+text_input = TextInput(value=str(rFP.get_current_run()), title="Select Run")
 
+button = Button(label="Single Raft Mode", button_type="success")
 
-m = layout(row(text_input, drop), l)
+interactors = layout(row(text_input, drop, button))
+
+m = layout(interactors, l)
 
 
 def update_dropdown(sattr, old, new):
     new_test = drop.value
 
     l_new = rFP.render(run=rFP.get_current_run(), testq=new_test)
-    m_new = layout(row(text_input, drop), l_new)
+    m_new = layout(row(text_input, drop, button), l_new)
     m.children = m_new.children
 
 drop.on_change('value', update_dropdown)
@@ -50,10 +53,22 @@ def update_text_input(sattr, old, new):
     new_run = text_input.value
 
     l_new_run = rFP.render(run=new_run, testq=rFP.get_current_test())
-    m_new_run = layout(row(text_input, drop), l_new_run)
+    m_new_run = layout(row(text_input, drop, button), l_new_run)
     m.children = m_new_run.children
 
 text_input.on_change('value', update_text_input)
+
+def update_button():
+    current_mode = rFP.get_single_raft()
+    new_mode = not current_mode
+
+    rFP.set_single_raft(choice=new_mode)
+    if new_mode is True:
+        button.label = "Single Raft Mode"
+    else:
+        button.label = 'Focal Plane Mode'
+
+button.on_click(update_button)
 
 
 curdoc().add_root(m)

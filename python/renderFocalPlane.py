@@ -33,6 +33,7 @@ class renderFocalPlane():
         self.source = ColumnDataSource()
         self.current_run = 0
         self.current_test = ""
+        self.EO_type = "I&T-Raft"
 
 
         self.emulate_raft_list = []
@@ -88,7 +89,7 @@ class renderFocalPlane():
     def get_testq(self, run=None, testq=None):
 
 
-        raft_list, data = self.get_EO.get_tests(site_type="I&T-Raft", test_type=testq, run=run)
+        raft_list, data = self.get_EO.get_tests(site_type=self.EO_type, test_type=testq, run=run)
         res = self.get_EO.get_results(test_type=testq, data=data, device=raft_list)
 
         test_list = []
@@ -105,7 +106,7 @@ class renderFocalPlane():
             if self.single_raft_mode is True:
                 run = self.current_run
                 run_info = self.connect.getRunResults(run=run)
-                raft_list = [[run_info['experimentSN'], self.installed_raft_names[0]]]
+                raft_list = [[run_info['experimentSN'], "R22"]]
             else:
                 raft_list = self.emulate_raft_list
 
@@ -122,6 +123,9 @@ class renderFocalPlane():
 
     def set_single_raft(self, choice=True):
         self.single_raft_mode = choice
+
+    def get_single_raft(self):
+        return self.single_raft_mode
 
     def set_emulation(self, raft_list, run_list):
 
@@ -141,11 +145,23 @@ class renderFocalPlane():
         self.current_run = run
         self.current_test = testq
 
+        run_sum = self.connect.getRunSummary(run=run)
+        if "Integration" in run_sum["subsystem"]:
+            self.EO_type = "I&T-Raft"
+        else:
+            self.EO_type = "BNL-Raft"
+
+        raft_list = self.get_raft_content()
+
         TOOLS = "pan,wheel_zoom,reset,hover,save"
         color_mapper = LogColorMapper(palette=palette)
 
+        fig_title = "Focal Plane"
+        if self.single_raft_mode is True:
+            fig_title = self.installed_raft_names[10]
+
         p = figure(
-            title="Focal plane", tools=TOOLS,
+            title=fig_title, tools=TOOLS,
             tooltips=[
                 ("Raft", "@raft_name"), ("Raft slot", "@raft_slot"), ("CCD slot", "@ccd_slot"),
                 ("CCD name", "@ccd_name"), ("Amp","@amp_number"),
@@ -166,8 +182,6 @@ class renderFocalPlane():
         ccd_slot = []
         amp_number = []
         test_q = []
-
-        raft_list = self.get_raft_content()
 
         for raft in range(21):
 
