@@ -1,3 +1,4 @@
+from __future__ import print_function
 from  eTraveler.clientAPI.connection import Connection
 from exploreRaft import exploreRaft
 import argparse
@@ -37,11 +38,10 @@ eR_dev = exploreRaft(db='Dev')
 returnData_prod = connect_prod.getHardwareInstances(htype=args.htype)
 returnData_dev = connect_dev.getHardwareInstances(htype=args.htype)
 
-print len(returnData_prod), args.htype, ' rafts found in prod'
-
 raft_list = collections.OrderedDict()
 raft_list_dev = collections.OrderedDict()
 
+location_prod = []
 for inst in returnData_prod:
 
     raft = inst['experimentSN']
@@ -53,7 +53,10 @@ for inst in returnData_prod:
     if len(content_prod) == 0:
         continue
     raft_list[raft] = content_prod
+    loc_prod = inst['location'].split(":")[0]
+    location_prod.append(loc_prod)
 
+location_dev = []
 for inst in returnData_dev:
 
     raft = inst['experimentSN']
@@ -63,14 +66,18 @@ for inst in returnData_dev:
 
     content_dev = eR_dev.raftContents(raftName=raft)
     raft_list_dev[raft] = content_dev
+    loc_dev = inst['location'].split(":")[0]
+    location_dev.append(loc_dev)
 
-
-print raft_list
-
-for raft in raft_list:
-    print 'Matching raft: ', raft
-    for raft_dev in raft_list_dev:
+for idp, raft in enumerate(raft_list):
+    print ('Matching raft: ', raft)
+    loc_prod = location_prod[idp]
+    for idd, raft_dev in enumerate(raft_list_dev):
         ccd_type = eR_prod.raft_type(raft=raft) + "-CCD"
+        loc_dev = location_dev[idd]
+        # require rafts to be in the same location
+        if loc_prod != loc_dev:
+            continue
         nc = 0
         nc_sn = 0
         nr = 0
@@ -78,7 +85,7 @@ for raft in raft_list:
 
         if raft in raft_dev:
             if len(raft_list_dev[raft_dev]) == 0:
-                print 'Dev raft ', raft_dev, ' has no content'
+                print ('Dev raft ', raft_dev, ' has no content')
                 continue
             for idx in range(0,9):
                 c = raft_list[raft][idx]
@@ -100,4 +107,4 @@ for raft in raft_list:
                         nr_sn += 1
                     except KeyError:
                         pass
-            print raft, raft_dev, nc, nc_sn, nr, nr_sn
+            print (raft, raft_dev, nc, nc_sn, nr, nr_sn)
