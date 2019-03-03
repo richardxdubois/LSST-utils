@@ -35,9 +35,6 @@ class compare_raft_defects():
 
         self.connect = Connection(operator='richard', db=self.db, exp='LSST-CAMERA', prodServer=pS)
 
-        self.r1_files = self.get_files_run(run=self.run1, defect_name=self.defect_list[0])
-        self.r2_files = self.get_files_run(run=self.run2, defect_name=self.defect_list[0])
-
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
                             mirrorName=self.mirror,prodServer=self.prodServer,appSuffix=appSuffix)
 
@@ -53,6 +50,10 @@ class compare_raft_defects():
 
         if self.debug is True:
             self.ccd_list = [('ITL-3800C-333', 0, 0)]
+
+        self.r1_files = self.get_files_run(run=self.run1, defect_name=self.defect_list[0])
+        self.r2_files = self.get_files_run(run=self.run2, defect_name=self.defect_list[0])
+
 
     def comp_defects(self, hdu1, hdu2):
 
