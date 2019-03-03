@@ -52,6 +52,10 @@ class compare_raft_defects():
 
     def comp_defects(self, hdu1, hdu2):
 
+        if self.amp == 1:
+            print('Raft ', defects.raft, ' Defect ', defects.current_defect, ' ccd ', defects.current_ccd,
+                  ' Slot ', defects.current_slot, ' Run 1 ', defects.run1, ' Run 2', defects.run2, ' \n')
+            print(' Amp  Tot(', defects.run1, ')  Tot(', defects.run2, ') # Diff Px')
 
         tot1 = tot2 = tot_diff = 0
 
@@ -83,7 +87,7 @@ class compare_raft_defects():
             tot2 += sum_run2
             tot_diff += diff_pix_count
 
-        if self.printit:
+        if self.amp == 16:
             print('\n Totals')
             print("       %5i        %5i       %5i" % (tot1, tot2, tot_diff))
 
@@ -198,14 +202,8 @@ if __name__ == "__main__":
 
     with PdfPages(args.output) as pdf:
         for ccd_t in defects.ccd_list:
-            print('Raft ', defects.raft, ' Defect ', defects.current_defect, ' ccd ', defects.current_ccd,
-                  ' Slot ', defects.current_slot, ' Run 1 ', defects.run1, ' Run 2', defects.run2, ' \n')
-            print(' Amp  Tot(', defects.run1, ')  Tot(', defects.run2, ') # Diff Px')
 
             for amp in range(1, 17):
-                defects.printit = False
-                if amp == 16:
-                    defects.printit = True
                 ccd = ccd_t[0]
 
                 view_defects = defects.examine_defects(amp=amp,ccd=ccd)
