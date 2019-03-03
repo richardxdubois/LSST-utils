@@ -27,12 +27,16 @@ class compare_raft_defects():
         self.prodServer = prodServer
         self.debug = debug
         self.printit = True
+        self.ccd_stats = {}
 
         pS = True
         if self.prodServer == 'Dev':
             pS = False
 
         self.connect = Connection(operator='richard', db=self.db, exp='LSST-CAMERA', prodServer=pS)
+
+        self.r1_files = self.get_files_run(run=self.run1, defect_name=self.defect_list[0])
+        self.r2_files = self.get_files_run(run=self.run2, defect_name=self.defect_list[0])
 
         self.fCCD = findCCD(FType='fits', testName='bright_defects_raft', run=-1, sensorId='E2V',
                             mirrorName=self.mirror,prodServer=self.prodServer,appSuffix=appSuffix)
@@ -53,9 +57,9 @@ class compare_raft_defects():
     def comp_defects(self, hdu1, hdu2):
 
         if self.amp == 1:
-            print('Raft ', defects.raft, ' Defect ', defects.current_defect, ' ccd ', defects.current_ccd,
-                  ' Slot ', defects.current_slot, ' Run 1 ', defects.run1, ' Run 2', defects.run2, ' \n')
-            print(' Amp  Tot(', defects.run1, ')  Tot(', defects.run2, ') # Diff Px')
+            print('Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd,
+                  ' Slot ', self.current_slot, ' Run 1 ', self.run1, ' Run 2', self.run2, ' \n')
+            print(' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px')
 
         tot1 = tot2 = tot_diff = 0
 
@@ -64,6 +68,8 @@ class compare_raft_defects():
         defect_2 = 0
         sum_run1 = 0
         sum_run2 = 0
+
+        amp_stats = self.ccd_stats.setdefault(self.current_ccd, [])
 
         for amp in range(1, 17):
             if self.amp != -1 and amp != self.amp:
@@ -78,16 +84,21 @@ class compare_raft_defects():
             badc = np.where(diff_pix != 0)
             defect_1 = np.where(pixeldata_run1 != 0)
             defect_2 = np.where(pixeldata_run2 != 0)
-
             diff_pix_count = len(badc[0])
+
+            amp_defects = np.array([sum_run1, sum_run2, diff_pix_count])
+            self.ccd_stats[self.current_ccd].append(amp_defects)
+
 #            if self.printit:
             print("%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count))
 
-            tot1 += sum_run1
-            tot2 += sum_run2
-            tot_diff += diff_pix_count
-
         if self.amp == 16:
+            tot1 = tot2 = tot_diff = 0
+            for i in range(0,16):
+                tot1 += self.ccd_stats[self.current_ccd][i][0]
+                tot2 += self.ccd_stats[self.current_ccd][i][1]
+                tot_diff += self.ccd_stats[self.current_ccd][i][2]
+
             print('\n Totals')
             print("       %5i        %5i       %5i" % (tot1, tot2, tot_diff))
 
@@ -152,12 +163,9 @@ class compare_raft_defects():
 
         self.current_defect = self.defect_list[0]
 
-        r1_files = self.get_files_run(run=self.run1, defect_name=self.current_defect)
-        r2_files = self.get_files_run(run=self.run2, defect_name=self.current_defect)
-
-        f1 = r1_files[ccd]
+        f1 = self.r1_files[ccd]
         hdu1 = fits.open(f1)
-        f2 = r2_files[ccd]
+        f2 = self.r2_files[ccd]
         hdu2 = fits.open(f2)
 
         comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
@@ -195,7 +203,7 @@ if __name__ == "__main__":
     else:
         debug = False
 
-    defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list = defect_list, debug=debug,
+    defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list=defect_list, debug=debug,
                                   mirror=args.mirror, prodServer=args.eTserver, appSuffix=args.appSuffix)
 
 #    tab_defects = defects.tabulate_defects()
