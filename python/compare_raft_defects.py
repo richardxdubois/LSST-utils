@@ -52,10 +52,6 @@ class compare_raft_defects():
 
     def comp_defects(self, hdu1, hdu2):
 
-        if self.printit:
-            print('Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd,
-                  'Slot ', self.current_slot, ' Run 1 ', self.run1, ' Run 2', self.run2, ' \n')
-            print(' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px')
 
         tot1 = tot2 = tot_diff = 0
 
@@ -65,7 +61,7 @@ class compare_raft_defects():
         sum_run1 = 0
         sum_run2 = 0
 
-        for amp in range(1,17):
+        for amp in range(1, 17):
             if self.amp != -1 and amp != self.amp:
                 continue
 
@@ -160,7 +156,6 @@ class compare_raft_defects():
         f2 = r2_files[ccd]
         hdu2 = fits.open(f2)
 
-        self.printit = False
         comp = self.comp_defects(hdu1=hdu1, hdu2=hdu2)
         return comp
 
@@ -203,13 +198,21 @@ if __name__ == "__main__":
 
     with PdfPages(args.output) as pdf:
         for ccd_t in defects.ccd_list:
-            ccd = ccd_t[0]
-            for amp in range(1,17):
+            print('Raft ', defects.raft, ' Defect ', defects.current_defect, ' ccd ', defects.current_ccd,
+                  ' Slot ', defects.current_slot, ' Run 1 ', defects.run1, ' Run 2', defects.run2, ' \n')
+            print(' Amp  Tot(', defects.run1, ')  Tot(', defects.run2, ') # Diff Px')
+
+            for amp in range(1, 17):
+                defects.printit = False
+                if amp == 16:
+                    defects.printit = True
+                ccd = ccd_t[0]
+
                 view_defects = defects.examine_defects(amp=amp,ccd=ccd)
                 badc_diff = view_defects[0]
                 badc_run1 = view_defects[1]
                 badc_run2 = view_defects[2]
-#                print(badc_diff)
+    #                print(badc_diff)
 
                 plt.scatter(badc_diff[1],badc_diff[0])
                 plt.title('Defect Differences: ' + ccd + ' amp ' + str(amp))
