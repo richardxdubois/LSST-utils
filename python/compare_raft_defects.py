@@ -6,6 +6,11 @@ import numpy as np
 from findCCD import findCCD
 from exploreRaft import exploreRaft
 import astropy.io.fits as fits
+from sklearn.cluster import DBSCAN
+from sklearn import metrics
+from sklearn.datasets.samples_generator import make_blobs
+from sklearn.preprocessing import StandardScaler
+
 
 import argparse
 
@@ -93,15 +98,31 @@ class compare_raft_defects():
 #            if self.printit:
             print("%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count))
 
-        if self.amp == 16:
-            tot1 = tot2 = tot_diff = 0
-            for i in range(0,16):
-                tot1 += self.ccd_stats[self.current_ccd][i][0]
-                tot2 += self.ccd_stats[self.current_ccd][i][1]
-                tot_diff += self.ccd_stats[self.current_ccd][i][2]
+            # find clusters
+            db = DBSCAN(eps=1., min_samples=2).fit(pixeldata_run1)
+            core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+            core_samples_mask[db.core_sample_indices_] = True
+            labels = db.labels_
 
-            print('\n Totals')
-            print("       %5i        %5i       %5i" % (tot1, tot2, tot_diff))
+            # Number of clusters in labels, ignoring noise if present.
+            n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+            n_noise_ = list(labels).count(-1)
+            unique_labels = set(labels)
+            for k in unique_labels:
+                if k == -1:
+                    continue
+                class_member_mask = (labels == k)
+                xy = np.where(pixeldata_run1[class_member_mask & core_samples_mask] == 1)
+
+            if self.amp == 16:
+                tot1 = tot2 = tot_diff = 0
+                for i in range(0,16):
+                    tot1 += self.ccd_stats[self.current_ccd][i][0]
+                    tot2 += self.ccd_stats[self.current_ccd][i][1]
+                    tot_diff += self.ccd_stats[self.current_ccd][i][2]
+
+                print('\n Totals')
+                print("       %5i        %5i       %5i" % (tot1, tot2, tot_diff))
 
         return (badc, defect_1, defect_2)
 
@@ -209,10 +230,15 @@ if __name__ == "__main__":
 
 #    tab_defects = defects.tabulate_defects()
 
+    amp_req = int(args.amp)
+
     with PdfPages(args.output) as pdf:
         for ccd_t in defects.ccd_list:
 
             for amp in range(1, 17):
+                if amp_req != -1 and amp != amp_req:
+                    continue
+
                 ccd = ccd_t[0]
 
                 view_defects = defects.examine_defects(amp=amp,ccd=ccd)
