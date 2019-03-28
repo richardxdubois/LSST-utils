@@ -10,7 +10,7 @@ from sklearn.cluster import DBSCAN
 from sklearn import metrics
 from sklearn.datasets.samples_generator import make_blobs
 from sklearn.preprocessing import StandardScaler
-
+from scipy import sparse
 
 import argparse
 
@@ -99,7 +99,11 @@ class compare_raft_defects():
             print("%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count))
 
             # find clusters
-            db = DBSCAN(eps=1., min_samples=2).fit(pixeldata_run1)
+            X = []
+            for i_d, d in enumerate(defect_1[0]):
+                X.append((d, defect_1[1][i_d]))
+
+            db = DBSCAN(eps=1., min_samples=2).fit(X)
             core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
             core_samples_mask[db.core_sample_indices_] = True
             labels = db.labels_
@@ -112,7 +116,11 @@ class compare_raft_defects():
                 if k == -1:
                     continue
                 class_member_mask = (labels == k)
-                xy = np.where(pixeldata_run1[class_member_mask & core_samples_mask] == 1)
+                xy = []
+                for i_d, d in enumerate(X):
+                    if class_member_mask[i_d]:
+                        xy.append(d)
+                continue
 
             if self.amp == 16:
                 tot1 = tot2 = tot_diff = 0
