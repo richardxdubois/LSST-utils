@@ -27,6 +27,8 @@ class compare_raft_defects():
         self.defect_list = defect_list
         self.mirror = mirror
         self.amp = -1
+        self.clusters1 = {}
+        self.clusters2 = {}
 
         self.db = db
         self.prodServer = prodServer
@@ -46,26 +48,25 @@ class compare_raft_defects():
         self.eR = exploreRaft(prodServer=self.prodServer,appSuffix=appSuffix)
 
         if self.debug is True:
-            self.run1 = 9049
-            self.run2 = 10141
+            self.run1 = 9537
+            self.run2 = 10317
 
         returnData = self.connect.getRunSummary(run=self.run2)
         self.raft = returnData['experimentSN']
         self.ccd_list = self.eR.raftContents(raftName=self.raft, run=self.run2)
 
         if self.debug is True:
-            self.ccd_list = [('ITL-3800C-333', 0, 0)]
+            self.ccd_list = [('ITL-3800C-325', 0, 0)]
 
         self.r1_files = self.get_files_run(run=self.run1, defect_name=self.defect_list[0])
         self.r2_files = self.get_files_run(run=self.run2, defect_name=self.defect_list[0])
-
 
     def comp_defects(self, hdu1, hdu2):
 
         if self.amp == 1:
             print('Raft ', self.raft, ' Defect ', self.current_defect, ' ccd ', self.current_ccd,
                   ' Slot ', self.current_slot, ' Run 1 ', self.run1, ' Run 2', self.run2, ' \n')
-            print(' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px')
+            print(' Amp  Tot(', self.run1, ')  Tot(', self.run2, ') # Diff Px   # Clus 1    # Clus 2')
 
         tot1 = tot2 = tot_diff = 0
 
@@ -95,32 +96,21 @@ class compare_raft_defects():
             amp_defects = np.array([sum_run1, sum_run2, diff_pix_count])
             self.ccd_stats[self.current_ccd].append(amp_defects)
 
-#            if self.printit:
-            print("%2i     %5i        %5i       %5i" % (amp, sum_run1, sum_run2, diff_pix_count))
-
             # find clusters
-            X = []
-            for i_d, d in enumerate(defect_1[0]):
-                X.append((d, defect_1[1][i_d]))
 
-            db = DBSCAN(eps=1., min_samples=2).fit(X)
-            core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
-            core_samples_mask[db.core_sample_indices_] = True
-            labels = db.labels_
+            n_clus1 = n_clus2 = 0
 
-            # Number of clusters in labels, ignoring noise if present.
-            n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
-            n_noise_ = list(labels).count(-1)
-            unique_labels = set(labels)
-            for k in unique_labels:
-                if k == -1:
-                    continue
-                class_member_mask = (labels == k)
-                xy = []
-                for i_d, d in enumerate(X):
-                    if class_member_mask[i_d]:
-                        xy.append(d)
-                continue
+            if len(defect_1[0]) != 0:
+                cl1 = self.clusters1.setdefault(ccd, {})
+                n_clus1, clusters1 = self.find_clusters(defect_1)
+                self.clusters1[ccd][amp] = clusters1
+            if len(defect_2[0]) != 0:
+                cl2 = self.clusters2.setdefault(ccd, {})
+                n_clus2, clusters2 = self.find_clusters(defect_2)
+                self.clusters2[ccd][amp] = clusters2
+
+            print("%2i     %5i        %5i       %5i      %5i       %5i" % (amp, sum_run1, sum_run2,
+                                    diff_pix_count, n_clus1, n_clus2 ))
 
             if self.amp == 16:
                 tot1 = tot2 = tot_diff = 0
@@ -133,6 +123,35 @@ class compare_raft_defects():
                 print("       %5i        %5i       %5i" % (tot1, tot2, tot_diff))
 
         return (badc, defect_1, defect_2)
+
+    def find_clusters(self, defect_list=None):
+
+        X = []
+        for i_d, d in enumerate(defect_list[0]):
+            X.append((d, defect_list[1][i_d]))
+
+        db = DBSCAN(eps=1., min_samples=2).fit(X)
+        core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+        core_samples_mask[db.core_sample_indices_] = True
+        labels = db.labels_
+
+        # Number of clusters in labels, ignoring noise if present.
+        n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+        n_noise_ = list(labels).count(-1)
+        unique_labels = set(labels)
+
+        cluster_dict = {}
+        for k in unique_labels:
+            if k == -1:
+                continue
+            class_member_mask = (labels == k)
+            xy = []
+            for i_d, d in enumerate(X):
+                if class_member_mask[i_d]:
+                    xy.append(d)
+            cluster_dict[k] = xy
+
+        return n_clusters_, cluster_dict
 
     def get_files_run(self, run, defect_name):
 
@@ -154,14 +173,14 @@ class compare_raft_defects():
                         file_list[ccd] = g
 
         if self.debug is True:
-            if run == 9049:
+            if run == 9537:
                 file_list = {
-                    'ITL-3800C-333': "/Users/richard/LSST/Data/RTM-004/"
-                                     "ITL-3800C-333_dark_pixel_mask-9049.fits"}
+                    'ITL-3800C-325': "/Users/richard/LSST/Data/ITL-3800C-325/"
+                                     "ITL-3800C-325_dark_pixel_mask-9537.fits"}
             else:
                 file_list = {
-                    'ITL-3800C-333':  "/Users/richard/LSST/Data/RTM-004/"
-                                      "ITL-3800C-333_dark_pixel_mask-10141.fits"}
+                    'ITL-3800C-325':  "/Users/richard/LSST/Data/ITL-3800C-325/"
+                                      "ITL-3800C-325_dark_pixel_mask-10317.fits"}
 
         return file_list
 
@@ -273,7 +292,33 @@ if __name__ == "__main__":
                 plt.title('Defect Run ' + args.run2 + ': ' + ccd + ' amp ' + str(amp))
                 plt.xlabel('column')
                 plt.ylabel('row')
-
                 pdf.savefig()
                 plt.close()
 
+                try:
+                    defects.clusters1[ccd][amp]
+                    for clus in defects.clusters1[ccd][amp]:
+                        pixels = defects.clusters1[ccd][amp][clus]
+                        plt.scatter([p[1] for p in pixels], [p[0] for p in pixels])
+                        plt.title('Defect Run ' + args.run1 + ': ' + ccd + ' amp ' + str(amp) + " cls " +
+                                  str(clus))
+                        plt.xlabel('column')
+                        plt.ylabel('row')
+                        pdf.savefig()
+                        plt.close()
+                except KeyError:
+                    pass
+
+                try:
+                    defects.clusters2[ccd][amp]
+                    for clus in defects.clusters2[ccd][amp]:
+                        pixels = defects.clusters2[ccd][amp][clus]
+                        plt.scatter([p[1] for p in pixels], [p[0] for p in pixels])
+                        plt.title('Defect Run ' + args.run2 + ': ' + ccd + ' amp ' + str(amp) + " cls " +
+                                  str(clus))
+                        plt.xlabel('column')
+                        plt.ylabel('row')
+                        pdf.savefig()
+                        plt.close()
+                except KeyError:
+                    pass
