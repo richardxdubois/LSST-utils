@@ -59,6 +59,11 @@ class compare_raft_defects():
         self.raft = returnData['experimentSN']
         self.ccd_list = self.eR.raftContents(raftName=self.raft, run=self.run2)
 
+        self.ccd_list_chk = self.eR.raftContents(raftName=self.raft, run=self.run1)
+        #if self.ccd_list != self.ccd_list_chk:
+        #    raise Exception("CCD lists don't match")
+
+
         if self.debug is True:
             self.ccd_list = [('ITL-3800C-325', 0, 0)]
 
@@ -265,7 +270,7 @@ if __name__ == "__main__":
 
     with PdfPages(args.output) as pdf:
         for ccd_t in defects.ccd_list:
-            if args.ccd is not None and ccd_t != args.ccd:
+            if args.ccd is not None and ccd_t[0] != args.ccd:
                 continue
 
             for amp in range(1, 17):
