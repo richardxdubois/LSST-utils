@@ -21,11 +21,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 class compare_raft_defects():
     def __init__(self, run1=None, run2=None, defect_list='bright_defects_raft', debug = False,  db='Prod',
-                 prodServer='Prod', appSuffix='', mirror='prod'):
+                 single_ccd=None, prodServer='Prod', appSuffix='', mirror='prod'):
 
         self.run1 = run1
         self.run2 = run2
         self.current_defect = ''
+        self.single_ccd = single_ccd
         self.current_ccd = ''
         self.current_slot = ""
         self.defect_list = defect_list
@@ -59,10 +60,10 @@ class compare_raft_defects():
         self.raft = returnData['experimentSN']
         self.ccd_list = self.eR.raftContents(raftName=self.raft, run=self.run2)
 
+        # check whether the two runs have the same CCD content (unless a single CCD is requested)
         self.ccd_list_chk = self.eR.raftContents(raftName=self.raft, run=self.run1)
-        #if self.ccd_list != self.ccd_list_chk:
-        #    raise Exception("CCD lists don't match")
-
+        if self.ccd_list != self.ccd_list_chk and self.single_ccd is None:
+            raise Exception("CCD lists don't match")
 
         if self.debug is True:
             self.ccd_list = [('ITL-3800C-325', 0, 0)]
@@ -262,6 +263,7 @@ if __name__ == "__main__":
         debug = False
 
     defects = compare_raft_defects(run1=args.run1, run2=args.run2, defect_list=defect_list, debug=debug,
+                                   single_ccd=args.ccd,
                                   mirror=args.mirror, prodServer=args.eTserver, appSuffix=args.appSuffix)
 
 #    tab_defects = defects.tabulate_defects()
