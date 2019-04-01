@@ -130,7 +130,7 @@ class compare_raft_defects():
         for i_d, d in enumerate(defect_list[0]):
             X.append((d, defect_list[1][i_d]))
 
-        db = DBSCAN(eps=1., min_samples=2).fit(X)
+        db = DBSCAN(eps=1., min_samples=3).fit(X)
         core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
         core_samples_mask[db.core_sample_indices_] = True
         labels = db.labels_
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument('-i', '--infile', default="",
                         help="input file name for list of runs, temps (default=%(default)s)")
     parser.add_argument('-a', '--amp', default=-1, help="optional amp to examine ")
-    parser.add_argument('-c', '--ccd', default='NONE', help="optional CCD to examine ")
+    parser.add_argument('-c', '--ccd', default=None, help="optional CCD to examine ")
 
     args = parser.parse_args()
 
@@ -261,6 +261,8 @@ if __name__ == "__main__":
 
     with PdfPages(args.output) as pdf:
         for ccd_t in defects.ccd_list:
+            if args.ccd is not None and ccd_t != args.ccd:
+                continue
 
             for amp in range(1, 17):
                 if amp_req != -1 and amp != amp_req:
