@@ -1,7 +1,6 @@
 from __future__ import print_function
+
 from eTraveler.clientAPI.connection import Connection
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 from findCCD import findCCD
 from exploreRaft import exploreRaft
@@ -13,6 +12,11 @@ from sklearn.preprocessing import StandardScaler
 from scipy import sparse
 
 import argparse
+import matplotlib
+matplotlib.use('agg')
+
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 
 class compare_raft_defects():
