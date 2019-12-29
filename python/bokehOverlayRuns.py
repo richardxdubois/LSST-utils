@@ -1,3 +1,4 @@
+from __future__ import print_function
 from get_EO_analysis_results import get_EO_analysis_results
 from  eTraveler.clientAPI.connection import Connection
 import numpy as np
@@ -28,13 +29,14 @@ at your command prompt. Then navigate to the URL
 in your browser.
 '''
 
-print 'firing up the bokeh server with a scatterplot'
+print ('firing up the bokeh server with a scatterplot')
 
 TOOLS="pan,wheel_zoom,box_select,lasso_select,reset"
 
 hhist, hedges = np.histogram(x, bins=20)
 ph = figure(tools=TOOLS,title="Gains")
-ph.step(range(len(hhist)), hhist, legend="Run: 7983")
+
+ph.step(hedges, hhist, legend="Run: 7983")
 
 text_input = TextInput(value="7983", title="BNL Raft Run")
 
@@ -55,7 +57,7 @@ def update(attr, old, new):
 
     x_new = np.array(test_list_new)
     hhist_new, _ = np.histogram(x_new, bins=20)
-    ph.step(range(len(hhist_new)), hhist_new, color='red', legend="Run:"+text_input.value)
+    ph.step(hedges, hhist_new, color='red', legend="Run:"+text_input.value)
 
 
 text_input.on_change('value', update)

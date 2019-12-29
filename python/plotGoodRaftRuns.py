@@ -318,7 +318,7 @@ if __name__ == "__main__":
 
     runs_bnl = [4390, 4417, 4418, 4576, 4613, 4625, 4626, 5508, 5511, 5634, 5635, 5675, 5761, 6131, 6147,\
                 6317, 6350, 6829, 6854, 7192, 7195, 7479, 7652, 7653, 7659, 7660, 7661, 7678,\
-                7983, 7984, 8028, 8404]
+                7983, 7984, 8028, 8404, 8696, 8705, 8746, 8758, 8872]
     run_list, raft_list = pG.make_run_pages(site_type="BNL-Raft", runs=runs_bnl)
 
     data_table_bnl = pG.write_table(run_list=run_list, raft_list=raft_list)
