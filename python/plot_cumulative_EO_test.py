@@ -15,7 +15,7 @@ from bokeh.layouts import row, layout
 from bokeh.models import Span, Label
 from bokeh.models.widgets import DataTable, TableColumn, NumberFormatter
 parser = argparse.ArgumentParser(
-    description='Create heatmap of Camera EO test data quantities.')
+    description='Plot test quantities to evaluate against construction thresholds.')
 
 parser.add_argument('-t', '--test', default="read_noise", help="test quantity to display")
 parser.add_argument('-m', '--max', default=1.e10, help="max test value to use")
@@ -34,7 +34,7 @@ r = exploreRaft()
 TOOLS = "pan,wheel_zoom,box_zoom,reset,save,box_select,lasso_select"
 
 test_list = []
-bad_pixels = []
+bad_pixels = [0.]
 weights = []
 pix_count = 0
 pix_count_corr = 0
@@ -55,6 +55,8 @@ raft_weight = []
 pix_amp_ITL = 2000. * 509. * 1.e-9
 pix_amp_e2v = 2002. * 512. * 1.e-9
 
+# note: the full FP mode is not working yet (2019-12-29)
+
 if args.run is not None:
 
     raft_list, data = g.get_tests(test_type=args.test, run=args.run)
@@ -66,6 +68,8 @@ if args.run is not None:
             amp_tests = res[args.test][raft][ccd]
             test_list.extend(amp_tests)
             pix_count += len(amp_tests)
+
+    weights = [1.]*len(test_list)
 
 else:
 
@@ -156,8 +160,6 @@ full_pixels = pix_count
 half_pixels = full_pixels*0.5
 pixels_95 = full_pixels*0.95
 pixels_75 = full_pixels*0.75
-
-
 
 f2 = interp1d(bins_interp, norm_cum, kind='cubic')
 f2_inv_half = lambda x: f2(x) - half_pixels
