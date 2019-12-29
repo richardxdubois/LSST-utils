@@ -25,6 +25,6 @@ for run in runs_list:
     for ccd in res[args.test]:
         amp_tests = res[args.test][ccd]
         test_list.extend(amp_tests)
-        amp_count += 16
+        amp_count += len(amp_tests)
 
     print("len(test_list) = ", len(test_list), " for ", amp_count, " amps")
