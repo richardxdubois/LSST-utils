@@ -3,7 +3,16 @@ from collections import OrderedDict
 import random
 
 
-def hook(run=None, mode=None, raft=None, ccd=None, test_cache=None):
+def init(menu_button=None):
+    print("user init setting up menu")
+    my_menu = [("User test 1", "User test 1")]
+
+    menu_button.menu = my_menu
+
+    return 0
+
+
+def hook(run=None, mode=None, raft=None, ccd=None, test_cache=None, test=None):
     """
     User hook for test quantity
     :param run: run number
@@ -32,7 +41,7 @@ def hook(run=None, mode=None, raft=None, ccd=None, test_cache=None):
 
         # using list comprehension + randrange()
         # to generate random number list
-        res = [random.randrange(0, 100, 1) for i in range(15)]
+        res = [random.randrange(0, 200, 1) for i in range(15)]
 
         amp = 0
         for val in res:
