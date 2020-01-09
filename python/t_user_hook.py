@@ -20,7 +20,7 @@ def hook(run=None, mode=None, raft=None, ccd=None, test_cache=None):
     if raft in ["R00", "R04", "R40", "R44"]:
         test_len = 48
         out_list = [-1.] * test_len
-        return
+        return out_list
     else:
         test_len = 144
 
@@ -32,7 +32,7 @@ def hook(run=None, mode=None, raft=None, ccd=None, test_cache=None):
 
         # using list comprehension + randrange()
         # to generate random number list
-        res = [random.randrange(1, 50, 1) for i in range(15)]
+        res = [random.randrange(0, 100, 1) for i in range(15)]
 
         amp = 0
         for val in res:

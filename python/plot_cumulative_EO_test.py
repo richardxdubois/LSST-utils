@@ -34,7 +34,7 @@ r = exploreRaft()
 TOOLS = "pan,wheel_zoom,box_zoom,reset,save,box_select,lasso_select"
 
 test_list = []
-bad_pixels = [0.]
+bad_pixels = []
 weights = []
 pix_count = 0
 pix_count_corr = 0
@@ -53,7 +53,9 @@ raft_bad = []
 raft_weight = []
 
 pix_amp_ITL = 2000. * 509. * 1.e-9
+col_pix_ITL = 2000.
 pix_amp_e2v = 2002. * 512. * 1.e-9
+col_pix_e2v = 2002.
 
 # note: the full FP mode is not working yet (2019-12-29)
 
@@ -86,11 +88,13 @@ else:
         res = g.get_all_results(data=data, device=raft_list)
 
         pix_per_amp = pix_amp_e2v
+        pix_col = col_pix_e2v
 
         r_type = r.raft_type(raft=raft_list)
         e2v = True
         if "CRTM" in raft_list or r_type == "ITL":
             pix_per_amp = pix_amp_ITL
+            pix_col = col_pix_ITL
             e2v = False
 
         print("Processing raft ", raft_list)
@@ -103,12 +107,12 @@ else:
             raft_test_list.extend(amp_tests)
             pix_count += len(amp_tests) * pix_per_amp
 
-            # get bad pixel counts
+            # get bad pixel counts; ignore possible overlap betweeen bad pixels and columns
 
             dkp = res["dark_pixels"][ccd]
-            dkpc = np.array(res["dark_columns"][ccd])*2000.
+            dkpc = np.array(res["dark_columns"][ccd])*pix_col
             brp = res["bright_pixels"][ccd]
-            brpc = np.array(res["bright_columns"][ccd])*2000.
+            brpc = np.array(res["bright_columns"][ccd])*pix_col
             raft_bad_pixels.extend(dkp + dkpc + brp + brpc)
 
         bad_pixels.extend(raft_bad_pixels)
