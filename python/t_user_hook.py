@@ -41,7 +41,7 @@ def hook(run=None, mode=None, raft=None, ccd=None, test_cache=None, test=None):
 
         # using list comprehension + randrange()
         # to generate random number list
-        res = [random.randrange(0, 200, 1) for i in range(15)]
+        res = [random.randrange(0, 100, 1) for i in range(15)]
 
         amp = 0
         for val in res:
