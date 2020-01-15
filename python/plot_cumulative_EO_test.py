@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import argparse
 from statistics import median
+from collections import OrderedDict
 
 from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
@@ -17,6 +18,7 @@ from bokeh.models.widgets import DataTable, TableColumn, NumberFormatter
 parser = argparse.ArgumentParser(
     description='Plot test quantities to evaluate against construction thresholds.')
 
+parser.add_argument('-b', '--binned', default="no", help="used binned read noises")
 parser.add_argument('-t', '--test', default="read_noise", help="test quantity to display")
 parser.add_argument('-m', '--max', default=1.e10, help="max test value to use")
 parser.add_argument('-n', '--min', default=0., help="min test value to use")
@@ -28,6 +30,36 @@ parser.add_argument('-o', '--output', default="cumulative.html", help="output ht
 
 args = parser.parse_args()
 
+
+def make_cumulative(read_noise, good_pixels):
+
+    order = np.argsort(np.array(read_noise))
+    read_noise_sorted = np.array(read_noise)[order]
+    good_pixels_sorted = np.array(good_pixels)[order]
+    cum_dist = np.zeros(len(good_pixels_sorted))
+
+    for i in range(len(cum_dist)):
+        cum_dist[i] = 0.
+        for j in range(i):
+            cum_dist[i] += good_pixels_sorted[j]
+
+    first_nonzero = 0
+    for r in range(len(read_noise_sorted)):
+        if read_noise_sorted[r] > 0.:
+            first_nonzero = r
+            break
+
+    rn_zero_check = read_noise_sorted[first_nonzero:-1]
+    cum_zero_check = cum_dist[first_nonzero:-1]
+
+    for s in range(1,len(cum_zero_check)):
+        if rn_zero_check[s] <= rn_zero_check[s-1]:
+            print(s, rn_zero_check[s-1], rn_zero_check[s])
+            rn_zero_check[s] += 1.e-6
+
+    return rn_zero_check, cum_zero_check
+
+
 g = get_EO_analysis_results(db=args.db)
 r = exploreRaft()
 
@@ -35,6 +67,7 @@ TOOLS = "pan,wheel_zoom,box_zoom,reset,save,box_select,lasso_select"
 
 test_list = []
 bad_pixels = []
+good_pix = []
 weights = []
 pix_count = 0
 pix_count_corr = 0
@@ -56,6 +89,9 @@ pix_amp_ITL = 2000. * 509. * 1.e-9
 col_pix_ITL = 2000.
 pix_amp_e2v = 2002. * 512. * 1.e-9
 col_pix_e2v = 2002.
+
+levels = OrderedDict([(7., "7e-"), (9., "9e-"), (13., "13e-"), (18., "18e-")])
+colours = ["green", "blue", "red", "black"]
 
 # note: the full FP mode is not working yet (2019-12-29)
 
@@ -114,6 +150,7 @@ else:
             brp = res["bright_pixels"][ccd]
             brpc = np.array(res["bright_columns"][ccd])*pix_col
             raft_bad_pixels.extend(dkp + dkpc + brp + brpc)
+            good_pix.extend(pix_per_amp - (dkp + dkpc + brp + brpc)*1.e-9)
 
         bad_pixels.extend(raft_bad_pixels)
         test_list.extend(raft_test_list)
@@ -165,7 +202,23 @@ half_pixels = full_pixels*0.5
 pixels_95 = full_pixels*0.95
 pixels_75 = full_pixels*0.75
 
-f2 = interp1d(bins_interp, norm_cum, kind='cubic')
+h = figure(title=args.test, tools=TOOLS, toolbar_location="below", x_range=(0., float(args.max)))
+
+if args.binned == "yes":
+
+    f2 = interp1d(bins_interp, norm_cum, kind='cubic')
+    histsource = ColumnDataSource(pd.DataFrame(dict(top=norm_cum, left=bins[:-1], right=bins[1:])))
+    # Using numpy to get the index of the bins to which the value is assigned
+    h.quad(source=histsource, top='top', bottom=0, left='left', right='right', fill_color='blue',
+           fill_alpha=0.2)
+    h.line(x=bins_interp, y=f2(bins_interp), line_color="black")
+else:
+    rn_sorted, cu_sorted = make_cumulative(test_list, good_pix)
+    f2 = interp1d(rn_sorted, cu_sorted, kind='cubic')
+    h.line(x=rn_sorted, y=f2(rn_sorted), line_color="blue")
+    h.line(x=rn_sorted, y=cu_sorted, line_color="blue")
+
+"""
 f2_inv_half = lambda x: f2(x) - half_pixels
 half = optimize.newton(f2_inv_half, 5.)
 
@@ -179,30 +232,21 @@ print("binned obj, thr ", f'{obj_val:6.2f}', f'{thr_val:6.2f}',
       " interp obj, thr ", f'{obj_interp:6.2f}',
       f'{thr_interp:6.2f}')
 print("noise = ", f'{half:6.2f}', " for ", f'{half_pixels:6.2f}', " Gpixels")
+"""
 
-histsource = ColumnDataSource(pd.DataFrame(dict(top=norm_cum, left=bins[:-1], right=bins[1:])))
-# Using numpy to get the index of the bins to which the value is assigned
-h = figure(title=args.test, tools=TOOLS, toolbar_location="below")
-h.quad(source=histsource, top='top', bottom=0, left='left', right='right', fill_color='blue',
-       fill_alpha=0.2)
+plot_lines = []
+pixels_list = []
+idx = 0
 
-h.line(x=bins_interp, y=f2(bins_interp), line_color="black")
+for electrons in levels.keys():
 
-thr_line = Span(location=float(pixels_95), dimension="width", line_color="blue")
-h.add_layout(thr_line)
-thr_label = Label(x=0, y=float(pixels_95), text='Thrsh (95%)', text_color="blue")
-h.add_layout(thr_label)
-
-obj_line = Span(location=float(pixels_75), dimension="width", line_color="red")
-h.add_layout(obj_line)
-obj_label = Label(x=0, y=float(pixels_75), text='Obj (75%)', text_color="red")
-h.add_layout(obj_label)
-
-# Low is 1/2 nominal pixel count
-low_line = Span(location=half_pixels, dimension="width", line_color="green")
-h.add_layout(low_line)
-low_label = Label(x=0, y=half_pixels, text='Low (50%)', text_color="green")
-h.add_layout(low_label)
+    pixels = f2(electrons)
+    pixels_list.append(pixels)
+    thr_line = Span(location=float(pixels), dimension="width", line_color=colours[idx])
+    h.add_layout(thr_line)
+    thr_label = Label(x=0, y=float(pixels), text=levels[electrons], text_color=colours[idx])
+    h.add_layout(thr_label)
+    idx += 1
 
 h.xaxis.axis_label = args.test
 h.yaxis.axis_label = "pixels (GPx)"
@@ -238,16 +282,16 @@ e2v_h_hist.quad(source=e2v_histsource, top='top', bottom=0, left='left', right='
 
 # tabulate different thresholds
 
-descr = ["Threshold KPP (95%)", "Objective KPP (75%)", "Low bin (50%)"]
-threshs = [pixels_95, pixels_75, half_pixels]
-vals = [thr_interp, obj_interp, half]
+descr = [levels[k] for k in levels.keys()]
+threshs = [k for k in levels.keys()]
+print(descr, threshs, pixels_list)
 
 columns = [
     TableColumn(field="descr", title="Threshold type"),
-    TableColumn(field="threshs", title="threshold (GPx)", formatter=NumberFormatter(format='0.00')),
-    TableColumn(field="vals", title="Read Noise (e-)", formatter=NumberFormatter(format='0.00'))
+    TableColumn(field="threshs", title="threshold (e-)", formatter=NumberFormatter(format='0.00')),
+    TableColumn(field="vals", title="Pixels (GPx)", formatter=NumberFormatter(format='0.00'))
 ]
-threshold_dict = dict(descr=descr, threshs=threshs, vals=vals)
+threshold_dict = dict(descr=descr, threshs=threshs, vals=pixels_list)
 
 thr_table = ColumnDataSource(threshold_dict)
 thr_dt = DataTable(source=thr_table, columns=columns, width=900, height=150)
