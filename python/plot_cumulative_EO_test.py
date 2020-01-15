@@ -13,7 +13,7 @@ from collections import OrderedDict
 from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout
-from bokeh.models import Span, Label
+from bokeh.models import Span, Label, LinearAxis, Range1d
 from bokeh.models.widgets import DataTable, TableColumn, NumberFormatter
 parser = argparse.ArgumentParser(
     description='Plot test quantities to evaluate against construction thresholds.')
@@ -202,7 +202,15 @@ half_pixels = full_pixels*0.5
 pixels_95 = full_pixels*0.95
 pixels_75 = full_pixels*0.75
 
-h = figure(title=args.test, tools=TOOLS, toolbar_location="below", x_range=(0., float(args.max)))
+h = figure(title=args.test, tools=TOOLS, toolbar_location="below", x_range=(0., float(args.max)),
+           y_range=(0., 3.5))
+h.xaxis.axis_label = args.test
+h.yaxis.axis_label = "pixels (GPx)"
+
+# Create 2nd RHS y-axis
+h_y_extra_max = 3.5/pix_count
+h.extra_y_ranges['total'] = Range1d(start=0, end=h_y_extra_max)
+h.add_layout(LinearAxis(y_range_name='total', axis_label='% Total'), 'right')
 
 if args.binned == "yes":
 
@@ -248,9 +256,6 @@ for electrons in levels.keys():
     h.add_layout(thr_label)
     idx += 1
 
-h.xaxis.axis_label = args.test
-h.yaxis.axis_label = "pixels (GPx)"
-
 # histograms: all, ITL, e2v
 
 np_array = np.array(test_list)
@@ -284,14 +289,16 @@ e2v_h_hist.quad(source=e2v_histsource, top='top', bottom=0, left='left', right='
 
 descr = [levels[k] for k in levels.keys()]
 threshs = [k for k in levels.keys()]
-print(descr, threshs, pixels_list)
+fracs = [f/pix_count for f in pixels_list]
+print(descr, threshs, pixels_list, fracs)
 
 columns = [
     TableColumn(field="descr", title="Threshold type"),
     TableColumn(field="threshs", title="threshold (e-)", formatter=NumberFormatter(format='0.00')),
-    TableColumn(field="vals", title="Pixels (GPx)", formatter=NumberFormatter(format='0.00'))
+    TableColumn(field="vals", title="Pixels (GPx)", formatter=NumberFormatter(format='0.00')),
+    TableColumn(field="fracs", title="% Total", formatter=NumberFormatter(format='0.00'))
 ]
-threshold_dict = dict(descr=descr, threshs=threshs, vals=pixels_list)
+threshold_dict = dict(descr=descr, threshs=threshs, vals=pixels_list, fracs=fracs)
 
 thr_table = ColumnDataSource(threshold_dict)
 thr_dt = DataTable(source=thr_table, columns=columns, width=900, height=150)
