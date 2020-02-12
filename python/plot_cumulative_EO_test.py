@@ -20,8 +20,8 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-b', '--binned', default="no", help="used binned read noises")
 parser.add_argument('-t', '--test', default="read_noise", help="test quantity to display")
-parser.add_argument('-m', '--max', default=1.e10, help="max test value to use")
-parser.add_argument('-n', '--min', default=0., help="min test value to use")
+parser.add_argument('-m', '--max', default=20, help="number bins")
+parser.add_argument('-n', '--min', default=0.1, help="min test value to use")
 parser.add_argument('-r', '--run', default=None, help="run number")
 parser.add_argument('--obj', default=9., help="Objective  value")
 parser.add_argument('--thr', default=13., help="Threshold value")
