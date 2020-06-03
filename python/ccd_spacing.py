@@ -1,0 +1,534 @@
+import numpy as np
+import glob
+import argparse
+import sys
+import os
+import math
+import numpy as np
+from scipy.stats import linregress
+
+from os.path import join
+from astropy.io import fits
+
+from mixcoatl.sourcegrid import SourceGrid
+
+from bokeh.models import LinearAxis, Grid, ContinuousColorMapper, LinearColorMapper, ColorBar, \
+    LogTicker
+from bokeh.plotting import figure, curdoc
+from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
+from bokeh.layouts import row, column, layout, gridplot
+from bokeh.models import CustomJS, ColumnDataSource, CDSView, BooleanFilter
+from bokeh.models.widgets import TextInput, Dropdown, Button, RangeSlider, FileInput
+from bokeh.models import CustomJS, ColumnDataSource, Legend
+
+
+class ccd_spacing():
+
+    def __init__(self, dir_index=None):
+
+        self.name_ccd1 = None
+        self.name_ccd2 = None
+
+        self.cut_spurious_spots = 80.  # spots need to be closer to another spot to include in lines
+        self.lines = {}
+        self.linfits = {}
+        self.rotate = 3.2/57.3
+        self.show_rotate = False
+        self.pitch = 65.
+
+        self.ccd1_scatter = None
+
+        self.src1 = None
+        self.src2 = None
+        self.srcX1 = None
+        self.srcY1 = None
+        self.srcX2 = None
+        self.srcY2 = None
+        self.gX1 = None
+        self.gY1 = None
+        self.gX2 = None
+        self.gY2 = None
+
+        self.x0_in = -100.
+        self.y0_in = 2000.
+        self.rot0_in = 0.
+
+        self.x1_in = 4150.
+        self.y1_in = 2000.
+        self.rot1_in = 0.
+
+        self.x0_fit = None
+        self.y0_fit = None
+        self.rot0_fit = None
+
+        self.x1_fit = None
+        self.y1_fit = None
+        self.rot1_fit = None
+
+        self.dx0 = None
+        self.dy0 = None
+
+        # flags
+
+        self.use_fit = False
+        self.use_offsets = False
+        self.init = False  # true if initialized (reset to False when getting new data)
+        self.overlay_ccd = False  # true to put CCDs on same plot
+        self.overlay_grid = False # true overlay grid on CCDs
+        self.redo_fit = True
+
+        self.dir_index = dir_index
+
+        # set up buttons etc
+
+        # button to terminate app
+        self.button_exit = Button(label="Exit", button_type="danger", width=100)
+        self.button_exit.on_click(self.do_exit)
+
+        # sliders for offsetting spots patterns - each sets a pair of values for its coordinate
+        self.slider_x = RangeSlider(title="x0 Value Range", start=-1000, end=5000, value=(self.x0_in,
+                                                                                          self.x1_in),
+                                    width=900,
+                                    format="0[.]0000")
+        self.slider_x.on_change('value_throttled', self.slider_x_select)
+        self.slider_y = RangeSlider(title="y0 Value Range", start=-1000, end=5000, value=(self.y0_in,
+                                                                                          self.y1_in),
+                                    width=900,
+                                    format="0[.]0000")
+        self.slider_y.on_change('value_throttled', self.slider_y_select)
+
+        # button to submit slider values
+        self.button_submit = Button(label="Submit", button_type="warning", width=100)
+        self.button_submit.on_click(self.do_submit)
+
+        # button to submit slider values
+        self.button_get_data = Button(label="Get Data", button_type="warning", width=100)
+        self.button_get_data.on_click(self.do_get_data)
+
+        # button to perform fit
+        self.button_fit = Button(label="Fit", button_type="warning", width=100)
+        self.button_fit.on_click(self.do_fit)
+
+        # button to toggle CCD overlay
+        self.button_overlay_ccd = Button(label="Overlay CCDs", button_type="danger", width=100)
+        self.button_overlay_ccd.on_click(self.do_overlay_ccd)
+
+        # button to toggle grid overlay from fit
+        self.button_overlay_grid = Button(label="Overlay grid", button_type="danger", width=100)
+        self.button_overlay_grid.on_click(self.do_overlay_grid)
+
+        # button to make plots from line fits
+        self.button_linfit_plots = Button(label="Linfit plots", button_type="success", width=100)
+        self.button_linfit_plots.on_click(self.do_linfit_plots)
+
+        # select directory of files
+        self.file_input = FileInput(accept=".cat", multiple=True)
+        self.file_input.on_change('value', self.upload_file_data)
+
+        # layouts
+
+        self.layout = None
+
+        self.min_layout = row(self.button_exit, self.button_get_data, self.button_overlay_ccd,
+                              self.button_overlay_grid, self.file_input, self.button_linfit_plots)
+        self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
+        self.max_layout = column(self.min_layout, self.sliders_layout, self.button_fit)
+
+        self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
+
+    # handlers
+
+    def upload_file_data(self, attr, old, new):
+        print("fit data upload succeeded")
+        print(self.file_input.filename[0], self.file_input.filename[1])
+
+    def do_exit(self):
+        print("Shutting down app")
+        sys.exit(0)
+
+    def do_overlay_ccd(self):
+        self.overlay_ccd = not self.overlay_ccd
+        if self.overlay_ccd:
+            self.button_overlay_ccd.button_type = "success"
+        else:
+            self.button_overlay_ccd.button_type = "danger"
+        pl = self.make_plots()
+        m_new = column(self.max_layout, pl)
+        self.layout.children = m_new.children
+
+    def do_overlay_grid(self):
+        self.overlay_grid = not self.overlay_grid
+        if self.overlay_grid:
+            self.button_overlay_grid.button_type = "success"
+        else:
+            self.button_overlay_grid.button_type = "danger"
+        pl = self.make_plots()
+        m_new = column(self.max_layout, pl)
+        self.layout.children = m_new.children
+
+    def do_linfit_plots(self):
+        p_grid = self.make_line_plots()
+
+        m_new = column(self.max_layout, p_grid)
+        self.layout.children = m_new.children
+
+    def do_fit(self):
+        rc = self.match()
+        self.use_fit = True
+        self.redo_fit = False
+        pl = self.make_plots()
+        m_new = column(self.max_layout, pl)
+        self.layout.children = m_new.children
+        return
+
+    def do_submit(self):
+        self.use_offsets = True
+        self.use_fit = False
+        pl = self.make_plots()
+        m_new = column(self.max_layout, pl)
+        self.layout.children = m_new.children
+        return
+
+    def slider_x_select(self, sattr, old, new):
+        self.x0_in = self.slider_x.value[0]
+        self.x1_in = self.slider_x.value[1]
+
+    def slider_y_select(self, sattr, old, new):
+        self.y0_in = self.slider_y.value[0]
+        self.y1_in = self.slider_y.value[1]
+
+#    def do_get_data(self, sattr, old, new):
+    def do_get_data(self):
+
+        rc = self.get_data()
+        self.use_offsets = False
+        self.use_fit = False
+        self.redo_fit = True
+        pl = self.make_plots()
+        m_new = column(self.max_layout, pl)
+        self.layout.children = m_new.children
+
+    # worker routines
+
+    def find_lines(self):
+
+        # sort the y-coordinates for both CCDs
+        order = []
+        x = []
+        y = []
+        rad = self.rotate
+        x1_rot = math.cos(rad) * self.srcX1 - math.sin(rad) * self.srcY1
+        y1_rot = math.sin(rad) * self.srcX1 + math.cos(rad) * self.srcY1
+
+        order.append(np.argsort(-np.array(y1_rot), kind="stable"))
+        x.append(np.array(self.srcX1)[order[0]])
+        y.append(np.array(self.srcY1)[order[0]])
+
+        x2_rot = math.cos(rad) * self.srcX2 - math.sin(rad) * self.srcY2
+        y2_rot = math.sin(rad) * self.srcX2 + math.cos(rad) * self.srcY2
+
+        order.append(np.argsort(-np.array(y2_rot), kind="stable"))
+        x.append(np.array(self.srcX2)[order[1]])
+        y.append(np.array(self.srcY2)[order[1]])
+        yrot = []
+        yrot.append(np.array(y1_rot)[order[0]])
+        yrot.append(np.array(y2_rot)[order[1]])
+
+        # find lines
+
+        for l in range(2):
+
+            y_min = min(yrot[l])
+            ccd = self.lines.setdefault(l, {})
+
+            for idy, yi in enumerate(yrot[l]):
+                line_bin = int((yi-y_min+self.pitch/5.)/self.pitch)
+                fl = self.lines[l].setdefault(line_bin, [])
+                self.lines[l][line_bin].append([x[l][idy], y[l][idy]])
+
+        # sort lists by x
+
+        for l in range(2):
+            nl = len(self.lines[l])
+            for n in range(nl):
+                self.lines[l][n] = sorted(self.lines[l][n], key=lambda xy: xy[0])
+
+        return
+
+    def make_line_plots(self):
+
+        print("# lines in ", self.name_ccd1, " ", len(self.lines[0]))
+        print("# lines in ", self.name_ccd2, " ", len(self.lines[1]))
+
+        num_spots = [len(self.lines[0][k]) for k in self.lines[0]]
+        num_spots2 = [len(self.lines[1][k]) for k in self.lines[1]]
+        num_spots.extend(num_spots2)
+        print("Total spots = ", sum(num_spots))
+
+        slopes = []
+        slopes_ccd1 = []
+        slopes_ccd2 = []
+
+        for l in range(2):
+            for lines in self.linfits[l]:
+                slopes.append(self.linfits[l][lines][0])
+                if l == 0:
+                    slopes_ccd1.append(self.linfits[l][lines][0])
+                else:
+                    slopes_ccd2.append(self.linfits[l][lines][0])
+
+        s_hist, bins = np.histogram(np.array(slopes), bins=20)
+        p_hist = figure(tools=self.TOOLS, title="slopes", x_axis_label='slope', y_axis_label='counts',
+                        width=600)
+
+        p_hist.vbar(top=s_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
+        s1_hist, bins = np.histogram(np.array(slopes_ccd1), bins=20)
+        p1_hist = figure(tools=self.TOOLS, title=self.name_ccd1 + " slopes", x_axis_label='slope', \
+                                                                                y_axis_label='counts',
+                        width=600)
+
+        p1_hist.vbar(top=s1_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
+        s2_hist, bins = np.histogram(np.array(slopes_ccd2), bins=20)
+        p2_hist = figure(tools=self.TOOLS, title=self.name_ccd2 + " slopes", x_axis_label='slope', \
+                                                                                y_axis_label='counts',
+                        width=600)
+
+        p2_hist.vbar(top=s2_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
+        n_lines = len(self.lines[0])
+
+        slopes_diff = []
+        for nl in range(n_lines):
+            slopes_diff.append(self.linfits[1][nl][0] - self.linfits[0][nl][0])
+
+        sd_hist, bins = np.histogram(np.array(slopes_diff), bins=20)
+        pd_hist = figure(tools=self.TOOLS, title="delta slopes", x_axis_label='slope difference',
+                         y_axis_label='counts',
+                         width=600)
+
+        pd_hist.vbar(top=sd_hist, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
+
+        svl1 = figure(title=self.name_ccd1 + ": slope vs line #", x_axis_label='line #',
+                    y_axis_label='slope', tools=self.TOOLS)
+        source_svl1 = ColumnDataSource(dict(y=slopes_ccd1, x=range(n_lines)))
+        svl1.circle(x="x", y="y", source=source_svl1, color="blue")
+        svl2 = figure(title=self.name_ccd2 + ": slope vs line #", x_axis_label='line #',
+                    y_axis_label='slope', tools=self.TOOLS)
+        source_svl2 = ColumnDataSource(dict(y=slopes_ccd2, x=range(n_lines)))
+        svl2.circle(x="x", y="y", source=source_svl2, color="blue")
+
+        hist_list = [[p_hist, pd_hist], [p1_hist, p2_hist], [svl1, svl2]]
+
+        # overlay fit lines on scatterplots
+
+        for l in range(2):
+            for nl in range(n_lines):
+                x0 = self.lines[l][nl][0][0]
+                y0 = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
+                x1 = self.lines[l][nl][-1][0]
+                y1 = self.linfits[l][nl][0] * x1 + self.linfits[l][nl][1]
+                if self.ccd1_scatter is not None:
+                    self.ccd1_scatter.line([x0, x1], [y0, y1], line_width=2)
+
+            hist_list.append([self.ccd1_scatter])
+
+        return gridplot(hist_list)
+
+    def fit_line_pairs(self, line_list):
+
+        x = []
+        y = []
+        for pt in line_list:
+            x.append(pt[0])
+            y.append(pt[1])
+
+        order = np.argsort(np.array(x), kind="stable")
+        x = np.array(x)[order]
+        y = np.array(y)[order]
+
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+
+        return slope, intercept, r_value, p_value, std_err
+
+    def get_data(self, dir_index=None):
+
+        if self.dir_index is None:
+            self.dir_index = dir_index
+
+        results_dirs = sorted(glob.glob(self.dir_index))
+        for result_dir in results_dirs:
+            print(result_dir)
+
+        infile1, infile2 = sorted(glob.glob(join(results_dirs[0], '*_source_catalog.cat')))
+        print(infile1)
+        print(infile2)
+
+        self.name_ccd1 = os.path.basename(infile1).split("_source")[0]
+        self.name_ccd2 = os.path.basename(infile2).split("_source")[0]
+
+        self.src1 = fits.getdata(infile1)
+        X1 = self.src1['base_SdssShape_x']
+        Y1 = self.src1['base_SdssShape_y']
+
+        median_x1 = np.median(np.array(X1))
+        median_y1 = np.median(np.array(Y1))
+        self.srcX1 = []
+        self.srcY1 = []
+        dist_x = 16 * 65.
+        dist_y = 27 * 65.
+        x_min = median_x1 - dist_x
+        x_max = median_x1 + dist_x
+        y_min = median_y1 - dist_y
+        y_max = median_y1 + dist_y
+
+        for n, x in enumerate(X1):
+            if x > x_min and x < x_max and Y1[n] > y_min and Y1[n] < y_max:
+                self.srcX1.append(x)
+                self.srcY1.append(Y1[n])
+
+        self.srcX1 = np.array((self.srcX1))
+        self.srcY1 = np.array((self.srcY1))
+
+        self.src2 = fits.getdata(infile2)
+        X2 = self.src2['base_SdssShape_x']
+        Y2 = self.src2['base_SdssShape_y']
+
+        median_x2 = np.median(np.array(X2))
+        median_y2 = np.median(np.array(Y2))
+        self.srcX2 = []
+        self.srcY2 = []
+        x_min = median_x2 - dist_x
+        x_max = median_x2 + dist_x
+        y_min = median_y2 - dist_y
+        y_max = median_y2 + dist_y
+
+        for n, x in enumerate(X2):
+            if x > x_min and x < x_max and Y2[n] > y_min and Y2[n] < y_max:
+                self.srcX2.append(x)
+                self.srcY2.append(Y2[n])
+        self.srcX2 = np.array((self.srcX2))
+        self.srcY2 = np.array((self.srcY2))
+
+        print("# spots on ", self.name_ccd1, " ", len(self.srcX1))
+        print("# spots on ", self.name_ccd2, " ", len(self.srcX2))
+
+        if self.show_rotate:
+            rad = self.rotate
+            x1_rot = math.cos(rad) * self.srcX1 - math.sin(rad) * self.srcY1
+            y1_rot = math.sin(rad) * self.srcX1 + math.cos(rad) * self.srcY1
+            x2_rot = math.cos(rad) * self.srcX2 - math.sin(rad) * self.srcY2
+            y2_rot = math.sin(rad) * self.srcX2 + math.cos(rad) * self.srcY2
+
+            self.srcX1 = x1_rot
+            self.srcY1 = y1_rot
+            self.srcX2 = x2_rot
+            self.srcY2 = y2_rot
+
+        self.x0_in = min(self.srcX1) - 90.  # 90 to account for gap between CCDs
+        self.x1_in = max(self.srcX2)
+        self.y0_in = np.mean(np.array(self.srcY1))
+        self.y1_in = np.mean(np.array(self.srcY2))
+        print("data guesses - x0, y0= ", self.x0_in, self.y0_in, " x1, y1 = ", self.x1_in, self.y1_in)
+
+        self.slider_x.value = (self.x0_in, self.x1_in)
+        self.slider_y.value = (self.y0_in, self.y1_in)
+
+        rc = self.find_lines()
+
+        for c in range(2):
+            lf = self.linfits.setdefault(c, {})
+            for lines in self.lines[c]:
+                lf.setdefault(lines, {})
+                slope, intercept, r_value, p_value, std_err = self.fit_line_pairs(self.lines[c][lines])
+                self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
+
+        return
+
+    def data_2_model(self, x0_guess, y0_guess, src=None):
+
+        model_grid = SourceGrid.from_source_catalog(src, y0_guess=y0_guess, x0_guess=x0_guess)
+
+        gY, gX = model_grid.make_grid(49, 49)
+
+        return model_grid, gY, gX
+
+    def make_plots(self):
+
+        if self.use_fit:
+            o1 = -self.dx0
+            o2 = -self.dy0
+            o3 = 0.
+            o4 = 0.
+        else:
+            o1 = o2 = o3 = o4 = 0.
+            if self.use_offsets:
+                o1 = self.x0_in
+                o2 = self.y0_in
+                o3 = self.x1_in
+                o4 = self.y1_in
+
+        x1 = self.srcX1-o1
+        y1 = self.srcY1-o2
+        x2 = self.srcX2-o3
+        y2 = self.srcY2-o4
+
+        self.ccd1_scatter = figure(title="Spots Grid:" + self.name_ccd1, x_axis_label='x',
+                    y_axis_label='y', tools=self.TOOLS)
+
+        source_g = None
+        cg = None
+        if self.overlay_grid and self.use_fit:
+            source_g = ColumnDataSource(dict(x=self.gX2, y=self.gY2))
+            cg = self.ccd1_scatter.circle(x="x", y="y", source=source_g, color="gray", size=10)
+
+        source_1 = ColumnDataSource(dict(x=x1, y=y1))
+        c1 = self.ccd1_scatter.circle(x="x", y="y", source=source_1, color="blue")
+
+        source_2 = ColumnDataSource(dict(x=x2, y=y2))
+        p2 = figure(title="Spots Grid: " + self.name_ccd2, x_axis_label='x',
+                    y_axis_label='y', tools=self.TOOLS)
+
+        if self.overlay_ccd:
+            c2 = self.ccd1_scatter.circle(x="x", y="y", source=source_2, color="red")
+            self.ccd1_scatter.height = 900
+            self.ccd1_scatter.width = 900
+            self.ccd1_scatter.title.text = "Spots Grid: " + self.name_ccd2 + " " + self.name_ccd1
+
+            legend_it = [(self.name_ccd1, [c1]), (self.name_ccd2, [c2])]
+            if cg is not None:
+                legend_it.append(("Grid", [cg]))
+            legend = Legend(items=legend_it)
+            self.ccd1_scatter.add_layout(legend, 'above')
+
+            plots_layout = layout(row(self.ccd1_scatter))
+        else:
+            p2.circle(x="x", y="y", source=source_2, color="red")
+            if self.overlay_grid and self.use_fit:
+                p2.circle(x="x", y="y", source=source_g, color="gray")
+            plots_layout = layout(row(self.ccd1_scatter, p2))
+
+        return plots_layout
+
+    def match(self):
+        # Need an intelligent guess
+
+        model_grid1, self.gY1, self.gX1 = self.data_2_model(x0_guess=self.x0_in, y0_guess=self.y0_in,
+                                                            src=self.src1)
+
+        model_grid2, self.gY2, self.gX2 = self.data_2_model(x0_guess=self.x1_in, y0_guess=self.y1_in,
+                                                            src=self.src2)
+
+        print('Grid 1:', model_grid1.x0, model_grid1.y0, model_grid1.theta)
+        print('Grid 2:', model_grid2.x0, model_grid2.y0, model_grid2.theta)
+
+        # Ignore rotation for now
+        self.dy0 = model_grid2.y0 - model_grid1.y0
+        self.dx0 = model_grid2.x0 - model_grid1.x0
+
+    def loop(self):
+        if not self.init:
+            rc = self.get_data(dir_index=self.dir_index)
+
+        self.layout = layout(self.max_layout)
