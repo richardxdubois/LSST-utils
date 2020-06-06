@@ -1,6 +1,4 @@
-import numpy as np
 import glob
-import argparse
 import sys
 import os
 import math
@@ -12,12 +10,9 @@ from astropy.io import fits
 
 from mixcoatl.sourcegrid import SourceGrid
 
-from bokeh.models import LinearAxis, Grid, ContinuousColorMapper, LinearColorMapper, ColorBar, \
-    LogTicker
 from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
 from bokeh.layouts import row, column, layout, gridplot
-from bokeh.models import CustomJS, ColumnDataSource, CDSView, BooleanFilter
 from bokeh.models.widgets import TextInput, Dropdown, Button, RangeSlider, FileInput
 from bokeh.models import CustomJS, ColumnDataSource, Legend
 
@@ -28,6 +23,8 @@ class ccd_spacing():
 
         self.name_ccd1 = None
         self.name_ccd2 = None
+        self.ccd_relative_orientation = "vertical"
+        self.extrap_dir = 1.
 
         self.cut_spurious_spots = 80.  # spots need to be closer to another spot to include in lines
         self.lines = {}
@@ -35,8 +32,15 @@ class ccd_spacing():
         self.rotate = 3.2/57.3
         self.show_rotate = False
         self.pitch = 65.
+        self.num_spots = 49
 
         self.ccd1_scatter = None
+
+        self.ccd_standard = 0
+        self.med_shift_x = 0.
+        self.med_shift_y = 0.
+
+        self.line_fitting = True
 
         self.src1 = None
         self.src2 = None
@@ -85,6 +89,14 @@ class ccd_spacing():
         self.button_exit = Button(label="Exit", button_type="danger", width=100)
         self.button_exit.on_click(self.do_exit)
 
+        # button view rotated grids for binning
+        self.button_rotate = Button(label="Rotate", button_type="danger", width=100)
+        self.button_rotate.on_click(self.do_rotate)
+
+        # button toggle line fitting
+        self.button_line_fitting = Button(label="Enable Lines", button_type="success", width=100)
+        self.button_line_fitting.on_click(self.do_line_fitting)
+
         # sliders for offsetting spots patterns - each sets a pair of values for its coordinate
         self.slider_x = RangeSlider(title="x0 Value Range", start=-1000, end=5000, value=(self.x0_in,
                                                                                           self.x1_in),
@@ -101,7 +113,7 @@ class ccd_spacing():
         self.button_submit = Button(label="Submit", button_type="warning", width=100)
         self.button_submit.on_click(self.do_submit)
 
-        # button to submit slider values
+        # button to change data source
         self.button_get_data = Button(label="Get Data", button_type="warning", width=100)
         self.button_get_data.on_click(self.do_get_data)
 
@@ -122,17 +134,21 @@ class ccd_spacing():
         self.button_linfit_plots.on_click(self.do_linfit_plots)
 
         # select directory of files
-        self.file_input = FileInput(accept=".cat", multiple=True)
-        self.file_input.on_change('value', self.upload_file_data)
+        #self.file_input = FileInput(accept=".cat", multiple=True)
+        #self.file_input.on_change('value', self.upload_file_data)
+        self.text_get_data_path = TextInput(value=self.dir_index, title="Change Data Path", width=700)
+        self.text_get_data_path.on_change('value', self.do_get_data_path)
 
         # layouts
 
         self.layout = None
 
         self.min_layout = row(self.button_exit, self.button_get_data, self.button_overlay_ccd,
-                              self.button_overlay_grid, self.file_input, self.button_linfit_plots)
+                              self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
+                              self.button_line_fitting)
         self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
-        self.max_layout = column(self.min_layout, self.sliders_layout, self.button_fit)
+        self.max_layout = column(self.min_layout, self.text_get_data_path, self.sliders_layout,
+                                 self.button_fit)
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
 
@@ -145,6 +161,20 @@ class ccd_spacing():
     def do_exit(self):
         print("Shutting down app")
         sys.exit(0)
+
+    def do_rotate(self):
+        self.show_rotate = not self.show_rotate
+        if self.show_rotate:
+            self.button_rotate.button_type = "danger"
+        else:
+            self.button_rotate.button_type = "success"
+
+    def do_line_fitting(self):
+        self.line_fitting = not self.line_fitting
+        if self.line_fitting:
+            self.button_line_fitting.button_type = "success"
+        else:
+            self.button_line_fitting.button_type = "danger"
 
     def do_overlay_ccd(self):
         self.overlay_ccd = not self.overlay_ccd
@@ -197,7 +227,6 @@ class ccd_spacing():
         self.y0_in = self.slider_y.value[0]
         self.y1_in = self.slider_y.value[1]
 
-#    def do_get_data(self, sattr, old, new):
     def do_get_data(self):
 
         rc = self.get_data()
@@ -208,15 +237,21 @@ class ccd_spacing():
         m_new = column(self.max_layout, pl)
         self.layout.children = m_new.children
 
+    def do_get_data_path(self, sattr, old, new):
+        self.dir_index = self.text_get_data_path.value
+        rc = self.do_get_data()
+        return
+
     # worker routines
 
     def find_lines(self):
 
         # sort the y-coordinates for both CCDs
+        self.lines = {}
         order = []
         x = []
         y = []
-        rad = self.rotate
+        rad = self.rotate * self.extrap_dir
         x1_rot = math.cos(rad) * self.srcX1 - math.sin(rad) * self.srcY1
         y1_rot = math.sin(rad) * self.srcX1 + math.cos(rad) * self.srcY1
 
@@ -308,6 +343,13 @@ class ccd_spacing():
                          y_axis_label='counts',
                          width=600)
 
+        s1v2 = figure(title="Slopes: " + self.name_ccd1 + " vs " + self.name_ccd2,
+                      x_axis_label=self.name_ccd1 + ' slope',
+                      y_axis_label=self.name_ccd2 + ' slope',
+                      tools=self.TOOLS)
+        source_s1v2 = ColumnDataSource(dict(y=slopes_ccd2, x=slopes_ccd1))
+        s1v2.circle(x="x", y="y", source=source_s1v2, color="blue")
+
         pd_hist.vbar(top=sd_hist, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
         svl1 = figure(title=self.name_ccd1 + ": slope vs line #", x_axis_label='line #',
@@ -319,7 +361,7 @@ class ccd_spacing():
         source_svl2 = ColumnDataSource(dict(y=slopes_ccd2, x=range(n_lines)))
         svl2.circle(x="x", y="y", source=source_svl2, color="blue")
 
-        hist_list = [[p_hist, pd_hist], [p1_hist, p2_hist], [svl1, svl2]]
+        hist_list = [[p_hist, pd_hist], [s1v2], [p1_hist, p2_hist], [svl1, svl2]]
 
         # overlay fit lines on scatterplots
 
@@ -352,8 +394,63 @@ class ccd_spacing():
 
         return slope, intercept, r_value, p_value, std_err
 
+    def match_lines(self):
+
+        # decide which CCD is the standard - the other is then measured relative to it. Pick the one that
+        # is fatter on top.
+
+        self.ccd_standard = 0
+        non_standard = 1
+        if len(self.lines[1][self.num_spots-1]) > len(self.lines[1][0]):
+            self.ccd_standard = 1
+            non_standard = 0
+
+        n_lines = len(self.lines[0])   # they'd better both have the same number!
+        shift_x = []
+        shift_y = []
+
+        for nl in range(n_lines):
+
+            # count spots and calculate the spots gap between the CCDs
+            missing_spots = self.num_spots - \
+                            (len(self.lines[0][nl]) + len(self.lines[1][nl]))
+            extrap_dist = missing_spots * self.pitch
+
+            near_end = 0
+            far_end = -1
+            if self.ccd_relative_orientation == "horizontal":
+                far_end = 0
+                near_end = -1
+
+            x1 = self.lines[self.ccd_standard][nl][near_end][0]
+            y1 = self.linfits[self.ccd_standard][nl][1] +  \
+                 self.linfits[self.ccd_standard][nl][0] * x1
+            x2 = self.lines[self.ccd_standard][nl][far_end][0]
+            y2 = self.linfits[self.ccd_standard][nl][1] + \
+                 self.linfits[self.ccd_standard][nl][0] * x2
+
+            length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            unitSlopeX = self.extrap_dir * (x2 - x1) / length
+            unitSlopeY = self.extrap_dir * (y2 - y1) / length
+
+            new_x = x1 - extrap_dist * unitSlopeX * self.extrap_dir
+            new_y = y1 - extrap_dist * unitSlopeY * self.extrap_dir
+            shift_x.append(self.lines[non_standard][nl][far_end][0] - new_x)
+            shift_y.append(self.lines[non_standard][nl][far_end][1] - new_y)
+
+        self.med_shift_x = np.median(np.array(shift_x))
+        self.med_shift_y = np.median(np.array(shift_y))
+
+        self.x1_in = self.med_shift_x
+        self.y1_in = 2000. + self.med_shift_y
+        self.x0_in = 0.
+        self.y0_in = 2000.
+
+        return
+
     def get_data(self, dir_index=None):
 
+        print(" Entered get_data")
         if self.dir_index is None:
             self.dir_index = dir_index
 
@@ -368,16 +465,30 @@ class ccd_spacing():
         self.name_ccd1 = os.path.basename(infile1).split("_source")[0]
         self.name_ccd2 = os.path.basename(infile2).split("_source")[0]
 
+        s1 = self.name_ccd1.split("_")[1]
+        s2 = self.name_ccd2.split(("_"))[1]
+        kw_x = 'base_SdssShape_x'
+        kw_y = 'base_SdssShape_y'
+        self.extrap_dir = 1.
+
+        if int(s1[1]) == int(s2[1]):
+            self.ccd_relative_orientation = "vertical"
+        else:
+            self.ccd_relative_orientation = "horizontal"  # swap x and y
+            kw_x = 'base_SdssShape_y'
+            kw_y = 'base_SdssShape_x'
+            self.extrap_dir = -1.
+
         self.src1 = fits.getdata(infile1)
-        X1 = self.src1['base_SdssShape_x']
-        Y1 = self.src1['base_SdssShape_y']
+        X1 = self.src1[kw_x]
+        Y1 = self.src1[kw_y]
 
         median_x1 = np.median(np.array(X1))
         median_y1 = np.median(np.array(Y1))
         self.srcX1 = []
         self.srcY1 = []
-        dist_x = 16 * 65.
-        dist_y = 27 * 65.
+        dist_x = 16 * self.pitch
+        dist_y = 27 * self.pitch
         x_min = median_x1 - dist_x
         x_max = median_x1 + dist_x
         y_min = median_y1 - dist_y
@@ -392,8 +503,8 @@ class ccd_spacing():
         self.srcY1 = np.array((self.srcY1))
 
         self.src2 = fits.getdata(infile2)
-        X2 = self.src2['base_SdssShape_x']
-        Y2 = self.src2['base_SdssShape_y']
+        X2 = self.src2[kw_x]
+        Y2 = self.src2[kw_y]
 
         median_x2 = np.median(np.array(X2))
         median_y2 = np.median(np.array(Y2))
@@ -415,7 +526,7 @@ class ccd_spacing():
         print("# spots on ", self.name_ccd2, " ", len(self.srcX2))
 
         if self.show_rotate:
-            rad = self.rotate
+            rad = self.rotate * self.extrap_dir
             x1_rot = math.cos(rad) * self.srcX1 - math.sin(rad) * self.srcY1
             y1_rot = math.sin(rad) * self.srcX1 + math.cos(rad) * self.srcY1
             x2_rot = math.cos(rad) * self.srcX2 - math.sin(rad) * self.srcY2
@@ -426,23 +537,22 @@ class ccd_spacing():
             self.srcX2 = x2_rot
             self.srcY2 = y2_rot
 
-        self.x0_in = min(self.srcX1) - 90.  # 90 to account for gap between CCDs
-        self.x1_in = max(self.srcX2)
-        self.y0_in = np.mean(np.array(self.srcY1))
-        self.y1_in = np.mean(np.array(self.srcY2))
-        print("data guesses - x0, y0= ", self.x0_in, self.y0_in, " x1, y1 = ", self.x1_in, self.y1_in)
-
         self.slider_x.value = (self.x0_in, self.x1_in)
         self.slider_y.value = (self.y0_in, self.y1_in)
 
-        rc = self.find_lines()
+        if self.line_fitting:
+            rc = self.find_lines()
 
-        for c in range(2):
-            lf = self.linfits.setdefault(c, {})
-            for lines in self.lines[c]:
-                lf.setdefault(lines, {})
-                slope, intercept, r_value, p_value, std_err = self.fit_line_pairs(self.lines[c][lines])
-                self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
+            self.linfits = {}
+
+            for c in range(2):
+                lf = self.linfits.setdefault(c, {})
+                for lines in self.lines[c]:
+                    lf.setdefault(lines, {})
+                    slope, intercept, r_value, p_value, std_err = self.fit_line_pairs(self.lines[c][lines])
+                    self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
+
+            rc = self.match_lines()
 
         return
 
@@ -456,6 +566,7 @@ class ccd_spacing():
 
     def make_plots(self):
 
+        print("Entered make_plots")
         if self.use_fit:
             o1 = -self.dx0
             o2 = -self.dy0
@@ -530,5 +641,8 @@ class ccd_spacing():
     def loop(self):
         if not self.init:
             rc = self.get_data(dir_index=self.dir_index)
+
+        if not self.line_fitting:
+            self.button_line_fitting.button_type = "danger"
 
         self.layout = layout(self.max_layout)
