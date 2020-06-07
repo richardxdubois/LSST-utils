@@ -19,10 +19,14 @@ from bokeh.models import CustomJS, ColumnDataSource, Legend
 
 class ccd_spacing():
 
-    def __init__(self, dir_index=None):
+    def __init__(self, dir_index=None, combo_name=None):
+
+        self.file_paths = {}
+        self.raft_ccd_combo = combo_name
 
         self.name_ccd1 = None
         self.name_ccd2 = None
+        self.names_ccd = []
         self.ccd_relative_orientation = "vertical"
         self.extrap_dir = 1.
 
@@ -39,6 +43,8 @@ class ccd_spacing():
         self.ccd_standard = 0
         self.med_shift_x = 0.
         self.med_shift_y = 0.
+        self.shift_x = []
+        self.shift_y = []
 
         self.line_fitting = True
 
@@ -110,11 +116,11 @@ class ccd_spacing():
         self.slider_y.on_change('value_throttled', self.slider_y_select)
 
         # button to submit slider values
-        self.button_submit = Button(label="Submit", button_type="warning", width=100)
+        self.button_submit = Button(label="Submit slider", button_type="warning", width=100)
         self.button_submit.on_click(self.do_submit)
 
         # button to change data source
-        self.button_get_data = Button(label="Get Data", button_type="warning", width=100)
+        self.button_get_data = Button(label="Refresh Data", button_type="warning", width=100)
         self.button_get_data.on_click(self.do_get_data)
 
         # button to perform fit
@@ -133,26 +139,38 @@ class ccd_spacing():
         self.button_linfit_plots = Button(label="Linfit plots", button_type="success", width=100)
         self.button_linfit_plots.on_click(self.do_linfit_plots)
 
-        # select directory of files
-        #self.file_input = FileInput(accept=".cat", multiple=True)
-        #self.file_input.on_change('value', self.upload_file_data)
-        self.text_get_data_path = TextInput(value=self.dir_index, title="Change Data Path", width=700)
-        self.text_get_data_path.on_change('value', self.do_get_data_path)
+        # do stuff in init
+
+        rc = self.find_files()
+        self.menu_data = []
+        for name in self.file_paths:
+            self.menu_data.append((name, self.file_paths[name] + ", " + name))
+
+        # drop down menu of test names, taking the menu from self.menu_test
+        self.drop_data = Dropdown(label="Select data", button_type="warning", menu=self.menu_data, width=150)
+        self.drop_data.on_click(self.update_dropdown_data)
 
         # layouts
 
         self.layout = None
 
-        self.min_layout = row(self.button_exit, self.button_get_data, self.button_overlay_ccd,
+        self.min_layout = row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
                               self.button_line_fitting)
         self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
-        self.max_layout = column(self.min_layout, self.text_get_data_path, self.sliders_layout,
+        self.max_layout = column(self.min_layout, self.sliders_layout,
                                  self.button_fit)
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
 
     # handlers
+
+    def update_dropdown_data(self, event):
+        self.dir_index = event.item.split(",")[0].strip()
+        self.raft_ccd_combo = event.item.split(",")[1].strip()
+
+        rc = self.do_get_data()
+        return
 
     def upload_file_data(self, attr, old, new):
         print("fit data upload succeeded")
@@ -237,12 +255,34 @@ class ccd_spacing():
         m_new = column(self.max_layout, pl)
         self.layout.children = m_new.children
 
-    def do_get_data_path(self, sattr, old, new):
-        self.dir_index = self.text_get_data_path.value
-        rc = self.do_get_data()
-        return
-
     # worker routines
+
+    def find_files(self):
+
+        base_dir = self.dir_index
+        self.file_paths = {}
+
+        result_dirs = sorted(glob.glob(base_dir + "/*/*/"))
+        for result_dir in result_dirs:
+            print(result_dir)
+            try:  # bail if 2 files not found
+                infile1, infile2 = sorted(glob.glob(join(result_dir, '*_source_catalog.cat')))
+            except ValueError:
+                continue
+
+            name_ccd1 = os.path.basename(infile1).split("_source")[0]
+            name_ccd2 = os.path.basename(infile2).split("_source")[0]
+
+            raft = name_ccd1.split("_")[0]
+            s1 = name_ccd1.split("_")[1]
+            s2 = name_ccd2.split(("_"))[1]
+            combo_name = raft + "_" + s1 + "_" + s2
+            try:
+                self.file_paths[combo_name] = result_dir
+            except KeyError:
+                self.file_paths[combo_name + "_1"] = result_dir
+
+        return
 
     def find_lines(self):
 
@@ -303,6 +343,7 @@ class ccd_spacing():
         slopes = []
         slopes_ccd1 = []
         slopes_ccd2 = []
+        color = ["blue", "red"]
 
         for l in range(2):
             for lines in self.linfits[l]:
@@ -365,7 +406,19 @@ class ccd_spacing():
 
         # overlay fit lines on scatterplots
 
+        spot_pitch = {}
+        residuals = {}
+        r_hist = figure(tools=self.TOOLS, title="residuals", x_axis_label='residuals',
+                        y_axis_label='counts',
+                        width=600)
+        pitch_hist = figure(tools=self.TOOLS, title="Spot pitch ", x_axis_label='pitch',
+                            y_axis_label='counts',
+                            width=600)
+
         for l in range(2):
+            spl = spot_pitch.setdefault(l, [])
+            res = residuals.setdefault(l, [])
+
             for nl in range(n_lines):
                 x0 = self.lines[l][nl][0][0]
                 y0 = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
@@ -374,7 +427,33 @@ class ccd_spacing():
                 if self.ccd1_scatter is not None:
                     self.ccd1_scatter.line([x0, x1], [y0, y1], line_width=2)
 
-            hist_list.append([self.ccd1_scatter])
+                n_spots = len(self.lines[l][nl])
+                xp = -1.
+                yp = -1.
+                for s in range(n_spots):
+                    x0 = self.lines[l][nl][s][0]
+                    y0 = self.lines[l][nl][s][1]
+                    y0_fit = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
+                    res.append(y0_fit - y0)
+                    if (xp != -1.):
+                        d = math.sqrt((x0 - xp)**2 + (y0 - yp)**2)
+                        spl.append(d)
+
+                    xp = x0
+                    yp = y0
+
+            resid, bins = np.histogram(np.array(res), bins=50, range=(-25., 25.))
+
+            w = bins[1] - bins[0]
+            r_hist.step(y=resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
+
+            pitches, bins = np.histogram(np.array(spl), bins=40, range=(55., 75.))
+            w = bins[1] - bins[0]
+
+            pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
+
+        hist_list.append([r_hist, pitch_hist])
+        hist_list.append([self.ccd1_scatter])
 
         return gridplot(hist_list)
 
@@ -406,8 +485,8 @@ class ccd_spacing():
             non_standard = 0
 
         n_lines = len(self.lines[0])   # they'd better both have the same number!
-        shift_x = []
-        shift_y = []
+        self.shift_x = []
+        self.shift_y = []
 
         for nl in range(n_lines):
 
@@ -435,11 +514,15 @@ class ccd_spacing():
 
             new_x = x1 - extrap_dist * unitSlopeX * self.extrap_dir
             new_y = y1 - extrap_dist * unitSlopeY * self.extrap_dir
-            shift_x.append(self.lines[non_standard][nl][far_end][0] - new_x)
-            shift_y.append(self.lines[non_standard][nl][far_end][1] - new_y)
 
-        self.med_shift_x = np.median(np.array(shift_x))
-        self.med_shift_y = np.median(np.array(shift_y))
+            old_x = self.lines[non_standard][nl][far_end][0]
+            old_y = self.linfits[non_standard][nl][1] + self.linfits[non_standard][nl][0] * old_x
+
+            self.shift_x.append(old_x - new_x)
+            self.shift_y.append(old_y - new_y)
+
+        self.med_shift_x = np.median(np.array(self.shift_x))
+        self.med_shift_y = np.median(np.array(self.shift_y))
 
         self.x1_in = self.med_shift_x
         self.y1_in = 2000. + self.med_shift_y
@@ -448,13 +531,14 @@ class ccd_spacing():
 
         return
 
-    def get_data(self, dir_index=None):
+    def get_data(self, combo_name=None):
 
         print(" Entered get_data")
-        if self.dir_index is None:
-            self.dir_index = dir_index
+        if combo_name is None:
+            combo_name = self.raft_ccd_combo
 
-        results_dirs = sorted(glob.glob(self.dir_index))
+        dir_index = self.file_paths[combo_name]
+        results_dirs = sorted(glob.glob(dir_index))
         for result_dir in results_dirs:
             print(result_dir)
 
@@ -464,6 +548,7 @@ class ccd_spacing():
 
         self.name_ccd1 = os.path.basename(infile1).split("_source")[0]
         self.name_ccd2 = os.path.basename(infile2).split("_source")[0]
+        self.names_ccd = [self.name_ccd1, self.name_ccd2]
 
         s1 = self.name_ccd1.split("_")[1]
         s2 = self.name_ccd2.split(("_"))[1]
@@ -640,7 +725,7 @@ class ccd_spacing():
 
     def loop(self):
         if not self.init:
-            rc = self.get_data(dir_index=self.dir_index)
+            rc = self.get_data(combo_name=self.raft_ccd_combo)
 
         if not self.line_fitting:
             self.button_line_fitting.button_type = "danger"
