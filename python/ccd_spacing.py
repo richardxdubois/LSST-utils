@@ -45,6 +45,7 @@ class ccd_spacing():
         self.med_shift_y = 0.
         self.shift_x = []
         self.shift_y = []
+        self.center_to_center = [0., 0.]
 
         self.line_fitting = True
 
@@ -168,13 +169,11 @@ class ccd_spacing():
     def update_dropdown_data(self, event):
         self.dir_index = event.item.split(",")[0].strip()
         self.raft_ccd_combo = event.item.split(",")[1].strip()
+        self.drop_data.button_type = "warning"
 
         rc = self.do_get_data()
-        return
 
-    def upload_file_data(self, attr, old, new):
-        print("fit data upload succeeded")
-        print(self.file_input.filename[0], self.file_input.filename[1])
+        return
 
     def do_exit(self):
         print("Shutting down app")
@@ -247,7 +246,14 @@ class ccd_spacing():
 
     def do_get_data(self):
 
-        rc = self.get_data()
+        try:
+            rc = self.get_data()
+        except ValueError:
+            self.drop_data.button_type = "danger"
+            m_new = column(self.max_layout)
+            self.layout.children = m_new.children
+            return
+
         self.use_offsets = False
         self.use_fit = False
         self.redo_fit = True
@@ -264,19 +270,14 @@ class ccd_spacing():
 
         result_dirs = sorted(glob.glob(base_dir + "/*/*/"))
         for result_dir in result_dirs:
-            print(result_dir)
             try:  # bail if 2 files not found
                 infile1, infile2 = sorted(glob.glob(join(result_dir, '*_source_catalog.cat')))
             except ValueError:
                 continue
 
-            name_ccd1 = os.path.basename(infile1).split("_source")[0]
-            name_ccd2 = os.path.basename(infile2).split("_source")[0]
-
-            raft = name_ccd1.split("_")[0]
-            s1 = name_ccd1.split("_")[1]
-            s2 = name_ccd2.split(("_"))[1]
-            combo_name = raft + "_" + s1 + "_" + s2
+            name_ccd1 = os.path.basename(infile1).split("_source")[0].strip()
+            name_ccd2 = os.path.basename(infile2).split("_source")[0].strip()
+            combo_name = name_ccd1 + "_" + name_ccd2
             try:
                 self.file_paths[combo_name] = result_dir
             except KeyError:
@@ -313,13 +314,34 @@ class ccd_spacing():
 
         for l in range(2):
 
+            n_close = 0
             y_min = min(yrot[l])
+            for nc in range(1, 10):
+                ya = yrot[l][-nc - 1]
+                yb = yrot[l][-nc]
+                diff = yrot[l][-nc - 1] - yrot[l][-nc]
+                if diff < 5.:  # look for a bunch of spots close together
+                    n_close += 1
+                if n_close > 4:
+                    y_min = yrot[l][-nc] -10.  # back off a bit to get back the first few
+                    break
+
             ccd = self.lines.setdefault(l, {})
 
             for idy, yi in enumerate(yrot[l]):
+                if yi - y_min < 0.:  # spurious low point
+                    continue
                 line_bin = int((yi-y_min+self.pitch/5.)/self.pitch)
+                if line_bin > 48:  # spurious high point
+                    continue
                 fl = self.lines[l].setdefault(line_bin, [])
                 self.lines[l][line_bin].append([x[l][idy], y[l][idy]])
+
+        if len(self.lines[0]) != self.num_spots or len(self.lines[1]) != self.num_spots:
+            print(self.raft_ccd_combo + ": Problem finding full grid: found ", len(self.lines[0]), " and ",
+                  len(self.lines[1]),
+                  " spots")
+            raise ValueError
 
         # sort lists by x
 
@@ -327,6 +349,11 @@ class ccd_spacing():
             nl = len(self.lines[l])
             for n in range(nl):
                 self.lines[l][n] = sorted(self.lines[l][n], key=lambda xy: xy[0])
+                # ensure end points make sense
+                if abs(self.lines[l][n][0][0] - self.lines[l][n][1][0]) > self.cut_spurious_spots:
+                    del self.lines[l][n][0]
+                if abs(self.lines[l][n][-1][0] - self.lines[l][n][-2][0]) > self.cut_spurious_spots:
+                    del self.lines[l][n][-1]
 
         return
 
@@ -391,6 +418,13 @@ class ccd_spacing():
         source_s1v2 = ColumnDataSource(dict(y=slopes_ccd2, x=slopes_ccd1))
         s1v2.circle(x="x", y="y", source=source_s1v2, color="blue")
 
+        sdvnl = figure(title="Slope diff vs line #: " + self.raft_ccd_combo,
+                       x_axis_label='slope difference',
+                       y_axis_label='line #',
+                       tools=self.TOOLS)
+        source_sdvnl = ColumnDataSource(dict(x=slopes_diff, y=range(n_lines)))
+        sdvnl.circle(x="x", y="y", source=source_sdvnl, color="blue")
+
         pd_hist.vbar(top=sd_hist, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
         svl1 = figure(title=self.name_ccd1 + ": slope vs line #", x_axis_label='line #',
@@ -402,7 +436,7 @@ class ccd_spacing():
         source_svl2 = ColumnDataSource(dict(y=slopes_ccd2, x=range(n_lines)))
         svl2.circle(x="x", y="y", source=source_svl2, color="blue")
 
-        hist_list = [[p_hist, pd_hist], [s1v2], [p1_hist, p2_hist], [svl1, svl2]]
+        hist_list = [[p_hist, pd_hist], [s1v2, sdvnl], [p1_hist, p2_hist], [svl1, svl2]]
 
         # overlay fit lines on scatterplots
 
@@ -415,6 +449,10 @@ class ccd_spacing():
                             y_axis_label='counts',
                             width=600)
 
+        off_ccd = [[0., 0.], [0., 0.]]
+        if self.use_offsets:
+            off_ccd = [[self.x0_in, self.y0_in], [self.x1_in, self.y1_in]]
+
         for l in range(2):
             spl = spot_pitch.setdefault(l, [])
             res = residuals.setdefault(l, [])
@@ -424,6 +462,11 @@ class ccd_spacing():
                 y0 = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
                 x1 = self.lines[l][nl][-1][0]
                 y1 = self.linfits[l][nl][0] * x1 + self.linfits[l][nl][1]
+                x0 -= off_ccd[l][0]
+                y0 -= off_ccd[l][1]
+                x1 -= off_ccd[l][0]
+                y1 -= off_ccd[l][1]
+
                 if self.ccd1_scatter is not None:
                     self.ccd1_scatter.line([x0, x1], [y0, y1], line_width=2)
 
@@ -493,7 +536,7 @@ class ccd_spacing():
             # count spots and calculate the spots gap between the CCDs
             missing_spots = self.num_spots - \
                             (len(self.lines[0][nl]) + len(self.lines[1][nl]))
-            extrap_dist = missing_spots * self.pitch
+            extrap_dist = (missing_spots + 1) * self.pitch  # n+1 gaps needed to add
 
             near_end = 0
             far_end = -1
@@ -529,6 +572,17 @@ class ccd_spacing():
         self.x0_in = 0.
         self.y0_in = 2000.
 
+        centers = [2048., 2048.]
+        if self.ccd_relative_orientation == "horizontal":
+            c1 = [centers[0] - self.x1_in, centers[1] - self.y1_in]
+            c0 = [centers[0] - self.x0_in, centers[1] - self.y0_in]
+        else:
+            c1 = [centers[0] - self.y1_in, centers[1] - self.x1_in]
+            c0 = [centers[0] - self.y0_in, centers[1] - self.x0_in]
+
+        self.center_to_center = np.array(c0) - np.array(c1)
+
+        print("center to center = ", self.center_to_center)
         return
 
     def get_data(self, combo_name=None):
@@ -536,6 +590,8 @@ class ccd_spacing():
         print(" Entered get_data")
         if combo_name is None:
             combo_name = self.raft_ccd_combo
+
+        self.drop_data.label = combo_name
 
         dir_index = self.file_paths[combo_name]
         results_dirs = sorted(glob.glob(dir_index))
@@ -609,6 +665,12 @@ class ccd_spacing():
 
         print("# spots on ", self.name_ccd1, " ", len(self.srcX1))
         print("# spots on ", self.name_ccd2, " ", len(self.srcX2))
+
+        if len(self.srcX1) == 0 or len(self.srcX2) == 0:
+            print(self.raft_ccd_combo + ": Problem with input data: found ", len(self.srcX1), " and ", \
+                                       len(self.srcX2), \
+                       " spots")
+            raise ValueError
 
         if self.show_rotate:
             rad = self.rotate * self.extrap_dir

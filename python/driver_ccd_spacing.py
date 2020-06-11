@@ -14,7 +14,7 @@ parser.add_argument('-d', '--dir',
                     #default='/Users/richard/LSST/Data/GridSpacing/6872D_spacing/spacing_148.6_-211.9_009/',
                     #default='/Users/richard/LSST/Data/GridSpacing/6872D_spacing/spacing_0.0_-21.0_000/',
                     help="default directory to use")
-parser.add_argument('-c', '--combo', default='R22_S10_S11',help="raft, sensor combo name")
+parser.add_argument('-c', '--combo', default='R20_S12_R21_S10', help="raft, sensor combo name")
 
 args = parser.parse_args()
 print(args.dir)
