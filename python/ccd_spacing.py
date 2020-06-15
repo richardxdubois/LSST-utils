@@ -46,6 +46,7 @@ class ccd_spacing():
         self.shift_x = []
         self.shift_y = []
         self.center_to_center = [0., 0.]
+        self.d_extrap = []
 
         self.line_fitting = True
 
@@ -381,7 +382,7 @@ class ccd_spacing():
                     slopes_ccd2.append(self.linfits[l][lines][0])
 
         s_hist, bins = np.histogram(np.array(slopes), bins=20)
-        p_hist = figure(tools=self.TOOLS, title="slopes", x_axis_label='slope', y_axis_label='counts',
+        p_hist = figure(tools=self.TOOLS, title="All slopes", x_axis_label='slope', y_axis_label='counts',
                         width=600)
 
         p_hist.vbar(top=s_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
@@ -399,6 +400,27 @@ class ccd_spacing():
                         width=600)
 
         p2_hist.vbar(top=s2_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
+        ex_hist, bins = np.histogram(np.array(self.d_extrap), bins=20)
+        pex_hist = figure(tools=self.TOOLS, title="Extrapolation distance", x_axis_label='distance (px)',
+                          y_axis_label='counts',
+                        width=600)
+
+        pex_hist.vbar(top=ex_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
+        shy_hist, bins = np.histogram(np.array(self.shift_y), bins=20)
+        shexy_hist = figure(tools=self.TOOLS, title="y shift distance", x_axis_label='distance (px)',
+                          y_axis_label='counts',
+                        width=600)
+
+        shexy_hist.vbar(top=shy_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
+        shx_hist, bins = np.histogram(np.array(self.shift_x), bins=20)
+        shexx_hist = figure(tools=self.TOOLS, title="x shift distance", x_axis_label='distance (px)',
+                          y_axis_label='counts',
+                        width=600)
+
+        shexx_hist.vbar(top=shx_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
 
         n_lines = len(self.lines[0])
 
@@ -436,15 +458,22 @@ class ccd_spacing():
         source_svl2 = ColumnDataSource(dict(y=slopes_ccd2, x=range(n_lines)))
         svl2.circle(x="x", y="y", source=source_svl2, color="blue")
 
-        hist_list = [[p_hist, pd_hist], [s1v2, sdvnl], [p1_hist, p2_hist], [svl1, svl2]]
+        hist_list = [[p_hist, pd_hist], [shexx_hist, shexy_hist], [pex_hist], [s1v2, sdvnl],
+                     [p1_hist, p2_hist], [svl1, svl2]]
 
         # overlay fit lines on scatterplots
 
         spot_pitch = {}
         residuals = {}
+        gap_residuals = {}
+
         r_hist = figure(tools=self.TOOLS, title="residuals", x_axis_label='residuals',
                         y_axis_label='counts',
                         width=600)
+        gr_hist = figure(tools=self.TOOLS, title="gap residuals", x_axis_label='residuals',
+                         y_axis_label='counts',
+                         width=600)
+
         pitch_hist = figure(tools=self.TOOLS, title="Spot pitch ", x_axis_label='pitch',
                             y_axis_label='counts',
                             width=600)
@@ -456,6 +485,7 @@ class ccd_spacing():
         for l in range(2):
             spl = spot_pitch.setdefault(l, [])
             res = residuals.setdefault(l, [])
+            g_res = gap_residuals.setdefault(l, [])
 
             for nl in range(n_lines):
                 x0 = self.lines[l][nl][0][0]
@@ -477,7 +507,14 @@ class ccd_spacing():
                     x0 = self.lines[l][nl][s][0]
                     y0 = self.lines[l][nl][s][1]
                     y0_fit = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
-                    res.append(y0_fit - y0)
+                    y_diff = y0_fit - y0
+                    res.append(y_diff)
+
+                    # find spots along the gaps
+                    if (self.ccd_standard == l and s == 0) or \
+                            (self.ccd_standard != l and s == (n_spots - 1)):
+                        g_res.append(y_diff)
+
                     if (xp != -1.):
                         d = math.sqrt((x0 - xp)**2 + (y0 - yp)**2)
                         spl.append(d)
@@ -485,17 +522,23 @@ class ccd_spacing():
                     xp = x0
                     yp = y0
 
-            resid, bins = np.histogram(np.array(res), bins=50, range=(-25., 25.))
+            resid, bins = np.histogram(np.array(res), bins=50, range=(-5., 5.))
 
             w = bins[1] - bins[0]
             r_hist.step(y=resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
-            pitches, bins = np.histogram(np.array(spl), bins=40, range=(55., 75.))
+            g_resid, bins = np.histogram(np.array(g_res), bins=50, range=(-5., 5.))
+
+            w = bins[1] - bins[0]
+            gr_hist.step(y=g_resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
+
+            pitches, bins = np.histogram(np.array(spl), bins=50, range=(60., 70.))
             w = bins[1] - bins[0]
 
             pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
         hist_list.append([r_hist, pitch_hist])
+        hist_list.append([gr_hist])
         hist_list.append([self.ccd1_scatter])
 
         return gridplot(hist_list)
@@ -537,6 +580,7 @@ class ccd_spacing():
             missing_spots = self.num_spots - \
                             (len(self.lines[0][nl]) + len(self.lines[1][nl]))
             extrap_dist = (missing_spots + 1) * self.pitch  # n+1 gaps needed to add
+            self.d_extrap.append(extrap_dist)
 
             near_end = 0
             far_end = -1

@@ -1,6 +1,8 @@
 import argparse
+import numpy as np
 from ccd_spacing import ccd_spacing
-from bokeh.plotting import curdoc, output_file, save, reset_output
+from bokeh.plotting import curdoc, output_file, save, reset_output, figure
+from bokeh.layouts import row, column
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, NumberFormatter, HTMLTemplateFormatter
 
 print("in main")
@@ -34,7 +36,9 @@ successes = 0
 names = []
 orient = []
 x = []
+x_o = []
 y = []
+y_o = []
 urls = []
 
 for combos in cS.file_paths:
@@ -52,8 +56,19 @@ for combos in cS.file_paths:
 
     names.append(combos)
     orient.append(cS.ccd_relative_orientation)
-    x.append(str(cS.center_to_center[0]))
-    y.append(str(cS.center_to_center[1]))
+
+    c2c = cS.center_to_center
+    x.append(str(c2c[0]))
+    y.append(str(c2c[1]))
+
+    if cS.ccd_relative_orientation == "horizontal":
+        a = -c2c[0]
+        c2c[0] = -c2c[1]
+        c2c[1] = a
+
+    x_o.append(c2c[0])
+    y_o.append(c2c[1])
+
     o_name = combos + "_plots.html"
     url_link = args.url_base + o_name
     urls.append(url_link)
@@ -72,10 +87,26 @@ results_columns = [
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="y", title="y offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="url", title="Links to plots",
-                formatter=HTMLTemplateFormatter(template="<a href='<%= url %>'>plots</a>"), width=50)
+                formatter=HTMLTemplateFormatter(template="<a href='<%= url %>' target='_blank'>plots</a>"),
+                width=50)
 ]
 
 results_table = DataTable(source=results_source, columns=results_columns, width=700, height=650)
 
+x_off, bins = np.histogram(np.array(x_o), bins=10)
+w = bins[1] - bins[0]
+x_hist = figure(tools=cS.TOOLS, title="x offsets", x_axis_label='offsets (px)',
+                y_axis_label='counts', height=300, width=600)
+x_hist.vbar(top=x_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
+
+y_off, bins = np.histogram(np.array(y_o), bins=10)
+w = bins[1] - bins[0]
+y_hist = figure(tools=cS.TOOLS, title="y offsets", x_axis_label='offsets (px)',
+                y_axis_label='counts', height=300, width=600)
+y_hist.step(y=y_off, x=bins[:-1] + w / 2.)
+y_hist.vbar(top=y_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
+
+out_lay = row(results_table, column(x_hist, y_hist))
+
 output_file(args.output + "CCD_grids.html")
-save(results_table, title="CCD grid plots")
+save(out_lay, title="CCD grid plots")
