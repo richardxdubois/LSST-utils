@@ -52,10 +52,10 @@ class ccd_spacing():
 
         self.src1 = None
         self.src2 = None
-        self.srcX1 = None
-        self.srcY1 = None
-        self.srcX2 = None
-        self.srcY2 = None
+
+        self.srcX = [[], []]
+        self.srcY = [[], []]
+
         self.gX1 = None
         self.gY1 = None
         self.gX2 = None
@@ -294,19 +294,19 @@ class ccd_spacing():
         x = []
         y = []
         rad = self.rotate * self.extrap_dir
-        x1_rot = math.cos(rad) * self.srcX1 - math.sin(rad) * self.srcY1
-        y1_rot = math.sin(rad) * self.srcX1 + math.cos(rad) * self.srcY1
+        x1_rot = math.cos(rad) * np.array(self.srcX[0]) - math.sin(rad) * np.array(self.srcY[0])
+        y1_rot = math.sin(rad) * np.array(self.srcX[0]) + math.cos(rad) * np.array(self.srcY[0])
 
-        order.append(np.argsort(-np.array(y1_rot), kind="stable"))
-        x.append(np.array(self.srcX1)[order[0]])
-        y.append(np.array(self.srcY1)[order[0]])
+        order.append(np.argsort(-y1_rot, kind="stable"))
+        x.append(np.array(self.srcX[0])[order[0]])
+        y.append(np.array(self.srcY[0])[order[0]])
 
-        x2_rot = math.cos(rad) * self.srcX2 - math.sin(rad) * self.srcY2
-        y2_rot = math.sin(rad) * self.srcX2 + math.cos(rad) * self.srcY2
+        x2_rot = math.cos(rad) * np.array(self.srcX[1]) - math.sin(rad) * np.array(self.srcY[1])
+        y2_rot = math.sin(rad) * np.array(self.srcX[1]) + math.cos(rad) * np.array(self.srcY[1])
 
-        order.append(np.argsort(-np.array(y2_rot), kind="stable"))
-        x.append(np.array(self.srcX2)[order[1]])
-        y.append(np.array(self.srcY2)[order[1]])
+        order.append(np.argsort(-y2_rot, kind="stable"))
+        x.append(np.array(self.srcX[1])[order[1]])
+        y.append(np.array(self.srcY[1])[order[1]])
         yrot = []
         yrot.append(np.array(y1_rot)[order[0]])
         yrot.append(np.array(y2_rot)[order[1]])
@@ -635,6 +635,9 @@ class ccd_spacing():
         if combo_name is None:
             combo_name = self.raft_ccd_combo
 
+        self.srcX = [[], []]
+        self.srcY = [[], []]
+
         self.drop_data.label = combo_name
 
         dir_index = self.file_paths[combo_name]
@@ -670,8 +673,6 @@ class ccd_spacing():
 
         median_x1 = np.median(np.array(X1))
         median_y1 = np.median(np.array(Y1))
-        self.srcX1 = []
-        self.srcY1 = []
         dist_x = 16 * self.pitch
         dist_y = 27 * self.pitch
         x_min = median_x1 - dist_x
@@ -681,11 +682,11 @@ class ccd_spacing():
 
         for n, x in enumerate(X1):
             if x > x_min and x < x_max and Y1[n] > y_min and Y1[n] < y_max:
-                self.srcX1.append(x)
-                self.srcY1.append(Y1[n])
+                self.srcX[0].append(x)
+                self.srcY[0].append(Y1[n])
 
-        self.srcX1 = np.array((self.srcX1))
-        self.srcY1 = np.array((self.srcY1))
+        self.srcX[0] = np.array((self.srcX[0]))
+        self.srcY[0] = np.array((self.srcY[0]))
 
         self.src2 = fits.getdata(infile2)
         X2 = self.src2[kw_x]
@@ -693,8 +694,7 @@ class ccd_spacing():
 
         median_x2 = np.median(np.array(X2))
         median_y2 = np.median(np.array(Y2))
-        self.srcX2 = []
-        self.srcY2 = []
+
         x_min = median_x2 - dist_x
         x_max = median_x2 + dist_x
         y_min = median_y2 - dist_y
@@ -702,34 +702,30 @@ class ccd_spacing():
 
         for n, x in enumerate(X2):
             if x > x_min and x < x_max and Y2[n] > y_min and Y2[n] < y_max:
-                self.srcX2.append(x)
-                self.srcY2.append(Y2[n])
-        self.srcX2 = np.array((self.srcX2))
-        self.srcY2 = np.array((self.srcY2))
+                self.srcX[1].append(x)
+                self.srcY[1].append(Y2[n])
+        self.srcX[1] = np.array((self.srcX[1]))
+        self.srcY[1] = np.array((self.srcY[1]))
 
-        print("# spots on ", self.name_ccd1, " ", len(self.srcX1))
-        print("# spots on ", self.name_ccd2, " ", len(self.srcX2))
+        print("# spots on ", self.name_ccd1, " ", len(self.srcX[0]))
+        print("# spots on ", self.name_ccd2, " ", len(self.srcX[1]))
 
-        if len(self.srcX1) == 0 or len(self.srcX2) == 0:
-            print(self.raft_ccd_combo + ": Problem with input data: found ", len(self.srcX1), " and ", \
-                                       len(self.srcX2), \
-                       " spots")
+        if len(self.srcX[0]) == 0 or len(self.srcX[1]) == 0:
+            print(self.raft_ccd_combo + ": Problem with input data: found ", len(self.srcX[0]), " and ",
+                  len(self.srcX[1]), " spots")
             raise ValueError
 
         if self.show_rotate:
             rad = self.rotate * self.extrap_dir
-            x1_rot = math.cos(rad) * self.srcX1 - math.sin(rad) * self.srcY1
-            y1_rot = math.sin(rad) * self.srcX1 + math.cos(rad) * self.srcY1
-            x2_rot = math.cos(rad) * self.srcX2 - math.sin(rad) * self.srcY2
-            y2_rot = math.sin(rad) * self.srcX2 + math.cos(rad) * self.srcY2
+            x1_rot = math.cos(rad) * self.srcX[0] - math.sin(rad) * self.srcY[0]
+            y1_rot = math.sin(rad) * self.srcX[0] + math.cos(rad) * self.srcY[0]
+            x2_rot = math.cos(rad) * self.srcX[1] - math.sin(rad) * self.srcY[1]
+            y2_rot = math.sin(rad) * self.srcX[1] + math.cos(rad) * self.srcY[1]
 
-            self.srcX1 = x1_rot
-            self.srcY1 = y1_rot
-            self.srcX2 = x2_rot
-            self.srcY2 = y2_rot
-
-        self.slider_x.value = (self.x0_in, self.x1_in)
-        self.slider_y.value = (self.y0_in, self.y1_in)
+            self.srcX[0] = x1_rot
+            self.srcY[0] = y1_rot
+            self.srcX[1] = x2_rot
+            self.srcY[1] = y2_rot
 
         if self.line_fitting:
             rc = self.find_lines()
@@ -744,6 +740,9 @@ class ccd_spacing():
                     self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
 
             rc = self.match_lines()
+
+        self.slider_x.value = (self.x0_in, self.x1_in)
+        self.slider_y.value = (self.y0_in, self.y1_in)
 
         return
 
@@ -771,13 +770,13 @@ class ccd_spacing():
                 o3 = self.x1_in
                 o4 = self.y1_in
 
-        x1 = self.srcX1-o1
-        y1 = self.srcY1-o2
-        x2 = self.srcX2-o3
-        y2 = self.srcY2-o4
+        x1 = np.array(self.srcX[0]) - o1
+        y1 = np.array(self.srcY[0]) - o2
+        x2 = np.array(self.srcX[1]) - o3
+        y2 = np.array(self.srcY[1]) - o4
 
         self.ccd1_scatter = figure(title="Spots Grid:" + self.name_ccd1, x_axis_label='x',
-                    y_axis_label='y', tools=self.TOOLS)
+                                   y_axis_label='y', tools=self.TOOLS)
 
         source_g = None
         cg = None
