@@ -14,7 +14,7 @@ from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
 from bokeh.layouts import row, column, layout, gridplot
 from bokeh.models.widgets import TextInput, Dropdown, Button, RangeSlider, FileInput
-from bokeh.models import CustomJS, ColumnDataSource, Legend
+from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, ColorBar, LogColorMapper
 
 
 class ccd_spacing():
@@ -466,6 +466,10 @@ class ccd_spacing():
         spot_pitch = {}
         residuals = {}
         gap_residuals = {}
+        x_spot = []
+        y_spot = []
+        res_spot = []
+        pitch_spot = []
 
         r_hist = figure(tools=self.TOOLS, title="residuals", x_axis_label='residuals',
                         y_axis_label='counts',
@@ -515,12 +519,18 @@ class ccd_spacing():
                             (self.ccd_standard != l and s == (n_spots - 1)):
                         g_res.append(y_diff)
 
+                    d = 0.
                     if (xp != -1.):
                         d = math.sqrt((x0 - xp)**2 + (y0 - yp)**2)
                         spl.append(d)
 
                     xp = x0
                     yp = y0
+
+                    x_spot.append(x0 - off_ccd[l][0])
+                    y_spot.append(y0 - off_ccd[l][1])
+                    res_spot.append(abs(y_diff))
+                    pitch_spot.append(d)
 
             resid, bins = np.histogram(np.array(res), bins=50, range=(-5., 5.))
 
@@ -537,8 +547,19 @@ class ccd_spacing():
 
             pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
+        cds_spot = ColumnDataSource(dict(x=x_spot, y=y_spot, res=res_spot, pitch=pitch_spot))
+
+        spot_heat = figure(title="Spots Grid:" + self.raft_ccd_combo, x_axis_label='x',
+                           y_axis_label='y', tools=self.TOOLS)
+        c_color_mapper = LinearColorMapper(palette=palette, low=64., high=66.5)
+        c_color_bar = ColorBar(color_mapper=c_color_mapper, label_standoff=8, width=500, height=20,
+                               border_line_color=None, location=(0, 0), orientation='horizontal')
+        spot_heat.circle(x="x", y="y", source=cds_spot, color="gray", size=10,
+                         fill_color={'field': 'pitch', 'transform': c_color_mapper})
+        spot_heat.add_layout(c_color_bar, 'below')
+
         hist_list.append([r_hist, pitch_hist])
-        hist_list.append([gr_hist])
+        hist_list.append([gr_hist, spot_heat])
         hist_list.append([self.ccd1_scatter])
 
         return gridplot(hist_list)
