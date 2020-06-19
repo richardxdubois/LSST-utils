@@ -655,6 +655,8 @@ class ccd_spacing():
         print(" Entered get_data")
         if combo_name is None:
             combo_name = self.raft_ccd_combo
+        else:
+            self.raft_ccd_combo = combo_name
 
         self.srcX = [[], []]
         self.srcY = [[], []]
