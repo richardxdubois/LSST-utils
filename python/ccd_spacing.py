@@ -53,6 +53,7 @@ class ccd_spacing():
         self.src1 = None
         self.src2 = None
 
+        self.clean = False
         self.srcX = [[], []]
         self.srcY = [[], []]
 
@@ -157,7 +158,7 @@ class ccd_spacing():
         self.button_enable_sims = Button(label="Enable sims", button_type="danger", width=100)
         self.button_enable_sims.on_click(self.do_enable_sims)
 
-        self.button_sims_orient = Button(label="Toggle orientation", button_type="danger", width=100)
+        self.button_sims_orient = Button(label="Toggle orientation", button_type="success", width=100)
         self.button_sims_orient.label = "vertical"
         self.button_sims_orient.on_click(self.do_sims_orient)
 
@@ -726,7 +727,6 @@ class ccd_spacing():
         self.srcY = [[], []]
 
         if self.sim_doit:
-            self.ccd_relative_orientation = "vertical"
             rc = self.simulate_response()
             combo_name = self.raft_ccd_combo = "Sim_x_Sim_y"
             self.name_ccd1 = "Sim_x"
@@ -741,8 +741,14 @@ class ccd_spacing():
         self.drop_data.label = combo_name
 
         if self.sim_doit:
-            X1 = self.sim_x[0]
-            Y1 = self.sim_y[0]
+            if self.ccd_relative_orientation == "vertical":
+                X1 = self.sim_x[0]
+                Y1 = self.sim_y[0]
+                self.extrap_dir = 1.
+            else:  # swap x and y for horizontal pairing
+                Y1 = self.sim_x[0]
+                X1 = self.sim_y[0]
+                self.extrap_dir = -1.
         else:
             dir_index = self.file_paths[combo_name]
             results_dirs = sorted(glob.glob(dir_index))
@@ -784,17 +790,27 @@ class ccd_spacing():
         y_min = median_y1 - dist_y
         y_max = median_y1 + dist_y
 
-        for n, x in enumerate(X1):
-            if x > x_min and x < x_max and Y1[n] > y_min and Y1[n] < y_max:
-                self.srcX[0].append(x)
-                self.srcY[0].append(Y1[n])
+        if self.clean:
+            for n, x in enumerate(X1):
+                if x > x_min and x < x_max and Y1[n] > y_min and Y1[n] < y_max:
+                    self.srcX[0].append(x)
+                    self.srcY[0].append(Y1[n])
+        else:
+            self.srcX[0] = X1
+            self.srcY[0] = Y1
 
         self.srcX[0] = np.array((self.srcX[0]))
         self.srcY[0] = np.array((self.srcY[0]))
 
         if self.sim_doit:
-            X2 = self.sim_x[1]
-            Y2 = self.sim_y[1]
+            if self.ccd_relative_orientation == "vertical":
+                X2 = self.sim_x[1]
+                Y2 = self.sim_y[1]
+                self.extrap_dir = 1.
+            else:  # swap x and y for horizontal pairing
+                Y2 = self.sim_x[1]
+                X2 = self.sim_y[1]
+                self.extrap_dir = -1.
         else:
             self.src2 = fits.getdata(infile2)
             X2 = self.src2[kw_x]
@@ -808,10 +824,15 @@ class ccd_spacing():
         y_min = median_y2 - dist_y
         y_max = median_y2 + dist_y
 
-        for n, x in enumerate(X2):
-            if x > x_min and x < x_max and Y2[n] > y_min and Y2[n] < y_max:
-                self.srcX[1].append(x)
-                self.srcY[1].append(Y2[n])
+        if self.clean:
+            for n, x in enumerate(X2):
+                if x > x_min and x < x_max and Y2[n] > y_min and Y2[n] < y_max:
+                    self.srcX[1].append(x)
+                    self.srcY[1].append(Y2[n])
+        else:
+            self.srcX[1] = X2
+            self.srcY[1] = Y2
+
         self.srcX[1] = np.array((self.srcX[1]))
         self.srcY[1] = np.array((self.srcY[1]))
 
@@ -953,10 +974,11 @@ class ccd_spacing():
         ccd_gap = 250.  # pixels - 0.25 mm at 10 um/px
         raft_gap = 500.  # 0.5 mm
 
+        gap = ccd_gap
         if self.sim_inter_raft:
             gap = raft_gap
-        else:
-            gap = ccd_gap
+
+        distance_grid_ctr = 4096. + gap/2.
 
         self.sim_x = [[], []]
         self.sim_y = [[], []]
@@ -969,7 +991,7 @@ class ccd_spacing():
 
             for idx, xs in enumerate(xg):
                 if xs < -gap / 2.:
-                    self.sim_x[1].append(4096. + xs + dxg[idx] * f_distort)
+                    self.sim_x[1].append(distance_grid_ctr + xs + dxg[idx] * f_distort)
                     self.sim_y[1].append(yg[idx] + dyg[idx] * f_distort)
                 elif xs > gap /2.:
                     self.sim_x[0].append(xs + dxg[idx] * f_distort)
@@ -977,12 +999,12 @@ class ccd_spacing():
 
         else:
             for idy, ys in enumerate(yg):
-                if ys < gap / 2.:
-                    self.sim_y[1].append(4096. + ys + dyg[idy] * f_distort)
-                    self.sim_x[1].append(xg[idy] + dxg[idy] * f_distort)
-                else:
-                    self.sim_y[0].append(ys + dyg[idy] * f_distort)
+                if ys < -gap / 2.:
+                    self.sim_y[0].append(distance_grid_ctr + ys + dyg[idy] * f_distort)
                     self.sim_x[0].append(xg[idy] + dxg[idy] * f_distort)
+                elif ys > gap / 2.:
+                    self.sim_y[1].append(ys + dyg[idy] * f_distort)
+                    self.sim_x[1].append(xg[idy] + dxg[idy] * f_distort)
         return
 
     def loop(self):
