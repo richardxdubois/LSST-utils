@@ -8,7 +8,7 @@ from scipy.stats import linregress
 from os.path import join
 from astropy.io import fits
 
-from mixcoatl.sourcegrid import SourceGrid
+from mixcoatl.sourcegrid import DistortedGrid
 
 from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
@@ -79,6 +79,17 @@ class ccd_spacing():
 
         self.dx0 = None
         self.dy0 = None
+
+        # simulation stuff
+
+        self.grid_data_file = None
+
+        self.sim_x = None
+        self.sim_y = None
+
+        self.sim_doit = True
+        self.sim_inter_raft = False
+        self.sim_distort = True
 
         # flags
 
@@ -653,46 +664,59 @@ class ccd_spacing():
     def get_data(self, combo_name=None):
 
         print(" Entered get_data")
+
+        self.srcX = [[], []]
+        self.srcY = [[], []]
+
+        if self.sim_doit:
+            self.ccd_relative_orientation = "vertical"
+            rc = self.simulate_response()
+            combo_name = self.raft_ccd_combo = "Sim_x_Sim_y"
+            self.name_ccd1 = "Sim_x"
+            self.name_ccd2 = "Sim_y"
+            self.names_ccd = [self.name_ccd1, self.name_ccd2]
+
         if combo_name is None:
             combo_name = self.raft_ccd_combo
         else:
             self.raft_ccd_combo = combo_name
 
-        self.srcX = [[], []]
-        self.srcY = [[], []]
-
         self.drop_data.label = combo_name
 
-        dir_index = self.file_paths[combo_name]
-        results_dirs = sorted(glob.glob(dir_index))
-        for result_dir in results_dirs:
-            print(result_dir)
-
-        infile1, infile2 = sorted(glob.glob(join(results_dirs[0], '*_source_catalog.cat')))
-        print(infile1)
-        print(infile2)
-
-        self.name_ccd1 = os.path.basename(infile1).split("_source")[0]
-        self.name_ccd2 = os.path.basename(infile2).split("_source")[0]
-        self.names_ccd = [self.name_ccd1, self.name_ccd2]
-
-        s1 = self.name_ccd1.split("_")[1]
-        s2 = self.name_ccd2.split(("_"))[1]
-        kw_x = 'base_SdssShape_x'
-        kw_y = 'base_SdssShape_y'
-        self.extrap_dir = 1.
-
-        if int(s1[1]) == int(s2[1]):
-            self.ccd_relative_orientation = "vertical"
+        if self.sim_doit:
+            X1 = self.sim_x[0]
+            Y1 = self.sim_y[0]
         else:
-            self.ccd_relative_orientation = "horizontal"  # swap x and y
-            kw_x = 'base_SdssShape_y'
-            kw_y = 'base_SdssShape_x'
-            self.extrap_dir = -1.
+            dir_index = self.file_paths[combo_name]
+            results_dirs = sorted(glob.glob(dir_index))
+            for result_dir in results_dirs:
+                print(result_dir)
 
-        self.src1 = fits.getdata(infile1)
-        X1 = self.src1[kw_x]
-        Y1 = self.src1[kw_y]
+            infile1, infile2 = sorted(glob.glob(join(results_dirs[0], '*_source_catalog.cat')))
+            print(infile1)
+            print(infile2)
+
+            self.name_ccd1 = os.path.basename(infile1).split("_source")[0]
+            self.name_ccd2 = os.path.basename(infile2).split("_source")[0]
+            self.names_ccd = [self.name_ccd1, self.name_ccd2]
+
+            s1 = self.name_ccd1.split("_")[1]
+            s2 = self.name_ccd2.split(("_"))[1]
+            kw_x = 'base_SdssShape_x'
+            kw_y = 'base_SdssShape_y'
+            self.extrap_dir = 1.
+
+            if int(s1[1]) == int(s2[1]):
+                self.ccd_relative_orientation = "vertical"
+            else:
+                self.ccd_relative_orientation = "horizontal"  # swap x and y
+                kw_x = 'base_SdssShape_y'
+                kw_y = 'base_SdssShape_x'
+                self.extrap_dir = -1.
+
+            self.src1 = fits.getdata(infile1)
+            X1 = self.src1[kw_x]
+            Y1 = self.src1[kw_y]
 
         median_x1 = np.median(np.array(X1))
         median_y1 = np.median(np.array(Y1))
@@ -711,9 +735,13 @@ class ccd_spacing():
         self.srcX[0] = np.array((self.srcX[0]))
         self.srcY[0] = np.array((self.srcY[0]))
 
-        self.src2 = fits.getdata(infile2)
-        X2 = self.src2[kw_x]
-        Y2 = self.src2[kw_y]
+        if self.sim_doit:
+            X2 = self.sim_x[1]
+            Y2 = self.sim_y[1]
+        else:
+            self.src2 = fits.getdata(infile2)
+            X2 = self.src2[kw_x]
+            Y2 = self.src2[kw_y]
 
         median_x2 = np.median(np.array(X2))
         median_y2 = np.median(np.array(Y2))
@@ -850,6 +878,55 @@ class ccd_spacing():
         # Ignore rotation for now
         self.dy0 = model_grid2.y0 - model_grid1.y0
         self.dx0 = model_grid2.x0 - model_grid1.x0
+
+    def simulate_response(self, distort=False):
+
+        # get the distortions file - contains undistorted grid + deviations
+        # cases to handle:
+        #  distort or not
+        #  vertical or horizontal pairing
+        #  intra or extra-raft pairing
+
+        grid = DistortedGrid.from_fits("/Users/richard/LSST/Code/misc/CCD_grids/optical_distortion_grid.fits")
+        xg = grid['X']
+        yg = grid['Y']
+        dxg = grid['DX']
+        dyg = grid['DY']
+
+        ccd_gap = 250.  # pixels - 0.25 mm at 10 um/px
+        raft_gap = 500.  # 0.5 mm
+
+        if self.sim_inter_raft:
+            gap = raft_gap
+        else:
+            gap = ccd_gap
+
+        self.sim_x = [[], []]
+        self.sim_y = [[], []]
+
+        f_distort = 0.
+        if self.sim_distort:
+            f_distort = 1.
+
+        if self.ccd_relative_orientation == "vertical":
+
+            for idx, xs in enumerate(xg):
+                if xs < -gap / 2.:
+                    self.sim_x[1].append(4096. + xs + dxg[idx] * f_distort)
+                    self.sim_y[1].append(yg[idx] + dyg[idx] * f_distort)
+                elif xs > gap /2.:
+                    self.sim_x[0].append(xs + dxg[idx] * f_distort)
+                    self.sim_y[0].append(yg[idx] + dyg[idx] * f_distort)
+
+        else:
+            for idy, ys in enumerate(yg):
+                if ys < gap / 2.:
+                    self.sim_y[1].append(4096. + ys + dyg[idy] * f_distort)
+                    self.sim_x[1].append(xg[idy] + dxg[idy] * f_distort)
+                else:
+                    self.sim_y[0].append(ys + dyg[idy] * f_distort)
+                    self.sim_x[0].append(xg[idy] + dxg[idy] * f_distort)
+        return
 
     def loop(self):
         if not self.init:
