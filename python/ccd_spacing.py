@@ -19,7 +19,7 @@ from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, 
 
 class ccd_spacing():
 
-    def __init__(self, dir_index=None, combo_name=None):
+    def __init__(self, dir_index=None, combo_name=None, distort_file = None):
 
         self.file_paths = {}
         self.raft_ccd_combo = combo_name
@@ -82,14 +82,14 @@ class ccd_spacing():
 
         # simulation stuff
 
-        self.grid_data_file = None
+        self.grid_data_file = distort_file
 
         self.sim_x = None
         self.sim_y = None
 
-        self.sim_doit = True
+        self.sim_doit = False
         self.sim_inter_raft = False
-        self.sim_distort = True
+        self.sim_distort = False
 
         # flags
 
@@ -152,6 +152,23 @@ class ccd_spacing():
         self.button_linfit_plots = Button(label="Linfit plots", button_type="success", width=100)
         self.button_linfit_plots.on_click(self.do_linfit_plots)
 
+        # simulation buttons
+
+        self.button_enable_sims = Button(label="Enable sims", button_type="danger", width=100)
+        self.button_enable_sims.on_click(self.do_enable_sims)
+
+        self.button_sims_orient = Button(label="Toggle orientation", button_type="danger", width=100)
+        self.button_sims_orient.label = "vertical"
+        self.button_sims_orient.on_click(self.do_sims_orient)
+
+        self.button_sims_intra_raft = Button(label="Toggle intra-raft", button_type="danger", width=100)
+        self.button_sims_intra_raft.label = "Intra-raft"
+        self.button_sims_intra_raft.on_click(self.do_sims_intra_raft)
+
+        self.button_sims_enable_distortions = Button(label="Toggle distortions", button_type="danger", width=100)
+        self.button_sims_enable_distortions.label = "Distortions Off"
+        self.button_sims_enable_distortions.on_click(self.do_sims_enable_distortions)
+
         # do stuff in init
 
         rc = self.find_files()
@@ -169,7 +186,8 @@ class ccd_spacing():
 
         self.min_layout = row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
-                              self.button_line_fitting)
+                              self.button_line_fitting, self.button_enable_sims, self.button_sims_orient,
+                              self.button_sims_intra_raft, self.button_sims_enable_distortions)
         self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
         self.max_layout = column(self.min_layout, self.sliders_layout,
                                  self.button_fit)
@@ -190,6 +208,45 @@ class ccd_spacing():
     def do_exit(self):
         print("Shutting down app")
         sys.exit(0)
+
+    def do_enable_sims(self):
+        self.sim_doit = not self.sim_doit
+        if self.sim_doit:
+            self.button_enable_sims.button_type = "success"
+        else:
+            self.button_enable_sims.button_type = "danger"
+
+        return
+
+    def do_sims_orient(self):
+        if self.ccd_relative_orientation == "vertical":
+            self.ccd_relative_orientation = "horizontal"
+        else:
+            self.ccd_relative_orientation = "vertical"
+
+        self.button_sims_orient.label = self.ccd_relative_orientation
+
+        return
+
+    def do_sims_intra_raft(self):
+        self.sim_inter_raft = not self.sim_inter_raft
+        if self.sim_inter_raft:
+            self.button_sims_intra_raft.button_type = "success"
+        else:
+            self.button_sims_intra_raft.button_type = "danger"
+
+        return
+
+    def do_sims_enable_distortions(self):
+        self.sim_distort = not self.sim_distort
+        if self.sim_distort:
+            self.button_sims_enable_distortions.button_type = "success"
+            self.button_sims_enable_distortions.label = "Distortions On"
+        else:
+            self.button_sims_enable_distortions.button_type = "danger"
+            self.button_sims_enable_distortions.label = "Distortions Off"
+
+        return
 
     def do_rotate(self):
         self.show_rotate = not self.show_rotate
@@ -887,7 +944,7 @@ class ccd_spacing():
         #  vertical or horizontal pairing
         #  intra or extra-raft pairing
 
-        grid = DistortedGrid.from_fits("/Users/richard/LSST/Code/misc/CCD_grids/optical_distortion_grid.fits")
+        grid = DistortedGrid.from_fits(self.grid_data_file)
         xg = grid['X']
         yg = grid['Y']
         dxg = grid['DX']

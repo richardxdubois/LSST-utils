@@ -21,8 +21,7 @@ parser.add_argument('-g', '--grid', default=
 
 args = parser.parse_args()
 print(args.dir)
-cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo)
-cS.grid_data_file = args.grid
+cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid)
 
 cS.line_fitting = False
 rc = cS.loop()
