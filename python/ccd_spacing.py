@@ -8,7 +8,7 @@ from scipy.stats import linregress
 from os.path import join
 from astropy.io import fits
 
-from mixcoatl.sourcegrid import DistortedGrid
+from mixcoatl.sourcegrid import grid_fit, DistortedGrid
 
 from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
@@ -19,7 +19,7 @@ from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, 
 
 class ccd_spacing():
 
-    def __init__(self, dir_index=None, combo_name=None, distort_file = None):
+    def __init__(self, dir_index=None, combo_name=None, distort_file=None):
 
         self.file_paths = {}
         self.raft_ccd_combo = combo_name
@@ -84,6 +84,11 @@ class ccd_spacing():
         # simulation stuff
 
         self.grid_data_file = distort_file
+        self.grid = None
+        self.grid_x0 = None
+        self.grid_y0 = None
+        self.grid_x1 = None
+        self.grid_y1 = None
 
         self.sim_x = None
         self.sim_y = None
@@ -717,7 +722,42 @@ class ccd_spacing():
         self.center_to_center = np.array(c0) - np.array(c1)
 
         print("center to center = ", self.center_to_center)
+
+        rc = self.guess_grid_centers()
+
         return
+
+    def guess_grid_centers(self):
+
+        # estimate grid center from line 24
+
+        non_standard = 1 - self.ccd_standard
+        near_end = 0
+        far_end = -1
+        if self.ccd_relative_orientation == "horizontal":
+            far_end = 0
+            near_end = -1
+
+        nl = 24
+
+        x10 = self.lines[self.ccd_standard][nl][near_end][0]
+        y10 = self.linfits[self.ccd_standard][nl][1] + \
+             self.linfits[self.ccd_standard][nl][0] * x10
+        x21 = self.lines[non_standard][nl][far_end][0]
+        y21 = self.linfits[non_standard][nl][1] + \
+              self.linfits[non_standard][nl][0] * x21
+
+        x21 -= self.shift_x[nl]
+        y21 -= self.shift_y[nl]
+
+        self.grid_x0 = (x21 + x10)/2.
+        self.grid_y0 = (y21 + y10)/2.
+
+        self.grid_x1 = self.grid_x0 + self.shift_x[nl]
+        self.grid_y1 = self.grid_y0 + self.shift_y[nl]
+
+        return
+
 
     def get_data(self, combo_name=None):
 
@@ -875,13 +915,15 @@ class ccd_spacing():
 
         return
 
-    def data_2_model(self, x0_guess, y0_guess, src=None):
+    def data_2_model(self, srcX, srcY, ncols, nrows, x0_guess, y0_guess, distortions=None):
 
-        model_grid = SourceGrid.from_source_catalog(src, y0_guess=y0_guess, x0_guess=x0_guess)
+        fitted_grid = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
+                              y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
 
-        gY, gX = model_grid.make_grid(49, 49)
+        #gY, gX = fitted_grid.make_grid(ncols, nrows)
 
-        return model_grid, gY, gX
+        #return fitted_grid, gY, gX
+        return fitted_grid
 
     def make_plots(self):
 
@@ -942,13 +984,36 @@ class ccd_spacing():
         return plots_layout
 
     def match(self):
+
+        print("start fitting")
+        distortions = None
+        if self.grid is None:
+            self.grid = DistortedGrid.from_fits(self.grid_data_file)
+
+        self.gX1 = self.grid["X"]
+        self.gY1 = self.grid["Y"]
+        self.gX2 = self.grid["X"]
+        self.gY2 = self.grid["Y"]
+
+        if self.sim_distort:
+            distortions = (self.grid["DY"], self.grid["DX"])
+            self.gX1 += self.grid["DX"]
+            self.gY1 += self.grid["DY"]
+            self.gX2 += self.grid["DX"]
+            self.gY2 += self.grid["DY"]
+
+
         # Need an intelligent guess
 
-        model_grid1, self.gY1, self.gX1 = self.data_2_model(x0_guess=self.x0_in, y0_guess=self.y0_in,
-                                                            src=self.src1)
+        model_grid1 = self.data_2_model(srcX=self.srcX[0], srcY=self.srcY[0],
+                                        ncols=49, nrows=49,
+                                        x0_guess=self.grid_x0, y0_guess=self.grid_y0,
+                                        distortions=distortions)
 
-        model_grid2, self.gY2, self.gX2 = self.data_2_model(x0_guess=self.x1_in, y0_guess=self.y1_in,
-                                                            src=self.src2)
+        model_grid2 = self.data_2_model(srcX=self.srcX[1], srcY=self.srcY[1],
+                                        ncols=49, nrows=49,
+                                        x0_guess=self.grid_x1, y0_guess=self.grid_y1,
+                                        distortions=distortions)
 
         print('Grid 1:', model_grid1.x0, model_grid1.y0, model_grid1.theta)
         print('Grid 2:', model_grid2.x0, model_grid2.y0, model_grid2.theta)
@@ -965,11 +1030,11 @@ class ccd_spacing():
         #  vertical or horizontal pairing
         #  intra or extra-raft pairing
 
-        grid = DistortedGrid.from_fits(self.grid_data_file)
-        xg = grid['X']
-        yg = grid['Y']
-        dxg = grid['DX']
-        dyg = grid['DY']
+        self.grid = DistortedGrid.from_fits(self.grid_data_file)
+        xg = self.grid['X']
+        yg = self.grid['Y']
+        dxg = self.grid['DX']
+        dyg = self.grid['DY']
 
         ccd_gap = 250.  # pixels - 0.25 mm at 10 um/px
         raft_gap = 500.  # 0.5 mm
@@ -991,20 +1056,20 @@ class ccd_spacing():
 
             for idx, xs in enumerate(xg):
                 if xs < -gap / 2.:
-                    self.sim_x[1].append(distance_grid_ctr + xs + dxg[idx] * f_distort)
-                    self.sim_y[1].append(yg[idx] + dyg[idx] * f_distort)
+                    self.sim_x[1].append(distance_grid_ctr + xs + dxg[idx] * f_distort + gap/2.)
+                    self.sim_y[1].append(2000. + yg[idx] + dyg[idx] * f_distort)
                 elif xs > gap /2.:
-                    self.sim_x[0].append(xs + dxg[idx] * f_distort)
-                    self.sim_y[0].append(yg[idx] + dyg[idx] * f_distort)
+                    self.sim_x[0].append(xs + dxg[idx] * f_distort - gap/2.)
+                    self.sim_y[0].append(2000. + yg[idx] + dyg[idx] * f_distort)
 
         else:
             for idy, ys in enumerate(yg):
                 if ys < -gap / 2.:
-                    self.sim_y[0].append(distance_grid_ctr + ys + dyg[idy] * f_distort)
-                    self.sim_x[0].append(xg[idy] + dxg[idy] * f_distort)
+                    self.sim_y[0].append(distance_grid_ctr + ys + dyg[idy] * f_distort + gap/2.)
+                    self.sim_x[0].append(2000. + xg[idy] + dxg[idy] * f_distort)
                 elif ys > gap / 2.:
-                    self.sim_y[1].append(ys + dyg[idy] * f_distort)
-                    self.sim_x[1].append(xg[idy] + dxg[idy] * f_distort)
+                    self.sim_y[1].append(ys + dyg[idy] * f_distort - gap/2.)
+                    self.sim_x[1].append(2000. + xg[idy] + dxg[idy] * f_distort)
         return
 
     def loop(self):
