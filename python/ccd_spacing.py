@@ -33,9 +33,9 @@ class ccd_spacing():
         self.cut_spurious_spots = 80.  # spots need to be closer to another spot to include in lines
         self.lines = {}
         self.linfits = {}
-        self.rotate = 3.2/57.3
+        self.rotate = 3.11/57.3   # obtained from undistorted grid model
         self.show_rotate = False
-        self.pitch = 65.
+        self.pitch = 65.34        # obtained from undistorted grid model
         self.num_spots = 49
 
         self.ccd1_scatter = None
@@ -636,6 +636,8 @@ class ccd_spacing():
         hist_list.append([gr_hist, spot_heat])
         hist_list.append([self.ccd1_scatter])
 
+        print("Mean spot pitch 0: ", np.mean(np.array(spot_pitch[0])), " 1: ", np.mean(np.array(spot_pitch[1])))
+
         return gridplot(hist_list)
 
     def fit_line_pairs(self, line_list):
@@ -1036,14 +1038,14 @@ class ccd_spacing():
         dxg = self.grid['DX']
         dyg = self.grid['DY']
 
-        ccd_gap = 250.  # pixels - 0.25 mm at 10 um/px
+        ccd_gap = 129.  # pixels - 0.25 mm at 10 um/px with 4096 px wide sensor to give 4225 separation
         raft_gap = 500.  # 0.5 mm
 
         gap = ccd_gap
         if self.sim_inter_raft:
             gap = raft_gap
 
-        distance_grid_ctr = 4096. + gap/2.
+        distance_grid_ctr = 4096.
 
         self.sim_x = [[], []]
         self.sim_y = [[], []]
