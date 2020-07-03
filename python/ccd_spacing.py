@@ -654,6 +654,8 @@ class ccd_spacing():
         y = np.array(y)[order]
 
         #slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        # https://scikit-learn.org/stable/modules/generated/
+        #                     sklearn.linear_model.RANSACRegressor.html#sklearn.linear_model.RANSACRegressor
         # Robustly fit linear model with RANSAC algorithm
         ransac = linear_model.RANSACRegressor()
         ransac.fit(x, y)
@@ -688,13 +690,17 @@ class ccd_spacing():
         n_lines = len(self.lines[0])   # they'd better both have the same number!
         self.shift_x = []
         self.shift_y = []
+        internal_hole_sums = [0, 0]
 
         for nl in range(n_lines):
 
             # count spots and calculate the spots gap between the CCDs
+            internal_hole = [self.missing_internal_spots(0, nl), self.missing_internal_spots(1, nl)]
+            internal_hole_sums[0] += internal_hole[0]
+            internal_hole_sums[1] += internal_hole[1]
             missing_spots = self.num_spots - \
                             (len(self.lines[0][nl]) + len(self.lines[1][nl]) +
-                             self.missing_internal_spots(0, nl) + self.missing_internal_spots(1, nl))
+                             internal_hole[0] + internal_hole[1])
             extrap_dist = (missing_spots + 1) * self.pitch  # n+1 gaps needed to add
             self.d_extrap.append(extrap_dist)
 
@@ -723,6 +729,8 @@ class ccd_spacing():
 
             self.shift_x.append(old_x - new_x)
             self.shift_y.append(old_y - new_y)
+
+        print("Found internal holes: ", internal_hole_sums)
 
         self.med_shift_x = np.median(np.array(self.shift_x))
         self.med_shift_y = np.median(np.array(self.shift_y))
