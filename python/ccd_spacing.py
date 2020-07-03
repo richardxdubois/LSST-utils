@@ -4,6 +4,7 @@ import os
 import math
 import numpy as np
 from scipy.stats import linregress
+from sklearn import linear_model
 
 from os.path import join
 from astropy.io import fits
@@ -30,12 +31,12 @@ class ccd_spacing():
         self.ccd_relative_orientation = "vertical"
         self.extrap_dir = 1.
 
-        self.cut_spurious_spots = 80.  # spots need to be closer to another spot to include in lines
         self.lines = {}
         self.linfits = {}
         self.rotate = 3.11/57.3   # obtained from undistorted grid model
         self.show_rotate = False
         self.pitch = 65.34        # obtained from undistorted grid model
+        self.cut_spurious_spots = 68.  # spots need to be closer to another spot to include in lines
         self.num_spots = 49
 
         self.ccd1_scatter = None
@@ -53,7 +54,7 @@ class ccd_spacing():
         self.src1 = None
         self.src2 = None
 
-        self.clean = False
+        self.clean = True
         self.srcX = [[], []]
         self.srcY = [[], []]
 
@@ -649,12 +650,29 @@ class ccd_spacing():
             y.append(pt[1])
 
         order = np.argsort(np.array(x), kind="stable")
-        x = np.array(x)[order]
+        x = np.array(x)[order].reshape(-1, 1)
         y = np.array(y)[order]
 
-        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        #slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        # Robustly fit linear model with RANSAC algorithm
+        ransac = linear_model.RANSACRegressor()
+        ransac.fit(x, y)
+        inlier_mask = ransac.inlier_mask_
+        outlier_mask = np.logical_not(inlier_mask)
 
-        return slope, intercept, r_value, p_value, std_err
+        #return slope, intercept, r_value, p_value, std_err
+        return ransac.estimator_.coef_[0], ransac.estimator_.intercept_, outlier_mask
+
+    def missing_internal_spots(self, sensor_num, line_num):
+
+        num_holes = 0
+        len_line = len(self.lines[sensor_num][line_num])
+        for spot in range(len_line-1):   # check for internal gaps
+            if abs(self.lines[sensor_num][line_num][spot+1][0] - self.lines[sensor_num][line_num][spot][0]) \
+                  > self.cut_spurious_spots:
+                num_holes += 1
+
+        return num_holes
 
     def match_lines(self):
 
@@ -675,7 +693,8 @@ class ccd_spacing():
 
             # count spots and calculate the spots gap between the CCDs
             missing_spots = self.num_spots - \
-                            (len(self.lines[0][nl]) + len(self.lines[1][nl]))
+                            (len(self.lines[0][nl]) + len(self.lines[1][nl]) +
+                             self.missing_internal_spots(0, nl) + self.missing_internal_spots(1, nl))
             extrap_dist = (missing_spots + 1) * self.pitch  # n+1 gaps needed to add
             self.d_extrap.append(extrap_dist)
 
@@ -902,16 +921,24 @@ class ccd_spacing():
             rc = self.find_lines()
 
             self.linfits = {}
+            outliers_count = [0, 0]
 
             for c in range(2):
                 lf = self.linfits.setdefault(c, {})
                 for lines in self.lines[c]:
                     lf.setdefault(lines, {})
-                    slope, intercept, r_value, p_value, std_err = self.fit_line_pairs(self.lines[c][lines])
-                    self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
+                    #slope, intercept, r_value, p_value, std_err = self.fit_line_pairs(self.lines[c][lines])
+                    slope, intercept, outlier_mask = self.fit_line_pairs(self.lines[c][lines])
+                    for idel, pt in enumerate(self.lines[c][lines]): # remove outliers from line
+                        if outlier_mask[idel]:
+                            del self.lines[c][lines][idel]
+                            outliers_count[c] += 1
 
+                    #self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
+                    self.linfits[c][lines] = [slope, intercept]
             rc = self.match_lines()
 
+        print("removed outliers: ", outliers_count)
         self.slider_x.value = (self.x0_in, self.x1_in)
         self.slider_y.value = (self.y0_in, self.y1_in)
 
