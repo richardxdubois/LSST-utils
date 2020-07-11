@@ -97,6 +97,8 @@ class ccd_spacing():
         self.sim_doit = False
         self.sim_inter_raft = False
         self.sim_distort = False
+        self.sim_rotate = 0.002
+        self.sim_offset = 0.
 
         # flags
 
@@ -1093,8 +1095,13 @@ class ccd_spacing():
 
             for idx, xs in enumerate(xg):
                 if xs < -gap / 2.:
-                    self.sim_x[1].append(distance_grid_ctr + xs + dxg[idx] * f_distort + gap/2.)
-                    self.sim_y[1].append(2000. + yg[idx] + dyg[idx] * f_distort)
+                    x10 = distance_grid_ctr + xs + dxg[idx] * f_distort + gap/2.
+                    y10 = 2000. + yg[idx] + dyg[idx] * f_distort
+                    x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10
+                    y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset
+
+                    self.sim_x[1].append(x11)
+                    self.sim_y[1].append(y11)
                 elif xs > gap /2.:
                     self.sim_x[0].append(xs + dxg[idx] * f_distort - gap/2.)
                     self.sim_y[0].append(2000. + yg[idx] + dyg[idx] * f_distort)
