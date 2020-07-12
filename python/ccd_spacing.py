@@ -96,7 +96,7 @@ class ccd_spacing():
 
         self.sim_doit = False
         self.sim_inter_raft = False
-        self.sim_distort = False
+        self.sim_distort = True
         self.sim_rotate = 0.002
         self.sim_offset = 0.
 
@@ -174,9 +174,14 @@ class ccd_spacing():
         self.button_sims_intra_raft.label = "Intra-raft"
         self.button_sims_intra_raft.on_click(self.do_sims_intra_raft)
 
-        self.button_sims_enable_distortions = Button(label="Toggle distortions", button_type="danger", width=100)
-        self.button_sims_enable_distortions.label = "Distortions Off"
+        self.button_sims_enable_distortions = Button(label="Toggle distortions", button_type="success", width=100)
+        self.button_sims_enable_distortions.label = "Distortions On"
         self.button_sims_enable_distortions.on_click(self.do_sims_enable_distortions)
+
+        self.text_sims_rotate = TextInput(value="0.", title="Sims Rot'n (rad)")
+        self.text_sims_rotate.on_change('value', self.update_sims_rotate)
+        self.text_sims_offset = TextInput(value="0.", title="Sims offset (px)")
+        self.text_sims_offset.on_change('value', self.update_sims_offset)
 
         # do stuff in init
 
@@ -193,10 +198,12 @@ class ccd_spacing():
 
         self.layout = None
 
+        sims_layout = row(self.button_enable_sims, self.button_sims_orient,
+                          self.button_sims_intra_raft, self.button_sims_enable_distortions,
+                          self.text_sims_offset, self.text_sims_rotate)
         self.min_layout = row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
-                              self.button_line_fitting, self.button_enable_sims, self.button_sims_orient,
-                              self.button_sims_intra_raft, self.button_sims_enable_distortions)
+                              self.button_line_fitting, sims_layout)
         self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
         self.max_layout = column(self.min_layout, self.sliders_layout,
                                  self.button_fit)
@@ -255,6 +262,14 @@ class ccd_spacing():
             self.button_sims_enable_distortions.button_type = "danger"
             self.button_sims_enable_distortions.label = "Distortions Off"
 
+        return
+
+    def update_sims_rotate(self, sattr, old, new):
+        self.sim_rotate = float(self.text_sims_rotate.value)
+        return
+
+    def update_sims_offset(self, sattr, old, new):
+        self.sim_offset = float(self.text_sims_offset.value)
         return
 
     def do_rotate(self):
