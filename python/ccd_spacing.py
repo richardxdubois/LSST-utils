@@ -203,9 +203,9 @@ class ccd_spacing():
                           self.text_sims_offset, self.text_sims_rotate)
         self.min_layout = row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
-                              self.button_line_fitting, sims_layout)
+                              self.button_line_fitting)
         self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
-        self.max_layout = column(self.min_layout, self.sliders_layout,
+        self.max_layout = column(self.min_layout, sims_layout, self.sliders_layout,
                                  self.button_fit)
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
