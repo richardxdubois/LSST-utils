@@ -121,13 +121,14 @@ for combos in config:
         a = -c2c[0]
         c2c[0] = c2c[1]
         c2c[1] = a
+        sdiff.append(-cS.mean_slope_diff)
     else:
         x.append(str(c2c[0]))
         y.append(str(c2c[1]))
+        sdiff.append(cS.mean_slope_diff)
 
     x_o.append(c2c[0])
     y_o.append(c2c[1])
-    sdiff.append(cS.mean_slope_diff)
 
     o_name = str(combos) + "_plots.html"
     url_link = args.url_base + o_name

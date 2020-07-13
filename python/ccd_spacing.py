@@ -758,7 +758,7 @@ class ccd_spacing():
 
         self.med_shift_x = np.median(np.array(self.shift_x))
         self.med_shift_y = np.median(np.array(self.shift_y))
-        self.mean_slope_diff = np.median(np.array(slope_difference))
+        self.mean_slope_diff = np.mean(np.array(slope_difference))
 
         self.x1_in = self.med_shift_x
         self.y1_in = 2000. + self.med_shift_y
