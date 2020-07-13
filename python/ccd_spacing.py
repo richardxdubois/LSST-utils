@@ -46,6 +46,7 @@ class ccd_spacing():
         self.med_shift_y = 0.
         self.shift_x = []
         self.shift_y = []
+        self.mean_slope_diff = None
         self.center_to_center = [0., 0.]
         self.d_extrap = []
 
@@ -81,6 +82,7 @@ class ccd_spacing():
 
         self.dx0 = None
         self.dy0 = None
+        self.dtheta0 = None
 
         # simulation stuff
 
@@ -624,17 +626,17 @@ class ccd_spacing():
                     res_spot.append(abs(y_diff))
                     pitch_spot.append(d)
 
-            resid, bins = np.histogram(np.array(res), bins=50, range=(-5., 5.))
+            resid, bins = np.histogram(np.array(res), bins=200, range=(-2., 2.))
 
             w = bins[1] - bins[0]
             r_hist.step(y=resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
-            g_resid, bins = np.histogram(np.array(g_res), bins=50, range=(-5., 5.))
+            g_resid, bins = np.histogram(np.array(g_res), bins=200, range=(-2., 2.))
 
             w = bins[1] - bins[0]
             gr_hist.step(y=g_resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
-            pitches, bins = np.histogram(np.array(spl), bins=50, range=(60., 70.))
+            pitches, bins = np.histogram(np.array(spl), bins=200, range=(64., 67.))
             w = bins[1] - bins[0]
 
             pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
@@ -655,7 +657,9 @@ class ccd_spacing():
         hist_list.append([self.ccd1_scatter])
 
         print("Mean spot pitch 0: ", np.mean(np.array(spot_pitch[0])), " 1: ", np.mean(np.array(spot_pitch[1])))
-
+        mean_delta_slope = np.mean(np.array(slopes_diff))
+        print("Mean delta slope: ", mean_delta_slope
+              )
         return gridplot(hist_list)
 
     def fit_line_pairs(self, line_list):
@@ -707,6 +711,7 @@ class ccd_spacing():
         n_lines = len(self.lines[0])   # they'd better both have the same number!
         self.shift_x = []
         self.shift_y = []
+        slope_difference = []
         internal_hole_sums = [0, 0]
 
         for nl in range(n_lines):
@@ -747,10 +752,13 @@ class ccd_spacing():
             self.shift_x.append(old_x - new_x)
             self.shift_y.append(old_y - new_y)
 
+            slope_difference.append(self.linfits[1][nl][0] - self.linfits[0][nl][0])
+
         print("Found internal holes: ", internal_hole_sums)
 
         self.med_shift_x = np.median(np.array(self.shift_x))
         self.med_shift_y = np.median(np.array(self.shift_y))
+        self.mean_slope_diff = np.median(np.array(slope_difference))
 
         self.x1_in = self.med_shift_x
         self.y1_in = 2000. + self.med_shift_y
@@ -1075,6 +1083,8 @@ class ccd_spacing():
         # Ignore rotation for now
         self.dy0 = model_grid2.y0 - model_grid1.y0
         self.dx0 = model_grid2.x0 - model_grid1.x0
+        self.dtheta0 = model_grid2.theta - model_grid1.theta
+        print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0 )
 
     def simulate_response(self, distort=False):
 

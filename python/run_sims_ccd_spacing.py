@@ -19,7 +19,7 @@ parser.add_argument('-c', '--combo', default='R22_S10_S11', help="raft, sensor c
 parser.add_argument('-f', '--dofit', default='yes', help="do full fit yes/no")
 parser.add_argument('-o', '--output', default='/Users/richard/LSST/Code/misc/CCD_grids/',
                     help="output directory path")
-parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
+parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/sims/',
                     help="base html path")
 parser.add_argument('-g', '--grid', default=
                     '/Users/richard/LSST/Code/misc/CCD_grids/optical_distortion_grid.fits',
@@ -32,7 +32,9 @@ cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.gr
 cS.line_fitting = True
 cS.use_offsets = True
 cS.overlay_ccd = True
+
 cS.sim_distort = True
+cS.sim_doit = True
 
 # loop over file sets
 out_lines = []
@@ -50,14 +52,47 @@ fx = []
 fy = []
 ftheta = []
 
-for combos in cS.file_paths:
+config = {}
+# configs are: distort on/off; offset; rotation; orientation
+config[0] = [False, 0., 0., "vertical"]
+config[1] = [True, 0., 0., "vertical"]
+config[2] = [True, 0., 0.002, "vertical"]
+config[3] = [True, 0., 0.004, "vertical"]
+config[4] = [True, 5., 0., "vertical"]
+config[5] = [True, 5., 0.002, "vertical"]
+config[6] = [True, 5., 0.004, "vertical"]
+config[7] = [True, 10., 0., "vertical"]
+config[8] = [True, 10., 0.002, "vertical"]
+config[9] = [True, 10., 0.004, "vertical"]
+
+config[10] = [False, 0., 0., "horizontal"]
+config[11] = [True, 0., 0., "horizontal"]
+config[12] = [True, 0., 0.002, "horizontal"]
+config[13] = [True, 0., 0.004, "horizontal"]
+config[14] = [True, 5., 0., "horizontal"]
+config[15] = [True, 5., 0.002, "horizontal"]
+config[16] = [True, 5., 0.004, "horizontal"]
+config[17] = [True, 10., 0., "horizontal"]
+config[18] = [True, 10., 0.002, "horizontal"]
+config[19] = [True, 10., 0.004, "horizontal"]
+
+for combos in config:
+    cS.sim_distort = config[combos][0]
+    cS.sim_offset = config[combos][1]
+    cS.sim_rotate = config[combos][2]
+    cS.ccd_relative_orientation = config[combos][3]
+
     try:
-        rc = cS.get_data(combo_name=combos)
+        rc = cS.get_data()
     except ValueError:
         problems += 1
         continue
     successes += 1
-    out_str = combos + " " + str(cS.ccd_relative_orientation) + " " + str(cS.center_to_center) + "\n"
+    c_name = str(config[combos][0]) + " " + str(config[combos][1]) + " " + str(config[combos][2]) + " " + \
+        config[combos][3]
+
+    print("Doing, ", c_name)
+    out_str = c_name + " " + str(cS.ccd_relative_orientation) + " " + str(cS.center_to_center) + "\n"
     out_lines.append(out_str)
 
     if args.dofit == "yes":
@@ -75,7 +110,7 @@ for combos in cS.file_paths:
     rc = cS.make_plots()
     line_layout = cS.make_line_plots()
 
-    names.append(combos)
+    names.append(c_name)
     orient.append(cS.ccd_relative_orientation)
 
     c2c = cS.center_to_center
@@ -94,12 +129,12 @@ for combos in cS.file_paths:
     y_o.append(c2c[1])
     sdiff.append(cS.mean_slope_diff)
 
-    o_name = combos + "_plots.html"
+    o_name = str(combos) + "_plots.html"
     url_link = args.url_base + o_name
     urls.append(url_link)
 
     output_file(args.output + o_name)
-    save(line_layout, title=combos + " grid plots")
+    save(line_layout, title=str(combos) + " grid plots")
     reset_output()
 
 print("Found ", successes, " good filesets and", problems, " problem filesets")
@@ -166,5 +201,5 @@ if args.dofit:
     out_lay = layout(row(results_table, column(x_hist, y_hist)), row(dx_hist, dy_hist))
 
 
-output_file(args.output + "CCD_grids.html")
-save(out_lay, title="CCD grid plots")
+output_file(args.output + "CCD_grids_sims.html")
+save(out_lay, title="CCD sims grid plots")
