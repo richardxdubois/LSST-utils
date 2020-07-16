@@ -18,12 +18,41 @@ from bokeh.models.widgets import TextInput, Dropdown, Button, RangeSlider, FileI
 from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, ColorBar, LogColorMapper
 
 
+class sensor():
+
+    def __init__(self):
+
+        # input data from spot finding
+
+        self.src = None
+        self.spot_input = None
+
+        # orientation to work in - is sensor boundary perpendicular to x or y in original coordinates.
+        self.orientation = None
+
+        # cleaned spot data
+        self.spot_cln = None
+
+        # fitted grid spots
+        self.fitted_grid = None
+
+        self.name = None
+
+        # found lines
+        self.lines = {}
+
+        # fitted lines
+        self.linfits = {}
+
+
 class ccd_spacing():
 
     def __init__(self, dir_index=None, combo_name=None, distort_file=None):
 
         self.file_paths = {}
         self.raft_ccd_combo = combo_name
+
+        self.sensor = None
 
         self.name_ccd1 = None
         self.name_ccd2 = None
@@ -50,7 +79,7 @@ class ccd_spacing():
         self.center_to_center = [0., 0.]
         self.d_extrap = []
 
-        self.line_fitting = True
+        self.line_fitting = False
 
         self.src1 = None
         self.src2 = None
@@ -380,85 +409,78 @@ class ccd_spacing():
 
         return
 
-    def find_lines(self):
+    def find_lines(self, x_in, y_in):
 
-        # sort the y-coordinates for both CCDs
-        self.lines = {}
-        order = []
-        x = []
-        y = []
+        if self.ccd_relative_orientation == "vertical":
+            x_use = x_in
+            y_use = y_in
+        else:
+            x_use = y_in
+            y_use = x_in
+
+        # sort the y-coordinates
         rad = self.rotate * self.extrap_dir
-        x1_rot = math.cos(rad) * np.array(self.srcX[0]) - math.sin(rad) * np.array(self.srcY[0])
-        y1_rot = math.sin(rad) * np.array(self.srcX[0]) + math.cos(rad) * np.array(self.srcY[0])
+        x_rot = math.cos(rad) * np.array(x_use) - math.sin(rad) * np.array(y_use)
+        y_rot = math.sin(rad) * np.array(x_use) + math.cos(rad) * np.array(y_use)
 
-        order.append(np.argsort(-y1_rot, kind="stable"))
-        x.append(np.array(self.srcX[0])[order[0]])
-        y.append(np.array(self.srcY[0])[order[0]])
-
-        x2_rot = math.cos(rad) * np.array(self.srcX[1]) - math.sin(rad) * np.array(self.srcY[1])
-        y2_rot = math.sin(rad) * np.array(self.srcX[1]) + math.cos(rad) * np.array(self.srcY[1])
-
-        order.append(np.argsort(-y2_rot, kind="stable"))
-        x.append(np.array(self.srcX[1])[order[1]])
-        y.append(np.array(self.srcY[1])[order[1]])
-        yrot = []
-        yrot.append(np.array(y1_rot)[order[0]])
-        yrot.append(np.array(y2_rot)[order[1]])
+        order = np.argsort(-y_rot, kind="stable")
+        x = np.array(x_use)[order]
+        y = np.array(y_use)[order]
+        y_rot_ordered = np.array(y_rot)[order]
 
         # find lines
 
-        for l in range(2):
+        n_close = 0
+        y_min = min(y_rot_ordered)
+        for nc in range(1, 10):
+            ya = y_rot_ordered[-nc - 1]
+            yb = y_rot_ordered[-nc]
+            diff = y_rot_ordered[-nc - 1] - y_rot_ordered[-nc]
+            if diff < 5.:  # look for a bunch of spots close together
+                n_close += 1
+            if n_close > 4:
+                y_min = y_rot_ordered[-nc] - 10.  # back off a bit to get back the first few
+                break
 
-            n_close = 0
-            y_min = min(yrot[l])
-            for nc in range(1, 10):
-                ya = yrot[l][-nc - 1]
-                yb = yrot[l][-nc]
-                diff = yrot[l][-nc - 1] - yrot[l][-nc]
-                if diff < 5.:  # look for a bunch of spots close together
-                    n_close += 1
-                if n_close > 4:
-                    y_min = yrot[l][-nc] -10.  # back off a bit to get back the first few
-                    break
+        ccd = {}
 
-            ccd = self.lines.setdefault(l, {})
+        for idy, yi in enumerate(y_rot_ordered):
+            if yi - y_min < 0.:  # spurious low point
+                continue
+            line_bin = int((yi-y_min+self.pitch/5.)/self.pitch)
+            if line_bin > 48:  # spurious high point
+                continue
+            fl = ccd.setdefault(line_bin, [])
+            if self.ccd_relative_orientation == "vertical":
+                ccd[line_bin].append([x[idy], y[idy]])
+            else:
+                ccd[line_bin].append([y[idy], x[idy]])
 
-            for idy, yi in enumerate(yrot[l]):
-                if yi - y_min < 0.:  # spurious low point
-                    continue
-                line_bin = int((yi-y_min+self.pitch/5.)/self.pitch)
-                if line_bin > 48:  # spurious high point
-                    continue
-                fl = self.lines[l].setdefault(line_bin, [])
-                self.lines[l][line_bin].append([x[l][idy], y[l][idy]])
-
-        if len(self.lines[0]) != self.num_spots or len(self.lines[1]) != self.num_spots:
-            print(self.raft_ccd_combo + ": Problem finding full grid: found ", len(self.lines[0]), " and ",
-                  len(self.lines[1]),
+        if len(ccd) != self.num_spots:
+            print(self.raft_ccd_combo + ": Problem finding full grid: found ", len(ccd),
                   " spots")
             raise ValueError
 
         # sort lists by x
 
-        for l in range(2):
-            nl = len(self.lines[l])
-            for n in range(nl):
-                self.lines[l][n] = sorted(self.lines[l][n], key=lambda xy: xy[0])
-                # ensure end points make sense
-                if abs(self.lines[l][n][0][0] - self.lines[l][n][1][0]) > self.cut_spurious_spots:
-                    del self.lines[l][n][0]
-                if abs(self.lines[l][n][-1][0] - self.lines[l][n][-2][0]) > self.cut_spurious_spots:
-                    del self.lines[l][n][-1]
+        nl = len(ccd)
+        for n in range(nl):
+            ccd[n] = sorted(ccd[n], key=lambda xy: xy[0])
+            # ensure end points make sense
+            if abs(ccd[n][0][0] - ccd[n][1][0]) > self.cut_spurious_spots:
+                del ccd[n][0]
+            if abs(ccd[n][-1][0] - ccd[n][-2][0]) > self.cut_spurious_spots:
+                del ccd[n][-1]
 
-        return
+        return ccd
 
     def make_line_plots(self):
 
-        print("# lines in ", self.name_ccd1, " ", len(self.lines[0]))
-        print("# lines in ", self.name_ccd2, " ", len(self.lines[1]))
+        print("# lines in ", self.name_ccd1, " ", len(self.sensor[0].lines))
+        print("# lines in ", self.name_ccd2, " ", len(self.sensor[1].lines))
 
-        num_spots = [len(self.lines[0][k]) for k in self.lines[0]]
-        num_spots2 = [len(self.lines[1][k]) for k in self.lines[1]]
+        num_spots = [len(self.sensor[0].lines[k]) for k in self.sensor[0].lines]
+        num_spots2 = [len(self.sensor[1].lines[k]) for k in self.sensor[1].lines]
         num_spots.extend(num_spots2)
         print("Total spots = ", sum(num_spots))
 
@@ -468,12 +490,12 @@ class ccd_spacing():
         color = ["blue", "red"]
 
         for l in range(2):
-            for lines in self.linfits[l]:
-                slopes.append(self.linfits[l][lines][0])
+            for lines in self.sensor[l].linfits:
+                slopes.append(self.sensor[l].linfits[lines][0])
                 if l == 0:
-                    slopes_ccd1.append(self.linfits[l][lines][0])
+                    slopes_ccd1.append(self.sensor[l].linfits[lines][0])
                 else:
-                    slopes_ccd2.append(self.linfits[l][lines][0])
+                    slopes_ccd2.append(self.sensor[l].linfits[lines][0])
 
         s_hist, bins = np.histogram(np.array(slopes), bins=20)
         p_hist = figure(tools=self.TOOLS, title="All slopes", x_axis_label='slope', y_axis_label='counts',
@@ -516,11 +538,11 @@ class ccd_spacing():
 
         shexx_hist.vbar(top=shx_hist, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
 
-        n_lines = len(self.lines[0])
+        n_lines = len(self.sensor[0].lines)
 
         slopes_diff = []
         for nl in range(n_lines):
-            slopes_diff.append(self.linfits[1][nl][0] - self.linfits[0][nl][0])
+            slopes_diff.append(self.sensor[1].linfits[nl][0] - self.sensor[0].linfits[nl][0])
 
         sd_hist, bins = np.histogram(np.array(slopes_diff), bins=20)
         pd_hist = figure(tools=self.TOOLS, title="delta slopes", x_axis_label='slope difference',
@@ -586,10 +608,10 @@ class ccd_spacing():
             g_res = gap_residuals.setdefault(l, [])
 
             for nl in range(n_lines):
-                x0 = self.lines[l][nl][0][0]
-                y0 = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
-                x1 = self.lines[l][nl][-1][0]
-                y1 = self.linfits[l][nl][0] * x1 + self.linfits[l][nl][1]
+                x0 = self.sensor[l].lines[nl][0][0]
+                y0 = self.sensor[l].linfits[nl][0] * x0 + self.sensor[l].linfits[nl][1]
+                x1 = self.sensor[l].lines[nl][-1][0]
+                y1 = self.sensor[l].linfits[nl][0] * x1 + self.sensor[l].linfits[nl][1]
                 x0 -= off_ccd[l][0]
                 y0 -= off_ccd[l][1]
                 x1 -= off_ccd[l][0]
@@ -598,15 +620,15 @@ class ccd_spacing():
                 if self.ccd1_scatter is not None:
                     self.ccd1_scatter.line([x0, x1], [y0, y1], line_width=2)
 
-                n_spots = len(self.lines[l][nl])
+                n_spots = len(self.sensor[l].lines[nl])
                 xp = -1.
                 yp = -1.
                 for s in range(n_spots):
-                    x0 = self.lines[l][nl][s][0]
-                    y0 = self.lines[l][nl][s][1]
-                    y0_fit = self.linfits[l][nl][0] * x0 + self.linfits[l][nl][1]
+                    x0 = self.sensor[l].lines[nl][s][0]
+                    y0 = self.sensor[l].lines[nl][s][1]
+                    y0_fit = self.sensor[l].linfits[nl][0] * x0 + self.sensor[l].linfits[nl][1]
                     y_diff = y0_fit - y0
-                    res.append(y_diff)
+                    res.append(y_diff + 1.)
 
                     # find spots along the gaps
                     if (self.ccd_standard == l and s == 0) or \
@@ -643,18 +665,27 @@ class ccd_spacing():
 
         cds_spot = ColumnDataSource(dict(x=x_spot, y=y_spot, res=res_spot, pitch=pitch_spot))
 
-        spot_heat = figure(title="Spots Grid:" + self.raft_ccd_combo, x_axis_label='x',
+        spot_heat = figure(title="Spots Grid: spot pitch " + self.raft_ccd_combo, x_axis_label='x',
                            y_axis_label='y', tools=self.TOOLS)
-        c_color_mapper = LinearColorMapper(palette=palette, low=64., high=66.5)
-        c_color_bar = ColorBar(color_mapper=c_color_mapper, label_standoff=8, width=500, height=20,
+        c_color_mapper_sp = LinearColorMapper(palette=palette, low=64., high=66.5)
+        c_color_bar_sp = ColorBar(color_mapper=c_color_mapper_sp, label_standoff=8, width=500, height=20,
                                border_line_color=None, location=(0, 0), orientation='horizontal')
         spot_heat.circle(x="x", y="y", source=cds_spot, color="gray", size=10,
-                         fill_color={'field': 'pitch', 'transform': c_color_mapper})
-        spot_heat.add_layout(c_color_bar, 'below')
+                         fill_color={'field': 'pitch', 'transform': c_color_mapper_sp})
+        spot_heat.add_layout(c_color_bar_sp, 'below')
+
+        c_color_mapper_res = LogColorMapper(palette=palette, low=0.001, high=2.)
+        c_color_bar_res = ColorBar(color_mapper=c_color_mapper_res, label_standoff=8, width=500, height=20,
+                               border_line_color=None, location=(0, 0), orientation='horizontal')
+        res_heat = figure(title="Spots Grid: residuals (-1, 1)  " + self.raft_ccd_combo, x_axis_label='x',
+                           y_axis_label='y', tools=self.TOOLS)
+        res_heat.circle(x="x", y="y", source=cds_spot, color="gray", size=10,
+                         fill_color={'field': 'res', 'transform': c_color_mapper_res})
+        res_heat.add_layout(c_color_bar_res, 'below')
 
         hist_list.append([r_hist, pitch_hist])
         hist_list.append([gr_hist, spot_heat])
-        hist_list.append([self.ccd1_scatter])
+        hist_list.append([res_heat, self.ccd1_scatter])
 
         print("Mean spot pitch 0: ", np.mean(np.array(spot_pitch[0])), " 1: ", np.mean(np.array(spot_pitch[1])))
         mean_delta_slope = np.mean(np.array(slopes_diff))
@@ -674,7 +705,6 @@ class ccd_spacing():
         x = np.array(x)[order].reshape(-1, 1)
         y = np.array(y)[order]
 
-        #slope, intercept, r_value, p_value, std_err = linregress(x, y)
         # https://scikit-learn.org/stable/modules/generated/
         #                     sklearn.linear_model.RANSACRegressor.html#sklearn.linear_model.RANSACRegressor
         # Robustly fit linear model with RANSAC algorithm
@@ -683,15 +713,15 @@ class ccd_spacing():
         inlier_mask = ransac.inlier_mask_
         outlier_mask = np.logical_not(inlier_mask)
 
-        #return slope, intercept, r_value, p_value, std_err
         return ransac.estimator_.coef_[0], ransac.estimator_.intercept_, outlier_mask
 
     def missing_internal_spots(self, sensor_num, line_num):
 
         num_holes = 0
-        len_line = len(self.lines[sensor_num][line_num])
+        len_line = len(self.sensor[sensor_num].lines[line_num])
         for spot in range(len_line-1):   # check for internal gaps
-            if abs(self.lines[sensor_num][line_num][spot+1][0] - self.lines[sensor_num][line_num][spot][0]) \
+            if abs(self.sensor[sensor_num].lines[line_num][spot+1][0] -
+                   self.sensor[sensor_num].lines[line_num][spot][0]) \
                   > self.cut_spurious_spots:
                 num_holes += 1
 
@@ -704,11 +734,11 @@ class ccd_spacing():
 
         self.ccd_standard = 0
         non_standard = 1
-        if len(self.lines[1][self.num_spots-1]) > len(self.lines[1][0]):
+        if len(self.sensor[1].lines[self.num_spots-1]) > len(self.sensor[1].lines[0]):
             self.ccd_standard = 1
             non_standard = 0
 
-        n_lines = len(self.lines[0])   # they'd better both have the same number!
+        n_lines = len(self.sensor[0].lines)   # they'd better both have the same number!
         self.shift_x = []
         self.shift_y = []
         slope_difference = []
@@ -721,7 +751,7 @@ class ccd_spacing():
             internal_hole_sums[0] += internal_hole[0]
             internal_hole_sums[1] += internal_hole[1]
             missing_spots = self.num_spots - \
-                            (len(self.lines[0][nl]) + len(self.lines[1][nl]) +
+                            (len(self.sensor[0].lines[nl]) + len(self.sensor[1].lines[nl]) +
                              internal_hole[0] + internal_hole[1])
             extrap_dist = (missing_spots + 1) * self.pitch  # n+1 gaps needed to add
             self.d_extrap.append(extrap_dist)
@@ -732,12 +762,12 @@ class ccd_spacing():
                 far_end = 0
                 near_end = -1
 
-            x1 = self.lines[self.ccd_standard][nl][near_end][0]
-            y1 = self.linfits[self.ccd_standard][nl][1] +  \
-                 self.linfits[self.ccd_standard][nl][0] * x1
-            x2 = self.lines[self.ccd_standard][nl][far_end][0]
-            y2 = self.linfits[self.ccd_standard][nl][1] + \
-                 self.linfits[self.ccd_standard][nl][0] * x2
+            x1 = self.sensor[self.ccd_standard].lines[nl][near_end][0]
+            y1 = self.sensor[self.ccd_standard].linfits[nl][1] +  \
+                 self.sensor[self.ccd_standard].linfits[nl][0] * x1
+            x2 = self.sensor[self.ccd_standard].lines[nl][far_end][0]
+            y2 = self.sensor[self.ccd_standard].linfits[nl][1] + \
+                 self.sensor[self.ccd_standard].linfits[nl][0] * x2
 
             length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
             unitSlopeX = self.extrap_dir * (x2 - x1) / length
@@ -746,13 +776,13 @@ class ccd_spacing():
             new_x = x1 - extrap_dist * unitSlopeX * self.extrap_dir
             new_y = y1 - extrap_dist * unitSlopeY * self.extrap_dir
 
-            old_x = self.lines[non_standard][nl][far_end][0]
-            old_y = self.linfits[non_standard][nl][1] + self.linfits[non_standard][nl][0] * old_x
+            old_x = self.sensor[non_standard].lines[nl][far_end][0]
+            old_y = self.sensor[non_standard].linfits[nl][1] + self.sensor[non_standard].linfits[nl][0] * old_x
 
             self.shift_x.append(old_x - new_x)
             self.shift_y.append(old_y - new_y)
 
-            slope_difference.append(self.linfits[1][nl][0] - self.linfits[0][nl][0])
+            slope_difference.append(self.sensor[1].linfits[nl][0] - self.sensor[0].linfits[nl][0])
 
         print("Found internal holes: ", internal_hole_sums)
 
@@ -766,16 +796,12 @@ class ccd_spacing():
         self.y0_in = 2000.
 
         centers = [2048., 2048.]
-        if self.ccd_relative_orientation == "horizontal":
-            c1 = [centers[0] - self.x1_in, centers[1] - self.y1_in]
-            c0 = [centers[0] - self.x0_in, centers[1] - self.y0_in]
-        else:
-            c1 = [centers[0] - self.y1_in, centers[1] - self.x1_in]
-            c0 = [centers[0] - self.y0_in, centers[1] - self.x0_in]
+        c1 = [centers[0] - self.y1_in, centers[1] - self.x1_in]
+        c0 = [centers[0] - self.y0_in, centers[1] - self.x0_in]
 
         self.center_to_center = np.array(c0) - np.array(c1)
 
-        print("center to center = ", self.center_to_center)
+        print("(y, x) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
 
         rc = self.guess_grid_centers()
 
@@ -794,12 +820,12 @@ class ccd_spacing():
 
         nl = 24
 
-        x10 = self.lines[self.ccd_standard][nl][near_end][0]
-        y10 = self.linfits[self.ccd_standard][nl][1] + \
-             self.linfits[self.ccd_standard][nl][0] * x10
-        x21 = self.lines[non_standard][nl][far_end][0]
-        y21 = self.linfits[non_standard][nl][1] + \
-              self.linfits[non_standard][nl][0] * x21
+        x10 = self.sensor[self.ccd_standard].lines[nl][near_end][0]
+        y10 = self.sensor[self.ccd_standard].linfits[nl][1] + \
+             self.sensor[self.ccd_standard].linfits[nl][0] * x10
+        x21 = self.sensor[non_standard].lines[nl][far_end][0]
+        y21 = self.sensor[non_standard].linfits[nl][1] + \
+              self.sensor[non_standard].linfits[nl][0] * x21
 
         x21 -= self.shift_x[nl]
         y21 -= self.shift_y[nl]
@@ -811,7 +837,6 @@ class ccd_spacing():
         self.grid_y1 = self.grid_y0 + self.shift_y[nl]
 
         return
-
 
     def get_data(self, combo_name=None):
 
@@ -833,6 +858,9 @@ class ccd_spacing():
             self.raft_ccd_combo = combo_name
 
         self.drop_data.label = combo_name
+
+        infile1 = None
+        infile2 = None
 
         if self.sim_doit:
             if self.ccd_relative_orientation == "vertical":
@@ -859,84 +887,13 @@ class ccd_spacing():
 
             s1 = self.name_ccd1.split("_")[1]
             s2 = self.name_ccd2.split(("_"))[1]
-            kw_x = 'base_SdssShape_x'
-            kw_y = 'base_SdssShape_y'
             self.extrap_dir = 1.
 
             if int(s1[1]) == int(s2[1]):
                 self.ccd_relative_orientation = "vertical"
             else:
                 self.ccd_relative_orientation = "horizontal"  # swap x and y
-                kw_x = 'base_SdssShape_y'
-                kw_y = 'base_SdssShape_x'
                 self.extrap_dir = -1.
-
-            self.src1 = fits.getdata(infile1)
-            X1 = self.src1[kw_x]
-            Y1 = self.src1[kw_y]
-
-        median_x1 = np.median(np.array(X1))
-        median_y1 = np.median(np.array(Y1))
-        dist_x = 16 * self.pitch
-        dist_y = 27 * self.pitch
-        x_min = median_x1 - dist_x
-        x_max = median_x1 + dist_x
-        y_min = median_y1 - dist_y
-        y_max = median_y1 + dist_y
-
-        if self.clean:
-            for n, x in enumerate(X1):
-                if x > x_min and x < x_max and Y1[n] > y_min and Y1[n] < y_max:
-                    self.srcX[0].append(x)
-                    self.srcY[0].append(Y1[n])
-        else:
-            self.srcX[0] = X1
-            self.srcY[0] = Y1
-
-        self.srcX[0] = np.array((self.srcX[0]))
-        self.srcY[0] = np.array((self.srcY[0]))
-
-        if self.sim_doit:
-            if self.ccd_relative_orientation == "vertical":
-                X2 = self.sim_x[1]
-                Y2 = self.sim_y[1]
-                self.extrap_dir = 1.
-            else:  # swap x and y for horizontal pairing
-                Y2 = self.sim_x[1]
-                X2 = self.sim_y[1]
-                self.extrap_dir = -1.
-        else:
-            self.src2 = fits.getdata(infile2)
-            X2 = self.src2[kw_x]
-            Y2 = self.src2[kw_y]
-
-        median_x2 = np.median(np.array(X2))
-        median_y2 = np.median(np.array(Y2))
-
-        x_min = median_x2 - dist_x
-        x_max = median_x2 + dist_x
-        y_min = median_y2 - dist_y
-        y_max = median_y2 + dist_y
-
-        if self.clean:
-            for n, x in enumerate(X2):
-                if x > x_min and x < x_max and Y2[n] > y_min and Y2[n] < y_max:
-                    self.srcX[1].append(x)
-                    self.srcY[1].append(Y2[n])
-        else:
-            self.srcX[1] = X2
-            self.srcY[1] = Y2
-
-        self.srcX[1] = np.array((self.srcX[1]))
-        self.srcY[1] = np.array((self.srcY[1]))
-
-        print("# spots on ", self.name_ccd1, " ", len(self.srcX[0]))
-        print("# spots on ", self.name_ccd2, " ", len(self.srcX[1]))
-
-        if len(self.srcX[0]) == 0 or len(self.srcX[1]) == 0:
-            print(self.raft_ccd_combo + ": Problem with input data: found ", len(self.srcX[0]), " and ",
-                  len(self.srcX[1]), " spots")
-            raise ValueError
 
         if self.show_rotate:
             rad = self.rotate * self.extrap_dir
@@ -950,26 +907,71 @@ class ccd_spacing():
             self.srcX[1] = x2_rot
             self.srcY[1] = y2_rot
 
-        if self.line_fitting:
-            rc = self.find_lines()
+        # refactoring to use sensor class
 
-            self.linfits = {}
-            outliers_count = [0, 0]
+        self.sensor = {}
+        self.sensor[0] = sensor()
+        self.sensor[1] = sensor()
 
-            for c in range(2):
-                lf = self.linfits.setdefault(c, {})
-                for lines in self.lines[c]:
-                    lf.setdefault(lines, {})
-                    #slope, intercept, r_value, p_value, std_err = self.fit_line_pairs(self.lines[c][lines])
-                    slope, intercept, outlier_mask = self.fit_line_pairs(self.lines[c][lines])
-                    for idel, pt in enumerate(self.lines[c][lines]): # remove outliers from line
+        kw_x = 'base_SdssShape_x'
+        kw_y = 'base_SdssShape_y'
+
+        # use simulation data
+        if self.sim_doit:
+            self.sensor[0].spot_input = dict(x=self.sim_x[0], y=self.sim_y[0])
+            self.sensor[1].spot_input = dict(x=self.sim_x[1], y=self.sim_y[1])
+        else:   # use projector data
+            self.sensor[0].src = fits.getdata(infile1)
+            self.sensor[0].spot_input = dict(x=self.sensor[0].src[kw_x], y=self.sensor[0].src[kw_y])
+            self.sensor[0].orientation = self.ccd_relative_orientation
+
+            self.sensor[1].src = fits.getdata(infile2)
+            self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y])
+            self.sensor[1].orientation = self.ccd_relative_orientation
+
+        num_spots_0 = len(self.sensor[0].spot_input["x"])
+        num_spots_1 = len(self.sensor[1].spot_input["x"])
+
+        print("# spots on ", self.name_ccd1, " ", num_spots_0)
+        print("# spots on ", self.name_ccd2, " ", num_spots_1)
+
+        if num_spots_0 == 0 or num_spots_1 == 0:
+            print(self.raft_ccd_combo + ": Problem with input data: found ", num_spots_0, " and ",
+                  num_spots_1, " spots")
+            raise ValueError
+
+        outliers_count = [0, 0]
+
+        for s in self.sensor:
+
+            if self.clean:
+                self.sensor[s].spot_cln = self.do_clean(self.sensor[s].spot_input, self.ccd_relative_orientation)
+
+        # process the data
+
+            if self.line_fitting:
+                self.sensor[s].lines = self.find_lines(self.sensor[s].spot_cln["x"], self.sensor[s].spot_cln["y"])
+
+                self.sensor[s].linfits = {}
+                outliers_count = [0, 0]
+
+                for lines in self.sensor[s].lines:
+                    self.sensor[s].linfits.setdefault(lines, {})
+                    slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines])
+                    for idel, pt in enumerate(self.sensor[s].lines[lines]):  # remove outliers from line
                         if outlier_mask[idel]:
-                            del self.lines[c][lines][idel]
-                            outliers_count[c] += 1
+                            del self.sensor[s].lines[lines][idel]
+                            outliers_count[s] += 1
 
-                    #self.linfits[c][lines] = [slope, intercept, r_value, p_value, std_err]
-                    self.linfits[c][lines] = [slope, intercept]
-            rc = self.match_lines()
+                    self.sensor[s].linfits[lines] = [slope, intercept]
+
+        rc = self.match_lines()
+
+        num_spots_cln_0 = len(self.sensor[0].spot_cln["x"])
+        num_spots_cln_1 = len(self.sensor[1].spot_cln["x"])
+
+        print("# spots after cln ", self.name_ccd1, " ", num_spots_cln_0)
+        print("# spots after cln ", self.name_ccd2, " ", num_spots_cln_1)
 
         print("removed outliers: ", outliers_count)
         self.slider_x.value = (self.x0_in, self.x1_in)
@@ -977,14 +979,41 @@ class ccd_spacing():
 
         return
 
+    def do_clean(self, sensor, orientation):
+
+        out_x = []
+        out_y = []
+        median_x = np.median(np.array(sensor["x"]))
+        median_y = np.median(np.array(sensor["y"]))
+
+        box_x = 16
+        box_y = 27
+        if orientation == "horizontal":
+            box_x = 27
+            box_y = 16
+
+        dist_x = box_x * self.pitch
+        dist_y = box_y * self.pitch
+        x_min = median_x - dist_x
+        x_max = median_x + dist_x
+        y_min = median_y - dist_y
+        y_max = median_y + dist_y
+
+        for n, x in enumerate(sensor["x"]):
+            if x > x_min and x < x_max and \
+                    sensor["y"][n] > y_min and sensor["y"][n] < y_max:
+                out_x.append(x)
+                out_y.append(sensor["y"][n])
+
+        out_dict = dict(x=np.array(out_x), y=np.array(out_y))
+
+        return out_dict
+
     def data_2_model(self, srcX, srcY, ncols, nrows, x0_guess, y0_guess, distortions=None):
 
         fitted_grid = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
                               y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
 
-        #gY, gX = fitted_grid.make_grid(ncols, nrows)
-
-        #return fitted_grid, gY, gX
         return fitted_grid
 
     def make_plots(self):
@@ -1003,10 +1032,10 @@ class ccd_spacing():
                 o3 = self.x1_in
                 o4 = self.y1_in
 
-        x1 = np.array(self.srcX[0]) - o1
-        y1 = np.array(self.srcY[0]) - o2
-        x2 = np.array(self.srcX[1]) - o3
-        y2 = np.array(self.srcY[1]) - o4
+        x1 = np.array(self.sensor[0].spot_cln["x"]) - o1
+        y1 = np.array(self.sensor[0].spot_cln["y"]) - o2
+        x2 = np.array(self.sensor[1].spot_cln["x"]) - o3
+        y2 = np.array(self.sensor[1].spot_cln["y"]) - o4
 
         self.ccd1_scatter = figure(title="Spots Grid:" + self.name_ccd1, x_axis_label='x',
                                    y_axis_label='y', tools=self.TOOLS)
@@ -1064,15 +1093,14 @@ class ccd_spacing():
             self.gX2 += self.grid["DX"]
             self.gY2 += self.grid["DY"]
 
-
         # Need an intelligent guess
 
-        model_grid1 = self.data_2_model(srcX=self.srcX[0], srcY=self.srcY[0],
+        model_grid1 = self.data_2_model(srcX=self.sensor[0].spot_cln["x"], srcY=self.sensor[0].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x0, y0_guess=self.grid_y0,
                                         distortions=distortions)
 
-        model_grid2 = self.data_2_model(srcX=self.srcX[1], srcY=self.srcY[1],
+        model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_cln["x"], srcY=self.sensor[1].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
                                         distortions=distortions)
