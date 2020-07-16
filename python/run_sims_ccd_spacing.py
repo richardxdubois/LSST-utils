@@ -98,14 +98,9 @@ for combos in config:
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
-        if cS.ccd_relative_orientation == "vertical":
-            fx.append(cS.dy0)
-            fy.append(cS.dx0)
-            ftheta.append(cS.dtheta0)
-        else:
-            fx.append(-cS.dx0)
-            fy.append(-cS.dy0)
-            ftheta.append(-cS.dtheta0)
+        fx.append(cS.dy0)
+        fy.append(cS.dx0)
+        ftheta.append(cS.dtheta0)
 
     rc = cS.make_plots()
     line_layout = cS.make_line_plots()
@@ -115,17 +110,9 @@ for combos in config:
 
     c2c = cS.center_to_center
 
-    if cS.ccd_relative_orientation == "horizontal":
-        x.append(str(-c2c[0]))
-        y.append(str(-c2c[1]))
-        a = -c2c[0]
-        c2c[0] = c2c[1]
-        c2c[1] = a
-        sdiff.append(-cS.mean_slope_diff)
-    else:
-        x.append(str(c2c[0]))
-        y.append(str(c2c[1]))
-        sdiff.append(cS.mean_slope_diff)
+    x.append(str(c2c[0]))
+    y.append(str(c2c[1]))
+    sdiff.append(cS.mean_slope_diff)
 
     x_o.append(c2c[0])
     y_o.append(c2c[1])

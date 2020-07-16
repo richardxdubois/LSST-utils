@@ -63,14 +63,9 @@ for combos in cS.file_paths:
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
-        if cS.ccd_relative_orientation == "vertical":
-            fx.append(cS.dy0)
-            fy.append(cS.dx0)
-            ftheta.append(cS.dtheta0)
-        else:
-            fx.append(-cS.dx0)
-            fy.append(-cS.dy0)
-            ftheta.append(-cS.dtheta0)
+        fx.append(cS.dy0)
+        fy.append(cS.dx0)
+        ftheta.append(cS.dtheta0)
 
     rc = cS.make_plots()
     line_layout = cS.make_line_plots()
@@ -80,15 +75,8 @@ for combos in cS.file_paths:
 
     c2c = cS.center_to_center
 
-    if cS.ccd_relative_orientation == "horizontal":
-        x.append(str(-c2c[0]))
-        y.append(str(-c2c[1]))
-        a = -c2c[0]
-        c2c[0] = c2c[1]
-        c2c[1] = a
-    else:
-        x.append(str(c2c[0]))
-        y.append(str(c2c[1]))
+    x.append(str(c2c[0]))
+    y.append(str(c2c[1]))
 
     x_o.append(c2c[0])
     y_o.append(c2c[1])
@@ -130,7 +118,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=900, height=650)
+results_table = DataTable(source=results_source, columns=results_columns, width=950, height=650)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]

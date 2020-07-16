@@ -484,6 +484,10 @@ class ccd_spacing():
         num_spots.extend(num_spots2)
         print("Total spots = ", sum(num_spots))
 
+        coord = 0
+        if self.ccd_relative_orientation == "horizontal":
+            coord = 1
+
         slopes = []
         slopes_ccd1 = []
         slopes_ccd2 = []
@@ -623,17 +627,23 @@ class ccd_spacing():
                 n_spots = len(self.sensor[l].lines[nl])
                 xp = -1.
                 yp = -1.
+                c_diff = -1.
                 for s in range(n_spots):
                     x0 = self.sensor[l].lines[nl][s][0]
                     y0 = self.sensor[l].lines[nl][s][1]
-                    y0_fit = self.sensor[l].linfits[nl][0] * x0 + self.sensor[l].linfits[nl][1]
-                    y_diff = y0_fit - y0
-                    res.append(y_diff + 1.)
+                    if self.ccd_relative_orientation == "vertical":  # get perpendicular coord residual
+                        y0_fit = self.sensor[l].linfits[nl][0] * x0 + self.sensor[l].linfits[nl][1]
+                        c_diff = y0_fit - y0
+                    else:
+                        x0_fit = (y0 - self.sensor[l].linfits[nl][1])/self.sensor[l].linfits[nl][0]
+                        c_diff = x0_fit - x0
+
+                    res.append(c_diff + 1.)
 
                     # find spots along the gaps
                     if (self.ccd_standard == l and s == 0) or \
                             (self.ccd_standard != l and s == (n_spots - 1)):
-                        g_res.append(y_diff)
+                        g_res.append(c_diff)
 
                     d = 0.
                     if (xp != -1.):
@@ -645,7 +655,7 @@ class ccd_spacing():
 
                     x_spot.append(x0 - off_ccd[l][0])
                     y_spot.append(y0 - off_ccd[l][1])
-                    res_spot.append(abs(y_diff))
+                    res_spot.append(abs(c_diff))
                     pitch_spot.append(d)
 
             resid, bins = np.histogram(np.array(res), bins=200, range=(-2., 2.))
@@ -782,7 +792,8 @@ class ccd_spacing():
             self.shift_x.append(old_x - new_x)
             self.shift_y.append(old_y - new_y)
 
-            slope_difference.append(self.sensor[1].linfits[nl][0] - self.sensor[0].linfits[nl][0])
+            slope_difference.append(math.atan(self.sensor[1].linfits[nl][0]) -
+                                    math.atan(self.sensor[0].linfits[nl][0]))
 
         print("Found internal holes: ", internal_hole_sums)
 
