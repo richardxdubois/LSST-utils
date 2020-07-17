@@ -51,6 +51,7 @@ urls = []
 fx = []
 fy = []
 ftheta = []
+st_name = []
 
 config = {}
 # configs are: distort on/off; offset; rotation; orientation
@@ -116,6 +117,7 @@ for combos in config:
 
     x_o.append(c2c[0])
     y_o.append(c2c[1])
+    st_name.append(cS.names_ccd[cS.ccd_standard])
 
     o_name = str(combos) + "_plots.html"
     url_link = args.url_base + o_name
@@ -136,6 +138,7 @@ else:
 results_columns = [
     TableColumn(field="names", title="Raft-sensors", width=50),
     TableColumn(field="o", title="Sensor Orientation", width=50),
+    TableColumn(field="st_name", title="Ref CCD", width=30),
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="y", title="y offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="sdiff", title="slopes diff (rad)", width=50, formatter=NumberFormatter(format='0.0000'))
@@ -153,7 +156,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=900, height=650)
+results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=650)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]

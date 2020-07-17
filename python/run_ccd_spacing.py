@@ -49,6 +49,7 @@ urls = []
 fx = []
 fy = []
 ftheta = []
+st_name = []
 
 for combos in cS.file_paths:
     try:
@@ -81,6 +82,7 @@ for combos in cS.file_paths:
     x_o.append(c2c[0])
     y_o.append(c2c[1])
     sdiff.append(cS.mean_slope_diff)
+    st_name.append(cS.names_ccd[cS.ccd_standard])
 
     o_name = combos + "_plots.html"
     url_link = args.url_base + o_name
@@ -94,13 +96,14 @@ print("Found ", successes, " good filesets and", problems, " problem filesets")
 
 if args.dofit:
     results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, fx=fx, fy=fy, ftheta=ftheta,
-                                           sdiff=sdiff, url=urls))
+                                           sdiff=sdiff, st_name=st_name, url=urls))
 else:
-    results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, url=urls))
+    results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, st_name=st_name, url=urls))
 
 results_columns = [
     TableColumn(field="names", title="Raft-sensors", width=50),
     TableColumn(field="o", title="Sensor Orientation", width=50),
+    TableColumn(field="st_name", title="Ref CCD", width=30),
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="y", title="y offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="sdiff", title="slopes diff (rad)", width=50, formatter=NumberFormatter(format='0.0000'))
@@ -118,7 +121,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=950, height=650)
+results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=650)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
