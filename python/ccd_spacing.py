@@ -603,7 +603,9 @@ class ccd_spacing():
                             width=600)
 
         off_ccd = [[0., 0.], [0., 0.]]
-        if self.use_offsets:
+        if self.use_fit:
+            off_ccd[self.ccd_standard] = [-self.dx0, -self.dy0]
+        elif self.use_offsets:
             off_ccd = [[self.x0_in, self.y0_in], [self.x1_in, self.y1_in]]
 
         for l in range(2):

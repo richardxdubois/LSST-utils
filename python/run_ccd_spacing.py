@@ -79,8 +79,13 @@ for combos in cS.file_paths:
     x.append(str(c2c[0]))
     y.append(str(c2c[1]))
 
-    x_o.append(c2c[0])
-    y_o.append(c2c[1])
+    if abs(c2c[0]) < 2000:  # "short" direction
+        x_o.append(c2c[0])
+        y_o.append(c2c[1])
+    else:  # "long" direction
+        x_o.append(c2c[1])
+        y_o.append(c2c[0])
+
     sdiff.append(cS.mean_slope_diff)
     st_name.append(cS.names_ccd[cS.ccd_standard])
 
@@ -125,13 +130,13 @@ results_table = DataTable(source=results_source, columns=results_columns, width=
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
-x_hist = figure(tools=cS.TOOLS, title="x offsets", x_axis_label='offsets (px)',
+x_hist = figure(tools=cS.TOOLS, title="short offsets", x_axis_label='offsets (px)',
                 y_axis_label='counts', height=300, width=600)
 x_hist.vbar(top=x_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
 y_off, bins = np.histogram(np.array(y_o), bins=10)
 w = bins[1] - bins[0]
-y_hist = figure(tools=cS.TOOLS, title="y offsets", x_axis_label='offsets (px)',
+y_hist = figure(tools=cS.TOOLS, title="long offsets", x_axis_label='offsets (px)',
                 y_axis_label='counts', height=300, width=600)
 y_hist.step(y=y_off, x=bins[:-1] + w / 2.)
 y_hist.vbar(top=y_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
