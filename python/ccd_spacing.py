@@ -344,9 +344,13 @@ class ccd_spacing():
         self.layout.children = m_new.children
 
     def do_fit(self):
-        rc = self.match()
         self.use_fit = True
+        rc = self.match()
         self.redo_fit = False
+        # set slider values to zero to be offsets from grid centers
+        self.slider_x.value = (0., 0.)
+        self.slider_y.value = (0., 0.)
+
         pl = self.make_plots()
         m_new = column(self.max_layout, pl)
         self.layout.children = m_new.children
@@ -354,7 +358,13 @@ class ccd_spacing():
 
     def do_submit(self):
         self.use_offsets = True
-        self.use_fit = False
+        #self.use_fit = False
+        if self.use_fit:
+            self.grid_x0 += self.slider_x.value[0]
+            self.grid_y0 += self.slider_y.value[0]
+            self.grid_x1 += self.slider_x.value[1]
+            self.grid_y1 += self.slider_y.value[1]
+
         pl = self.make_plots()
         m_new = column(self.max_layout, pl)
         self.layout.children = m_new.children
@@ -1089,7 +1099,7 @@ class ccd_spacing():
 
     def match(self):
 
-        print("start fitting")
+        print("start fitting with guesses ", self.grid_x0, self.grid_y0, self.grid_x1, self.grid_y1)
         distortions = None
         if self.grid is None:
             self.grid = DistortedGrid.from_fits(self.grid_data_file)
@@ -1121,11 +1131,19 @@ class ccd_spacing():
         print('Grid 1:', model_grid1.x0, model_grid1.y0, model_grid1.theta)
         print('Grid 2:', model_grid2.x0, model_grid2.y0, model_grid2.theta)
 
-        # Ignore rotation for now
+
         self.dy0 = model_grid2.y0 - model_grid1.y0
         self.dx0 = model_grid2.x0 - model_grid1.x0
         self.dtheta0 = model_grid2.theta - model_grid1.theta
-        print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0 )
+        print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0)
+
+        # reset grid guesses
+
+        self.grid_x0 = model_grid1.x0
+        self.grid_x1 = model_grid2.x0
+        self.grid_y0 = model_grid1.y0
+        self.grid_y1 = model_grid2.y0
+
 
     def simulate_response(self, distort=False):
 
