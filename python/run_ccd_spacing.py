@@ -106,7 +106,7 @@ else:
     results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, st_name=st_name, url=urls))
 
 results_columns = [
-    TableColumn(field="names", title="Raft-sensors", width=50),
+    TableColumn(field="names", title="Raft-sensors", width=75),
     TableColumn(field="o", title="Sensor Orientation", width=50),
     TableColumn(field="st_name", title="Ref CCD", width=30),
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
