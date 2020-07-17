@@ -51,6 +51,7 @@ urls = []
 fx = []
 fy = []
 ftheta = []
+st_name = []
 
 config = {}
 # configs are: distort on/off; offset; rotation; orientation
@@ -98,14 +99,9 @@ for combos in config:
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
-        if cS.ccd_relative_orientation == "vertical":
-            fx.append(cS.dy0)
-            fy.append(cS.dx0)
-            ftheta.append(cS.dtheta0)
-        else:
-            fx.append(-cS.dx0)
-            fy.append(-cS.dy0)
-            ftheta.append(-cS.dtheta0)
+        fx.append(cS.dy0)
+        fy.append(cS.dx0)
+        ftheta.append(cS.dtheta0)
 
     rc = cS.make_plots()
     line_layout = cS.make_line_plots()
@@ -115,20 +111,17 @@ for combos in config:
 
     c2c = cS.center_to_center
 
-    if cS.ccd_relative_orientation == "horizontal":
-        x.append(str(-c2c[0]))
-        y.append(str(-c2c[1]))
-        a = -c2c[0]
-        c2c[0] = c2c[1]
-        c2c[1] = a
-        sdiff.append(-cS.mean_slope_diff)
-    else:
-        x.append(str(c2c[0]))
-        y.append(str(c2c[1]))
-        sdiff.append(cS.mean_slope_diff)
+    x.append(str(c2c[0]))
+    y.append(str(c2c[1]))
+    sdiff.append(cS.mean_slope_diff)
 
-    x_o.append(c2c[0])
-    y_o.append(c2c[1])
+    if abs(c2c[0]) < 2000:  # "short" direction
+        x_o.append(c2c[0])
+        y_o.append(c2c[1])
+    else:  # "long" direction
+        x_o.append(c2c[1])
+        y_o.append(c2c[0])
+    st_name.append(cS.names_ccd[cS.ccd_standard])
 
     o_name = str(combos) + "_plots.html"
     url_link = args.url_base + o_name
@@ -142,13 +135,14 @@ print("Found ", successes, " good filesets and", problems, " problem filesets")
 
 if args.dofit:
     results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, fx=fx, fy=fy, ftheta=ftheta,
-                                           sdiff=sdiff, url=urls))
+                                           sdiff=sdiff, st_name=st_name, url=urls))
 else:
     results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, url=urls))
 
 results_columns = [
-    TableColumn(field="names", title="Raft-sensors", width=50),
+    TableColumn(field="names", title="Raft-sensors", width=75),
     TableColumn(field="o", title="Sensor Orientation", width=50),
+    TableColumn(field="st_name", title="Ref CCD", width=30),
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="y", title="y offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="sdiff", title="slopes diff (rad)", width=50, formatter=NumberFormatter(format='0.0000'))
@@ -166,7 +160,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=900, height=650)
+results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=650)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
