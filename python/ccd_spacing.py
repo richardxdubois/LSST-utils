@@ -832,7 +832,7 @@ class ccd_spacing():
 
     def guess_grid_centers(self):
 
-        # estimate grid center from line 24
+        # estimate grid center from lines around line 24
 
         non_standard = 1 - self.ccd_standard
         near_end = 0
@@ -843,21 +843,43 @@ class ccd_spacing():
 
         nl = 24
 
-        x10 = self.sensor[self.ccd_standard].lines[nl][near_end][0]
-        y10 = self.sensor[self.ccd_standard].linfits[nl][1] + \
-             self.sensor[self.ccd_standard].linfits[nl][0] * x10
-        x21 = self.sensor[non_standard].lines[nl][far_end][0]
-        y21 = self.sensor[non_standard].linfits[nl][1] + \
-              self.sensor[non_standard].linfits[nl][0] * x21
+        x10_list = []
+        y10_list = []
+        x21_list = []
+        y21_list = []
+        x_shift_list = []
+        y_shift_list = []
 
-        x21 -= self.shift_x[nl]
-        y21 -= self.shift_y[nl]
+        for num_lin in range(nl-2, nl+3):
+            x10 = self.sensor[self.ccd_standard].lines[num_lin][near_end][0]
+            y10 = self.sensor[self.ccd_standard].linfits[num_lin][1] + \
+                 self.sensor[self.ccd_standard].linfits[num_lin][0] * x10
+            x21 = self.sensor[non_standard].lines[num_lin][far_end][0]
+            y21 = self.sensor[non_standard].linfits[num_lin][1] + \
+                  self.sensor[non_standard].linfits[num_lin][0] * x21
 
-        self.grid_x0 = (x21 + x10)/2.
-        self.grid_y0 = (y21 + y10)/2.
+            x21 -= self.shift_x[num_lin]
+            y21 -= self.shift_y[num_lin]
 
-        self.grid_x1 = self.grid_x0 + self.shift_x[nl]
-        self.grid_y1 = self.grid_y0 + self.shift_y[nl]
+            x10_list.append(x10)
+            y10_list.append(y10)
+            x21_list.append(x21)
+            y21_list.append(y21)
+            x_shift_list.append(self.shift_x[num_lin])
+            y_shift_list.append(self.shift_y[num_lin])
+
+        x10_med = np.median(np.array(x10_list))
+        y10_med = np.median(np.array(y10_list))
+        x21_med = np.median(np.array(x21_list))
+        y21_med = np.median(np.array(y21_list))
+        x_shift = np.median(np.array(x_shift_list))
+        y_shift = np.median(np.array(y_shift_list))
+
+        self.grid_x0 = (x21_med + x10_med)/2.
+        self.grid_y0 = (y21_med + y10_med)/2.
+
+        self.grid_x1 = self.grid_x0 + x_shift
+        self.grid_y1 = self.grid_y0 + y_shift
 
         return
 
@@ -1143,7 +1165,6 @@ class ccd_spacing():
         self.grid_x1 = model_grid2.x0
         self.grid_y0 = model_grid1.y0
         self.grid_y1 = model_grid2.y0
-
 
     def simulate_response(self, distort=False):
 
