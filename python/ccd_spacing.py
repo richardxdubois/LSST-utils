@@ -878,7 +878,7 @@ class ccd_spacing():
         self.grid_x0 = (x21_med + x10_med)/2.
         self.grid_y0 = (y21_med + y10_med)/2.
 
-        self.grid_x1 = self.grid_x0 + x_shift
+        self.grid_x1 = (self.grid_x0 + x_shift)*1.006  # ad hoc scale factor to nudge most of the off by 1 spotters
         self.grid_y1 = self.grid_y0 + y_shift
 
         return
