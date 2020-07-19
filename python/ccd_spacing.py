@@ -685,6 +685,27 @@ class ccd_spacing():
 
             pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
+        grid_width = []
+        for num_lin in range(n_lines):  # end to end grid width
+            x10 = self.sensor[self.ccd_standard].lines[num_lin][-1][0]
+            y10 = self.sensor[self.ccd_standard].linfits[num_lin][1] + \
+                 self.sensor[self.ccd_standard].linfits[num_lin][0] * x10
+            x21 = self.sensor[1-self.ccd_standard].lines[num_lin][0][0]
+            y21 = self.sensor[1-self.ccd_standard].linfits[num_lin][1] + \
+                  self.sensor[1-self.ccd_standard].linfits[num_lin][0] * x21
+
+            x21 -= self.shift_x[num_lin]
+            y21 -= self.shift_y[num_lin]
+            dist = math.hypot(x21-x10, y21-y10)/self.pitch  # distance in spots
+            grid_width.append(dist)
+
+        gw, bins = np.histogram(np.array(grid_width), bins=50)
+        w = bins[1] - bins[0]
+        gw_hist = figure(tools=self.TOOLS, title="Grid width ", x_axis_label='width (spots)',
+                            y_axis_label='counts',
+                            width=600)
+        gw_hist.vbar(top=gw, x=bins[:-1], width=bins[1]-bins[0], fill_color='red', fill_alpha=0.2)
+
         cds_spot = ColumnDataSource(dict(x=x_spot, y=y_spot, res=res_spot, pitch=pitch_spot))
 
         spot_heat = figure(title="Spots Grid: spot pitch " + self.raft_ccd_combo, x_axis_label='x',
@@ -706,8 +727,9 @@ class ccd_spacing():
         res_heat.add_layout(c_color_bar_res, 'below')
 
         hist_list.append([r_hist, pitch_hist])
-        hist_list.append([gr_hist, spot_heat])
-        hist_list.append([res_heat, self.ccd1_scatter])
+        hist_list.append([gr_hist, gw_hist])
+        hist_list.append([res_heat, spot_heat])
+        hist_list.append([self.ccd1_scatter])
 
         print("Mean spot pitch 0: ", np.mean(np.array(spot_pitch[0])), " 1: ", np.mean(np.array(spot_pitch[1])))
         mean_delta_slope = np.mean(np.array(slopes_diff))
@@ -878,7 +900,7 @@ class ccd_spacing():
         self.grid_x0 = (x21_med + x10_med)/2.
         self.grid_y0 = (y21_med + y10_med)/2.
 
-        self.grid_x1 = (self.grid_x0 + x_shift)*1.006  # ad hoc scale factor to nudge most of the off by 1 spotters
+        self.grid_x1 = self.grid_x0 + x_shift
         self.grid_y1 = self.grid_y0 + y_shift
 
         return
