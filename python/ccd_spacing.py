@@ -685,12 +685,18 @@ class ccd_spacing():
 
             pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
+        far = -1
+        near = 0
+        if self.ccd_relative_orientation == "horizontal":
+            far = 0
+            near = -1
+
         grid_width = []
         for num_lin in range(n_lines):  # end to end grid width
-            x10 = self.sensor[self.ccd_standard].lines[num_lin][-1][0]
+            x10 = self.sensor[self.ccd_standard].lines[num_lin][far][0]
             y10 = self.sensor[self.ccd_standard].linfits[num_lin][1] + \
                  self.sensor[self.ccd_standard].linfits[num_lin][0] * x10
-            x21 = self.sensor[1-self.ccd_standard].lines[num_lin][0][0]
+            x21 = self.sensor[1-self.ccd_standard].lines[num_lin][near][0]
             y21 = self.sensor[1-self.ccd_standard].linfits[num_lin][1] + \
                   self.sensor[1-self.ccd_standard].linfits[num_lin][0] * x21
 
@@ -1138,6 +1144,10 @@ class ccd_spacing():
             if self.overlay_grid and self.use_fit:
                 p2.circle(x="x", y="y", source=source_g, color="gray")
             plots_layout = layout(row(self.ccd1_scatter, p2))
+
+        if self.use_fit:
+            self.ccd1_scatter.circle(x=self.grid_x0-o1, y=self.grid_y0-o2, color="black")
+            self.ccd1_scatter.circle(x=self.grid_x1-o3, y=self.grid_y1-o4, color="green")
 
         return plots_layout
 
