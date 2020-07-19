@@ -19,6 +19,8 @@ parser.add_argument('-c', '--combo', default='R22_S10_S11', help="raft, sensor c
 parser.add_argument('-f', '--dofit', default='yes', help="do full fit yes/no")
 parser.add_argument('-o', '--output', default='/Users/richard/LSST/Code/misc/CCD_grids/',
                     help="output directory path")
+parser.add_argument('--out_params', default='CCD_grids_params.csv',
+                    help="output params file spec")
 parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
                     help="base html path")
 parser.add_argument('-g', '--grid', default=
@@ -35,7 +37,7 @@ cS.overlay_ccd = True
 cS.sim_distort = True
 
 # loop over file sets
-out_lines = []
+
 problems = 0
 successes = 0
 names = []
@@ -58,8 +60,6 @@ for combos in cS.file_paths:
         problems += 1
         continue
     successes += 1
-    out_str = combos + " " + str(cS.ccd_relative_orientation) + " " + str(cS.center_to_center) + "\n"
-    out_lines.append(out_str)
 
     if args.dofit == "yes":
         cS.use_fit = True
@@ -164,3 +164,20 @@ if args.dofit:
 
 output_file(args.output + "CCD_grids.html")
 save(out_lay, title="CCD grid plots")
+
+# write out results to csv file
+
+f = open(args.out_params, "w+")
+
+header_line = "name, orientation, ref_CCD, dx_line, dy_line, dtheta_line, dx_fit, dy_fit, dtheta_fit \n"
+f.write(header_line)
+
+for idn, name in enumerate(names):
+
+    line_out = str(name) + ", " + str(orient[idn]) + ", " + str(st_name[idn]) + ", " + str(x[idn]) + ", ", \
+               str(y[idn]) + \
+               ", " + str(sdiff[idn]) + ", " + str(fx[idn]) + ", " + str(fy[idn]) + ", " + str(ftheta[idn]) + " \n"
+
+    f.write("".join(line_out))
+
+f.close()

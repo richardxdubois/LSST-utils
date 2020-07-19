@@ -1056,8 +1056,8 @@ class ccd_spacing():
 
         out_x = []
         out_y = []
-        median_x = np.median(np.array(sensor["x"]))
-        median_y = np.median(np.array(sensor["y"]))
+        median_x = np.nanmedian(np.array(sensor["x"]))
+        median_y = np.nanmedian(np.array(sensor["y"]))
 
         box_x = 16
         box_y = 27
@@ -1073,6 +1073,8 @@ class ccd_spacing():
         y_max = median_y + dist_y
 
         for n, x in enumerate(sensor["x"]):
+            if np.isnan(x) or np.isnan(sensor["y"][n]):  # there be nan's in the input data!
+                continue
             if x > x_min and x < x_max and \
                     sensor["y"][n] > y_min and sensor["y"][n] < y_max:
                 out_x.append(x)
