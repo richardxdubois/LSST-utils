@@ -57,6 +57,7 @@ for combos in cS.file_paths:
     try:
         rc = cS.get_data(combo_name=combos)
     except ValueError:
+        print("run_ccd_spacing - problem with ", combos)
         problems += 1
         continue
     successes += 1
@@ -126,7 +127,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=650)
+results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=1000)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
