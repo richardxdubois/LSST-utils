@@ -127,7 +127,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=1000)
+results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=1200)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
@@ -170,7 +170,7 @@ save(out_lay, title="CCD grid plots")
 
 f = open(args.out_params, "w+")
 
-header_line = "name, orientation, ref_CCD, dx_line, dy_line, dtheta_line, dx_fit, dy_fit, dtheta_fit \n"
+header_line = "name, orientation, ref_CCD, dx_line, dy_line, dtheta_line, dx_fit, dy_fit, dtheta_fit\n"
 f.write(header_line)
 
 for idn, name in enumerate(names):

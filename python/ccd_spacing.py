@@ -468,7 +468,7 @@ class ccd_spacing():
 
         if len(ccd) != self.num_spots:
             print(self.raft_ccd_combo + ": Problem finding full grid: found ", len(ccd),
-                  " spots")
+                  " lines")
             raise ValueError
 
         # sort lists by x
@@ -1038,7 +1038,8 @@ class ccd_spacing():
 
                     self.sensor[s].linfits[lines] = [slope, intercept]
 
-        rc = self.match_lines()
+        if self.line_fitting:
+            rc = self.match_lines()
 
         num_spots_cln_0 = len(self.sensor[0].spot_cln["x"])
         num_spots_cln_1 = len(self.sensor[1].spot_cln["x"])
