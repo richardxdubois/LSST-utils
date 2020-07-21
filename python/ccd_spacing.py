@@ -687,9 +687,9 @@ class ccd_spacing():
 
         far = -1
         near = 0
-        if self.ccd_relative_orientation == "vertical":
-            far = 0
-            near = -1
+        #if self.ccd_relative_orientation == "vertical":
+        #    far = 0
+        #    near = -1
 
         grid_width = []
         for num_lin in range(n_lines):  # end to end grid width
@@ -853,11 +853,18 @@ class ccd_spacing():
         self.med_shift_y = np.median(np.array(self.shift_y))
         self.mean_slope_diff = np.mean(np.array(slope_difference))
 
-        self.x1_in = self.med_shift_x * (1.-2.*self.ccd_standard)  # to fix - only 1 dim shifts
-        self.y1_in = 2000. + self.med_shift_y * (1.-2.*self.ccd_standard)
+        if self.ccd_standard == 0:
+            self.x1_in = self.med_shift_x
+            self.y1_in = 2000. + self.med_shift_y
 
-        self.x0_in = 0.
-        self.y0_in = 2000.
+            self.x0_in = 0.
+            self.y0_in = 2000.
+        else:
+            self.x0_in = self.med_shift_x
+            self.y0_in = 2000. + self.med_shift_y
+
+            self.x1_in = 0.
+            self.y1_in = 2000.
 
         centers = [2048., 2048.]
 
@@ -882,9 +889,11 @@ class ccd_spacing():
         non_standard = 1 - self.ccd_standard
         near_end = 0
         far_end = -1
-        if self.ccd_relative_orientation == "horizontal":
+        if self.ccd_standard == 1:
             far_end = 0
             near_end = -1
+
+        sgn = 2.*self.ccd_standard - 1.
 
         nl = 24
 
@@ -895,13 +904,14 @@ class ccd_spacing():
         x_shift_list = []
         y_shift_list = []
 
+        #  always zero and one going into the fitter
         for num_lin in range(nl-2, nl+3):
-            x10 = self.sensor[self.ccd_standard].lines[num_lin][near_end][0]
-            y10 = self.sensor[self.ccd_standard].linfits[num_lin][1] + \
-                 self.sensor[self.ccd_standard].linfits[num_lin][0] * x10
-            x21 = self.sensor[non_standard].lines[num_lin][far_end][0]
-            y21 = self.sensor[non_standard].linfits[num_lin][1] + \
-                  self.sensor[non_standard].linfits[num_lin][0] * x21
+            x10 = self.sensor[0].lines[num_lin][near_end][0]
+            y10 = self.sensor[0].linfits[num_lin][1] + \
+                 self.sensor[0].linfits[num_lin][0] * x10
+            x21 = self.sensor[1].lines[num_lin][far_end][0]
+            y21 = self.sensor[1].linfits[num_lin][1] + \
+                  self.sensor[1].linfits[num_lin][0] * x21
 
             x21 -= self.shift_x[num_lin]
             y21 -= self.shift_y[num_lin]
@@ -920,11 +930,18 @@ class ccd_spacing():
         x_shift = np.median(np.array(x_shift_list))
         y_shift = np.median(np.array(y_shift_list))
 
-        self.grid_x0 = (x21_med + x10_med)/2.
-        self.grid_y0 = (y21_med + y10_med)/2.
+        if self.ccd_standard == 0:
+            self.grid_x0 = (x21_med + x10_med)/2.
+            self.grid_y0 = (y21_med + y10_med)/2.
 
-        self.grid_x1 = self.grid_x0 + x_shift
-        self.grid_y1 = self.grid_y0 + y_shift
+            self.grid_x1 = self.grid_x0 + x_shift
+            self.grid_y1 = self.grid_y0 + y_shift
+        else:
+            self.grid_x1 = (x21_med + x10_med) / 2.
+            self.grid_y1 = (y21_med + y10_med) / 2.
+
+            self.grid_x0 = self.grid_x1 + x_shift
+            self.grid_y0 = self.grid_y1 + y_shift
 
         return
 
