@@ -421,7 +421,7 @@ class ccd_spacing():
 
     def find_lines(self, x_in, y_in):
 
-        if self.ccd_relative_orientation == "vertical":
+        if self.ccd_relative_orientation == "horizontal":
             x_use = x_in
             y_use = y_in
         else:
@@ -461,7 +461,7 @@ class ccd_spacing():
             if line_bin > 48:  # spurious high point
                 continue
             fl = ccd.setdefault(line_bin, [])
-            if self.ccd_relative_orientation == "vertical":
+            if self.ccd_relative_orientation == "horizontal":
                 ccd[line_bin].append([x[idy], y[idy]])
             else:
                 ccd[line_bin].append([y[idy], x[idy]])
@@ -495,7 +495,7 @@ class ccd_spacing():
         print("Total spots = ", sum(num_spots))
 
         coord = 0
-        if self.ccd_relative_orientation == "horizontal":
+        if self.ccd_relative_orientation == "vertical":
             coord = 1
 
         slopes = []
@@ -643,7 +643,7 @@ class ccd_spacing():
                 for s in range(n_spots):
                     x0 = self.sensor[l].lines[nl][s][0]
                     y0 = self.sensor[l].lines[nl][s][1]
-                    if self.ccd_relative_orientation == "vertical":  # get perpendicular coord residual
+                    if self.ccd_relative_orientation == "horizontal":  # get perpendicular coord residual
                         y0_fit = self.sensor[l].linfits[nl][0] * x0 + self.sensor[l].linfits[nl][1]
                         c_diff = y0_fit - y0
                     else:
@@ -687,7 +687,7 @@ class ccd_spacing():
 
         far = -1
         near = 0
-        if self.ccd_relative_orientation == "horizontal":
+        if self.ccd_relative_orientation == "vertical":
             far = 0
             near = -1
 
@@ -784,9 +784,19 @@ class ccd_spacing():
 
         self.ccd_standard = 0
         non_standard = 1
-        if len(self.sensor[1].lines[self.num_spots-1]) > len(self.sensor[1].lines[0]):
-            self.ccd_standard = 1
-            non_standard = 0
+        #if len(self.sensor[1].lines[self.num_spots-1]) > len(self.sensor[1].lines[0]):
+        #    self.ccd_standard = 1
+        #    non_standard = 0
+
+        if self.ccd_relative_orientation == "vertical":
+            co = 1
+        else:
+            co = 0
+        m_0 = self.sensor[0].lines[0][0][co]
+        m_1 = self.sensor[1].lines[1][0][co]
+        if m_1 < m_0:
+                self.ccd_standard = 1
+                non_standard = 0
 
         n_lines = len(self.sensor[0].lines)   # they'd better both have the same number!
         self.shift_x = []
@@ -808,9 +818,9 @@ class ccd_spacing():
 
             near_end = 0
             far_end = -1
-            if self.ccd_relative_orientation == "horizontal":
-                far_end = 0
-                near_end = -1
+            #if self.ccd_relative_orientation == "vertical":
+            #    far_end = 0
+            #    near_end = -1
 
             x1 = self.sensor[self.ccd_standard].lines[nl][near_end][0]
             y1 = self.sensor[self.ccd_standard].linfits[nl][1] +  \
@@ -820,14 +830,16 @@ class ccd_spacing():
                  self.sensor[self.ccd_standard].linfits[nl][0] * x2
 
             length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-            unitSlopeX = self.extrap_dir * (x2 - x1) / length
-            unitSlopeY = self.extrap_dir * (y2 - y1) / length
 
-            new_x = x1 - extrap_dist * unitSlopeX * self.extrap_dir
-            new_y = y1 - extrap_dist * unitSlopeY * self.extrap_dir
+            unitSlopeX = (x2 - x1) / length
+            unitSlopeY = (y2 - y1) / length
+
+            new_x = x1 - extrap_dist * unitSlopeX
+            new_y = y1 - extrap_dist * unitSlopeY
 
             old_x = self.sensor[non_standard].lines[nl][far_end][0]
-            old_y = self.sensor[non_standard].linfits[nl][1] + self.sensor[non_standard].linfits[nl][0] * old_x
+            old_y = self.sensor[non_standard].linfits[nl][1] + \
+                    self.sensor[non_standard].linfits[nl][0] * old_x
 
             self.shift_x.append(old_x - new_x)
             self.shift_y.append(old_y - new_y)
@@ -841,19 +853,23 @@ class ccd_spacing():
         self.med_shift_y = np.median(np.array(self.shift_y))
         self.mean_slope_diff = np.mean(np.array(slope_difference))
 
-        self.x1_in = self.med_shift_x
-        self.y1_in = 2000. + self.med_shift_y
+        self.x1_in = self.med_shift_x * (1.-2.*self.ccd_standard)  # to fix - only 1 dim shifts
+        self.y1_in = 2000. + self.med_shift_y * (1.-2.*self.ccd_standard)
+
         self.x0_in = 0.
         self.y0_in = 2000.
 
         centers = [2048., 2048.]
-        c1 = [centers[0] - self.y1_in, centers[1] - self.x1_in]
-        c0 = [centers[0] - self.y0_in, centers[1] - self.x0_in]
 
+        c1 = [centers[0] - self.x1_in, centers[1] - self.y1_in]
+        c0 = [centers[0] - self.x0_in, centers[1] - self.y0_in]
         self.center_to_center = np.array(c0) - np.array(c1)
 
-        print("standard CCD ", self.ccd_standard, self.names_ccd[self.ccd_standard])
-        print("(y, x) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
+        print(" x1_in, y1_in = ", self.x1_in, self.y1_in)
+        print("shift x, y = ", self.med_shift_x, self.med_shift_y)
+        print("standard CCD ", self.ccd_standard, self.names_ccd[self.ccd_standard],
+              self.ccd_relative_orientation)
+        print("(x, y) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
 
         rc = self.guess_grid_centers()
 
@@ -964,9 +980,9 @@ class ccd_spacing():
             self.extrap_dir = 1.
 
             if int(s1[1]) == int(s2[1]):
-                self.ccd_relative_orientation = "vertical"
+                self.ccd_relative_orientation = "horizontal"
             else:
-                self.ccd_relative_orientation = "horizontal"  # swap x and y
+                self.ccd_relative_orientation = "vertical"  # swap x and y
                 self.extrap_dir = -1.
 
         if self.show_rotate:
@@ -980,8 +996,6 @@ class ccd_spacing():
             self.srcY[0] = y1_rot
             self.srcX[1] = x2_rot
             self.srcY[1] = y2_rot
-
-        # refactoring to use sensor class
 
         self.sensor = {}
         self.sensor[0] = sensor()
@@ -1019,12 +1033,14 @@ class ccd_spacing():
         for s in self.sensor:
 
             if self.clean:
-                self.sensor[s].spot_cln = self.do_clean(self.sensor[s].spot_input, self.ccd_relative_orientation)
+                self.sensor[s].spot_cln = self.do_clean(self.sensor[s].spot_input,
+                                                        self.ccd_relative_orientation)
 
         # process the data
 
             if self.line_fitting:
-                self.sensor[s].lines = self.find_lines(self.sensor[s].spot_cln["x"], self.sensor[s].spot_cln["y"])
+                self.sensor[s].lines = self.find_lines(self.sensor[s].spot_cln["x"],
+                                                       self.sensor[s].spot_cln["y"])
 
                 self.sensor[s].linfits = {}
                 outliers_count = [0, 0]
@@ -1063,7 +1079,7 @@ class ccd_spacing():
 
         box_x = 16
         box_y = 27
-        if orientation == "horizontal":
+        if orientation == "vertical":
             box_x = 27
             box_y = 16
 
@@ -1134,7 +1150,7 @@ class ccd_spacing():
             c2 = self.ccd1_scatter.circle(x="x", y="y", source=source_2, color="red")
             self.ccd1_scatter.height = 900
             self.ccd1_scatter.width = 900
-            self.ccd1_scatter.title.text = "Spots Grid: " + self.name_ccd2 + " " + self.name_ccd1
+            self.ccd1_scatter.title.text = "Spots Grid: " + self.name_ccd1 + " " + self.name_ccd2
 
             legend_it = [(self.name_ccd1, [c1]), (self.name_ccd2, [c2])]
             if cg is not None:
@@ -1188,7 +1204,6 @@ class ccd_spacing():
 
         print('Grid 1:', model_grid1.x0, model_grid1.y0, model_grid1.theta)
         print('Grid 2:', model_grid2.x0, model_grid2.y0, model_grid2.theta)
-
 
         self.dy0 = model_grid2.y0 - model_grid1.y0
         self.dx0 = model_grid2.x0 - model_grid1.x0

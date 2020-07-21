@@ -23,7 +23,7 @@ args = parser.parse_args()
 print(args.dir)
 cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid)
 
-cS.line_fitting = True
+cS.line_fitting = False
 rc = cS.loop()
 
 curdoc().add_root(cS.layout)
