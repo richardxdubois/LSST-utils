@@ -852,6 +852,7 @@ class ccd_spacing():
 
         self.center_to_center = np.array(c0) - np.array(c1)
 
+        print("standard CCD ", self.ccd_standard, self.names_ccd[self.ccd_standard])
         print("(y, x) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
 
         rc = self.guess_grid_centers()
