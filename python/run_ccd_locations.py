@@ -5,6 +5,64 @@ from bokeh.plotting import curdoc, output_file, save, reset_output, figure
 from bokeh.layouts import row, column, layout
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, NumberFormatter, HTMLTemplateFormatter
 
+
+def dir_signs(current, combo):
+
+    # current is current raft/sensor name: Rab_Scd - it is one of the combo name pairs
+    # combo is the measurement pair - Rij_Skl_Rmn_Sop
+
+    # cross raft boundaries
+
+    # ij != mn
+    #      j==n: i>m - -y ; i<m +y
+    #      i==m: n>j - +x ; j>n -x
+
+    # inside a raft
+
+    #       k==o: p>l - +x; l>p - -x
+    #       l==p: o>k - +y; k>o - -y
+
+    cur_name = current.split("_")
+    cur_r = cur_name[0][-2:]
+    cur_s = cur_name[1][-2:]
+
+    r = [0]*2
+    s = [0]*2
+
+    c_name = combo.split("_")
+    r[0] = c_name[0][-2:]
+    s[0] = c_name[1][-2:]
+
+    r[1] = c_name[2][-2:]
+    s[1] = c_name[3][-2:]
+
+    c_cur = 0
+    c_oth = 1
+    if cur_r == r[1] and cur_s == s[1]:
+        c_cur = 1
+        c_oth = 0
+
+    x_sign = 1.
+    y_sign = 1.
+
+    # now run through the options
+
+    # cross-raft
+
+    if cur_r != r[c_oth]:
+        if int(cur_r[1]) == int(r[c_oth][1]) and int(cur_r[0]) > int(r[c_oth][0]):
+            y_sign = -1.
+        elif int(cur_r[0]) == int(r[c_oth][0]) and int(cur_r[0]) > int(r[c_oth][0]):
+            x_sign = -1.
+    else:
+        if int(cur_s[0]) == int(s[c_oth][0]) and int(cur_s[1]) > int(s[c_oth][1]):
+            x_sign = -1.
+        elif int(cur_s[1]) == int(s[c_oth][1]) and int(cur_s[0]) > int(s[c_oth][0]):
+            y_sign = -1.
+
+    return x_sign, y_sign
+
+
 print("in main")
 
 parser = argparse.ArgumentParser(
@@ -48,7 +106,7 @@ for index, c_row in csv_assign.iterrows():
     st_name.append(c_row["ref_CCD"])
     fx.append(c_row["dx_fit"])
     fy.append(c_row["dy_fit"])
-    ftheta.append(c_row["dtheta_fit "])  # beware the extra blank!
+    ftheta.append(c_row["dtheta_fit"])
 
 print("Found ", len(names), " good filesets")
 
@@ -103,6 +161,8 @@ focal_plane.circle(x=0., y=0., color="green", size=8)
 
 linked = ["R30_S10_R30_S20", "R30_S00_R30_S10", "R20_S20_R30_S00", "R20_S10_R20_S20", "R20_S20_R20_S21",
           "R20_S21_R30_S01", "R30_S01_R30_S11", "R30_S11_R30_S21", "R30_S20_R30_S21"]
+sensors = ["R30_S20", "R30_S10", "R30_S00", "R20_S20",
+           "R20_S21", "R30_S01", "R20_S11", "R20_S21", "R30_S20"]
 
 start_x = 0.
 start_y = 0.
@@ -110,20 +170,20 @@ start_y = 0.
 running_x = start_x
 running_y = start_y
 
-for m in linked[1:]:
+print(linked[0], sensors[0], 0., 0.)
+
+for idm, m in enumerate(linked):
     idl = names.index(m)
-    s_ref = st_name[idl]
-    dirn = -1.
-    if s_ref == m[0:7]:
-        dirn = 1.
+    cur_sensor = sensors[idm]
+    x_sign, y_sign = dir_signs(current=cur_sensor, combo=m)
 
-    dx = x[idl] * dirn
-    dy = y[idl] * dirn
+    dx = -x[idl] * x_sign
+    dy = -y[idl] * y_sign
 
-    running_x += dy
-    running_y += dx
+    running_x += dx
+    running_y += dy
 
-    print(m, s_ref, running_x, running_y)
+    print(m, cur_sensor, running_x, running_y)
 
 
 out_lay = layout(sd_hist, focal_plane)
