@@ -65,8 +65,8 @@ for combos in cS.file_paths:
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
-        fx.append(cS.dy0)
-        fy.append(cS.dx0)
+        fx.append(cS.dx0)
+        fy.append(cS.dy0)
         ftheta.append(cS.dtheta0)
 
     rc = cS.make_plots()
