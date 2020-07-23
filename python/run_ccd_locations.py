@@ -6,7 +6,7 @@ from bokeh.layouts import row, column, layout
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, NumberFormatter, HTMLTemplateFormatter
 
 
-def dir_signs(target, combo):
+def dir_signs(target, combo, standard):
 
     # current is current raft/sensor name: Rab_Scd - it is one of the combo name pairs
     # combo is the measurement pair
@@ -47,6 +47,10 @@ def dir_signs(target, combo):
     x_sign = 1.
     y_sign = 1.
 
+    std_sign = 1.  # account for direction between standard and target
+    if target != standard:
+        std_sign = -1.
+
     # now run through the options
 
     # cross-raft
@@ -54,13 +58,17 @@ def dir_signs(target, combo):
     if cur_r != r[c_oth]:
         if int(cur_r[1]) == int(r[c_oth][1]) and int(cur_r[0]) < int(r[c_oth][0]):
             y_sign = -1.
+            x_sign = std_sign
         elif int(cur_r[0]) == int(r[c_oth][0]) and int(cur_r[0]) < int(r[c_oth][0]):
             x_sign = -1.
+            y_sign = std_sign
     else:
         if int(cur_s[0]) == int(s[c_oth][0]) and int(cur_s[1]) < int(s[c_oth][1]):
             x_sign = -1.
+            y_sign = std_sign
         elif int(cur_s[1]) == int(s[c_oth][1]) and int(cur_s[0]) < int(s[c_oth][0]):
             y_sign = -1.
+            x_sign = std_sign
 
     return x_sign, y_sign
 
@@ -114,12 +122,6 @@ print("Found ", len(names), " good filesets")
 
 TOOLS = "pan, wheel_zoom, box_zoom, reset, save"
 
-sd, bins = np.histogram(np.array(sdiff), bins=10)
-w = bins[1] - bins[0]
-sd_hist = figure(tools=TOOLS, title="rotations (rad)", x_axis_label='rotation (rad)',
-                y_axis_label='counts', height=300, width=600)
-sd_hist.vbar(top=sd, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
-
 # now build the sensor/raft grid
 
 focal_plane = figure(tools=TOOLS, title="Focal plane grid", x_axis_label='pixels',
@@ -172,12 +174,12 @@ start_y = 0.
 running_x = start_x
 running_y = start_y
 
-print(linked[0], sensors[0], 0., 0.)
+print(linked[0], sensors[-1], 0., 0.)
 
 for idm, m in enumerate(linked):
     idl = names.index(m)
     cur_sensor = sensors[idm]
-    x_sign, y_sign = dir_signs(target=cur_sensor, combo=m)
+    x_sign, y_sign = dir_signs(target=cur_sensor, combo=m, standard=st_name[idl])
 
     dx = x[idl] * x_sign
     dy = -y[idl] * y_sign
@@ -185,10 +187,10 @@ for idm, m in enumerate(linked):
     running_x += dx
     running_y += dy
 
-    print(m, cur_sensor, running_x, running_y, "      ", dx, x_sign, dy, y_sign)
+    print(m, cur_sensor, running_x, running_y, "      ", sdiff[idl], dx, x_sign, dy, y_sign)
 
 
-out_lay = layout(sd_hist, focal_plane)
+out_lay = layout(focal_plane)
 
 output_file(args.output + "CCD_locations.html")
 save(out_lay, title="CCD grid locations")
