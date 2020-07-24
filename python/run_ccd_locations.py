@@ -71,6 +71,9 @@ def dir_signs(target, combo, standard):
             y_sign = -1.
             x_sign = std_sign
 
+    x_sign = std_sign
+    y_sign = std_sign
+
     return x_sign, y_sign, std_sign
 
 
@@ -164,10 +167,8 @@ for n in names:
 
 focal_plane.circle(x=0., y=0., color="green", size=8)
 
-linked = ["R30_S10_R30_S20", "R30_S00_R30_S10", "R20_S20_R30_S00", "R20_S20_R20_S21",
-          "R20_S21_R30_S01", "R30_S01_R30_S11", "R30_S11_R30_S21", "R30_S20_R30_S21"]
-sensors = ["R30_S10", "R30_S00", "R20_S20",
-           "R20_S21", "R30_S01", "R30_S11", "R30_S21", "R30_S20"]
+sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R20_S02",
+           "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22", "R30_S21", "R30_S20"]
 
 start_x = 0.
 start_y = 0.
@@ -175,20 +176,38 @@ start_y = 0.
 running_x = start_x
 running_y = start_y
 
-print(linked[0], sensors[-1], 0., 0.)
+print(sensors[-1], 0., 0.)
+rot_angle = 0
+cur_sensor = sensors[-1]  # assumes this is a loop with the starting point == ending point
 
-for idm, m in enumerate(linked):
-    idl = names.index(m)
-    cur_sensor = sensors[idm]
-    x_sign, y_sign, std_sign = dir_signs(target=cur_sensor, combo=m, standard=st_name[idl])
+# find the proper connecting measurement given the current sensor and standard
+for tgt_sensor in sensors:
+    idl = 0
+    # find the connecting measurement for target and current sensor. idl is index into arrays.
+    for ic, c in enumerate(names):
+        if tgt_sensor in c:
+            if cur_sensor in c:
+                idl = ic
 
-    dx0 = x[idl] * x_sign
+    #x_sign, y_sign, std_sign = dir_signs(target=tgt_sensor, combo=names[idl], standard=st_name[idl])
+
+    x_sign = 1.
+    y_sign = 1.
+
+    std_sign = 1.  # account for direction between standard and target
+    if tgt_sensor != st_name[idl]:
+        std_sign = -1.
+        x_sign = std_sign
+        y_sign = std_sign
+
+    dx0 = -x[idl] * x_sign
     dy0 = -y[idl] * y_sign
 
-    # apply the rotation to the deltas, but only after the first connection and invert since going backwards
-    rot_angle = -std_sign*sdiff[idl]
+    # apply running rotation to the deltas, but only after the first connection and invert since going backwards
+    rot_angle -= std_sign*sdiff[idl]
+    rot_angle = 0.
 
-    if idm == 1:
+    if idl == 0:
         dx = dx0
         dy = dy0
     else:
@@ -198,8 +217,10 @@ for idm, m in enumerate(linked):
     running_x += dx
     running_y += dy
 
-    print(m, cur_sensor, running_x, running_y, "      ", sdiff[idl], dx, x_sign, dy, y_sign)
+    print(tgt_sensor, names[idl], running_x, running_y, "      ",
+          st_name[idl], std_sign, sdiff[idl], rot_angle, dx, x_sign, dx0, dy, y_sign, dy0)
 
+    cur_sensor = tgt_sensor
 
 out_lay = layout(focal_plane)
 
