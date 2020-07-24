@@ -130,8 +130,8 @@ TOOLS = "pan, wheel_zoom, box_zoom, reset, save"
 
 focal_plane = figure(tools=TOOLS, title="Focal plane grid", x_axis_label='pixels',
                 y_axis_label='pixels', height=1000, width=1000)
-d_raft = 127000.  # 127 mm between raft centers - per LCA-13381
-d_sensor = 42250.  # 42.25 mm between sensor centers
+d_raft = 12700.  # pixels - 127 mm between raft centers - per LCA-13381
+d_sensor = 4225.  # pixels - 42.25 mm between sensor centers
 
 for rh in range(0, 5):
     for rv in range(0, 5):
@@ -163,7 +163,7 @@ for n in names:
     cy_1 = -2.5*d_raft + (float(r1[0])+0.5)*d_raft + (float(s1[0]) - 1.)*d_sensor
     cx_1 = -2.5*d_raft + (float(r1[1])+0.5)*d_raft + (float(s1[1]) - 1.)*d_sensor
 
-    focal_plane.line([cx_0, cx_1], [cy_0, cy_1], line_color="black", line_width=2)
+    focal_plane.line([cx_0, cx_1], [cy_0, cy_1], line_color="black", line_width=8)
 
 focal_plane.circle(x=0., y=0., color="green", size=8)
 
@@ -179,6 +179,12 @@ running_y = start_y
 print(sensors[-1], 0., 0.)
 rot_angle = 0
 cur_sensor = sensors[-1]  # assumes this is a loop with the starting point == ending point
+
+r0 = cur_sensor[0:3]
+s0 = cur_sensor[4:7]
+
+cy_0 = -2.5 * d_raft + (float(r0[1]) + 0.5) * d_raft + (float(s0[1]) - 1.) * d_sensor
+cx_0 = -2.5 * d_raft + (float(r0[2]) + 0.5) * d_raft + (float(s0[2]) - 1.) * d_sensor
 
 # find the proper connecting measurement given the current sensor and standard
 for tgt_sensor in sensors:
@@ -213,6 +219,16 @@ for tgt_sensor in sensors:
     else:
         dx = dx0 * math.cos(rot_angle) - dy0 * math.sin(rot_angle)
         dy = dx0 * math.sin(rot_angle) + dy0 * math.cos(rot_angle)
+
+    focal_plane.line([cx_0, dx + cx_0],
+                     [cy_0, dy + cy_0],
+                     line_color="red", line_width=2)
+
+    r0 = tgt_sensor[0:3]
+    s0 = tgt_sensor[4:7]
+
+    cy_0 = -2.5 * d_raft + (float(r0[1]) + 0.5) * d_raft + (float(s0[1]) - 1.) * d_sensor
+    cx_0 = -2.5 * d_raft + (float(r0[2]) + 0.5) * d_raft + (float(s0[2]) - 1.) * d_sensor
 
     running_x += dx
     running_y += dy
