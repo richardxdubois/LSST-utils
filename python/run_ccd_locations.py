@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import math
 import pandas
 from bokeh.plotting import curdoc, output_file, save, reset_output, figure
 from bokeh.layouts import row, column, layout
@@ -70,7 +71,7 @@ def dir_signs(target, combo, standard):
             y_sign = -1.
             x_sign = std_sign
 
-    return x_sign, y_sign
+    return x_sign, y_sign, std_sign
 
 
 print("in main")
@@ -179,10 +180,20 @@ print(linked[0], sensors[-1], 0., 0.)
 for idm, m in enumerate(linked):
     idl = names.index(m)
     cur_sensor = sensors[idm]
-    x_sign, y_sign = dir_signs(target=cur_sensor, combo=m, standard=st_name[idl])
+    x_sign, y_sign, std_sign = dir_signs(target=cur_sensor, combo=m, standard=st_name[idl])
 
-    dx = x[idl] * x_sign
-    dy = -y[idl] * y_sign
+    dx0 = x[idl] * x_sign
+    dy0 = -y[idl] * y_sign
+
+    # apply the rotation to the deltas, but only after the first connection and invert since going backwards
+    rot_angle = -std_sign*sdiff[idl]
+
+    if idm == 1:
+        dx = dx0
+        dy = dy0
+    else:
+        dx = dx0 * math.cos(rot_angle) - dy0 * math.sin(rot_angle)
+        dy = dx0 * math.sin(rot_angle) + dy0 * math.cos(rot_angle)
 
     running_x += dx
     running_y += dy
