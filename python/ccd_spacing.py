@@ -970,13 +970,13 @@ class ccd_spacing():
         infile2 = None
 
         if self.sim_doit:
-            if self.ccd_relative_orientation == "vertical":
+            if self.ccd_relative_orientation == "horizontal":
                 X1 = self.sim_x[0]
                 Y1 = self.sim_y[0]
                 self.extrap_dir = 1.
             else:  # swap x and y for horizontal pairing
-                Y1 = self.sim_x[0]
-                X1 = self.sim_y[0]
+                X1 = self.sim_x[0]
+                Y1 = self.sim_y[0]
                 self.extrap_dir = -1.
         else:
             dir_index = self.file_paths[combo_name]
