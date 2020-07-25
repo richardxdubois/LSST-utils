@@ -1058,17 +1058,63 @@ class ccd_spacing():
             if self.line_fitting:
                 self.sensor[s].lines = self.find_lines(self.sensor[s].spot_cln["x"],
                                                        self.sensor[s].spot_cln["y"])
+                # decide which CCD is the standard - the other is then measured relative to it. Pick the one that
+                # is fatter on top.
+
+        if self.line_fitting:
+
+            self.ccd_standard = 0
+            non_standard = 1
+            # if len(self.sensor[1].lines[self.num_spots-1]) > len(self.sensor[1].lines[0]):
+            #    self.ccd_standard = 1
+            #    non_standard = 0
+
+            if self.ccd_relative_orientation == "vertical":
+                co = 1
+            else:
+                co = 0
+            m_0 = self.sensor[0].lines[0][0][co]
+            m_1 = self.sensor[1].lines[1][0][co]
+            if m_1 < m_0:
+                self.ccd_standard = 1
+
+            fit_trunc = -1
+            for s in self.sensor:
+                fst = 0
+                lst = fit_trunc
+
+                if self.ccd_relative_orientation == "horizontal":
+                    if s == self.ccd_standard:
+                        fst = 0
+                        lst = fit_trunc
+                    else:
+                        fst = fit_trunc
+                        lst = -1
+                else:
+                    if s == self.ccd_standard:
+                        fst = 0
+                        lst = fit_trunc
+                    else:
+                        fst = fit_trunc
+                        lst = -1
 
                 self.sensor[s].linfits = {}
-                outliers_count = [0, 0]
 
-                for lines in self.sensor[s].lines:
+                for lc, lines in enumerate(self.sensor[s].lines):
+                    outliers_count = [0, 0]
                     self.sensor[s].linfits.setdefault(lines, {})
-                    slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines])
-                    for idel, pt in enumerate(self.sensor[s].lines[lines]):  # remove outliers from line
-                        if outlier_mask[idel]:
-                            del self.sensor[s].lines[lines][idel]
-                            outliers_count[s] += 1
+
+                    if fit_trunc != -1:
+                        slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines])
+                        for idel, pt in enumerate(self.sensor[s].lines[lines][fst:lst]):  # remove outliers from line
+                            if outlier_mask[idel]:
+                                del self.sensor[s].lines[lines][idel]
+                                outliers_count[s] += 1
+                    else:
+                        if lst == -1:
+                            slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines][-fst:])
+                        else:
+                            slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines][fst:lst])
 
                     self.sensor[s].linfits[lines] = [slope, intercept]
 

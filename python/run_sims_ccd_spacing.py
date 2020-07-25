@@ -101,8 +101,8 @@ for combos in config:
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
-        fx.append(cS.dy0)
-        fy.append(cS.dx0)
+        fx.append(cS.dx0)
+        fy.append(cS.dy0)
         ftheta.append(cS.dtheta0)
 
     rc = cS.make_plots()
@@ -182,6 +182,12 @@ d_y = np.array([float(yi) for yi in y]) - np.array(fy)
 
 out_lay = row(results_table, column(x_hist, y_hist))
 
+sd, bins = np.histogram(np.array(sdiff), bins=10)
+w = bins[1] - bins[0]
+sd_hist = figure(tools=cS.TOOLS, title="rotations (rad)", x_axis_label='rotation (rad)',
+                 y_axis_label='counts', height=300, width=600)
+sd_hist.vbar(top=sd, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
+
 if args.dofit:
     dx_off, bins = np.histogram(np.array(d_x), bins=10)
     w = bins[1] - bins[0]
@@ -195,7 +201,7 @@ if args.dofit:
                     y_axis_label='counts', height=300, width=600)
     dy_hist.vbar(top=dy_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
-    out_lay = layout(row(results_table, column(x_hist, y_hist)), row(dx_hist, dy_hist))
+    out_lay = layout(row(results_table, column(x_hist, y_hist, sd_hist)), row(dx_hist, dy_hist))
 
 
 output_file(args.output + "CCD_grids_sims.html")
