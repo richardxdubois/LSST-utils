@@ -100,6 +100,9 @@ focal_plane.circle(x=0., y=0., color="green", size=8)
 sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R20_S02",
            "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22", "R30_S21", "R30_S20"]
 
+#sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01",
+#           "R20_S11", "R20_S21", "R30_S01", "R30_S11", "R30_S21", "R30_S20"]
+
 start_x = 0.
 start_y = 0.
 
@@ -132,7 +135,7 @@ for tgt_sensor in sensors:
     dx0 = -x[idl] * std_sign
     dy0 = -y[idl] * std_sign
 
-    # apply rotation to the deltas, but only after the first connection and invert since going backwards
+    # apply rotation to the deltas, but only after the first connection
     rot_angle = std_sign*sdiff[idl]
 
     if idl == 0:
