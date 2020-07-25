@@ -7,76 +7,6 @@ from bokeh.layouts import row, column, layout
 from bokeh.models import ColumnDataSource, DataTable, TableColumn, NumberFormatter, HTMLTemplateFormatter
 
 
-def dir_signs(target, combo, standard):
-
-    # current is current raft/sensor name: Rab_Scd - it is one of the combo name pairs
-    # combo is the measurement pair
-
-    #  target sensor is Rij_Skl. The originating sensor is Rmn_Sop
-
-    # cross raft boundaries
-
-    # ij != mn
-    #      j==n: i<m - -y ; i>m +y
-    #      i==m: j<n - -x ; j>n +x
-
-    # inside a raft
-
-    #       k==o: l>p - +x; l<p - -x
-    #       l==p: k>o - +y; k<o - -y
-
-    cur_name = target.split("_")
-    cur_r = cur_name[0][-2:]
-    cur_s = cur_name[1][-2:]
-
-    r = [0]*2
-    s = [0]*2
-
-    c_name = combo.split("_")
-    r[0] = c_name[0][-2:]
-    s[0] = c_name[1][-2:]
-
-    r[1] = c_name[2][-2:]
-    s[1] = c_name[3][-2:]
-
-    c_tgt = 0
-    c_oth = 1
-    if cur_r == r[1] and cur_s == s[1]:
-        c_tgt = 1
-        c_oth = 0
-
-    x_sign = 1.
-    y_sign = 1.
-
-    std_sign = 1.  # account for direction between standard and target
-    if target != standard:
-        std_sign = -1.
-
-    # now run through the options
-
-    # cross-raft
-
-    if cur_r != r[c_oth]:
-        if int(cur_r[1]) == int(r[c_oth][1]) and int(cur_r[0]) < int(r[c_oth][0]):
-            y_sign = -1.
-            x_sign = std_sign
-        elif int(cur_r[0]) == int(r[c_oth][0]) and int(cur_r[0]) < int(r[c_oth][0]):
-            x_sign = -1.
-            y_sign = std_sign
-    else:
-        if int(cur_s[0]) == int(s[c_oth][0]) and int(cur_s[1]) < int(s[c_oth][1]):
-            x_sign = -1.
-            y_sign = std_sign
-        elif int(cur_s[1]) == int(s[c_oth][1]) and int(cur_s[0]) < int(s[c_oth][0]):
-            y_sign = -1.
-            x_sign = std_sign
-
-    x_sign = std_sign
-    y_sign = std_sign
-
-    return x_sign, y_sign, std_sign
-
-
 print("in main")
 
 parser = argparse.ArgumentParser(
@@ -195,23 +125,15 @@ for tgt_sensor in sensors:
             if cur_sensor in c:
                 idl = ic
 
-    #x_sign, y_sign, std_sign = dir_signs(target=tgt_sensor, combo=names[idl], standard=st_name[idl])
-
-    x_sign = 1.
-    y_sign = 1.
-
     std_sign = 1.  # account for direction between standard and target
     if tgt_sensor != st_name[idl]:
         std_sign = -1.
-        x_sign = std_sign
-        y_sign = std_sign
 
-    dx0 = -x[idl] * x_sign
-    dy0 = -y[idl] * y_sign
+    dx0 = -x[idl] * std_sign
+    dy0 = -y[idl] * std_sign
 
-    # apply running rotation to the deltas, but only after the first connection and invert since going backwards
-    rot_angle -= std_sign*sdiff[idl]
-    #rot_angle = 0.
+    # apply rotation to the deltas, but only after the first connection and invert since going backwards
+    rot_angle = std_sign*sdiff[idl]
 
     if idl == 0:
         dx = dx0
@@ -234,7 +156,7 @@ for tgt_sensor in sensors:
     running_y += dy
 
     print(tgt_sensor, names[idl], running_x, running_y, "      ",
-          st_name[idl], std_sign, sdiff[idl], rot_angle, dx, x_sign, dx0, dy, y_sign, dy0)
+          st_name[idl], std_sign, sdiff[idl], rot_angle, dx, dx0, dy, dy0)
 
     cur_sensor = tgt_sensor
 
