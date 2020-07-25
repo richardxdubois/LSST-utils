@@ -211,7 +211,7 @@ for tgt_sensor in sensors:
 
     # apply running rotation to the deltas, but only after the first connection and invert since going backwards
     rot_angle -= std_sign*sdiff[idl]
-    rot_angle = 0.
+    #rot_angle = 0.
 
     if idl == 0:
         dx = dx0
@@ -227,8 +227,8 @@ for tgt_sensor in sensors:
     r0 = tgt_sensor[0:3]
     s0 = tgt_sensor[4:7]
 
-    cy_0 = -2.5 * d_raft + (float(r0[1]) + 0.5) * d_raft + (float(s0[1]) - 1.) * d_sensor
-    cx_0 = -2.5 * d_raft + (float(r0[2]) + 0.5) * d_raft + (float(s0[2]) - 1.) * d_sensor
+    cx_0 += dx
+    cy_0 += dy
 
     running_x += dx
     running_y += dy

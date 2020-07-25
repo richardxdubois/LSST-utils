@@ -1264,7 +1264,7 @@ class ccd_spacing():
         if self.sim_distort:
             f_distort = 1.
 
-        if self.ccd_relative_orientation == "vertical":
+        if self.ccd_relative_orientation == "horizontal":
 
             for idx, xs in enumerate(xg):
                 if xs < -gap / 2.:
