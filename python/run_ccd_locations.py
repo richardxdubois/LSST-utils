@@ -135,15 +135,15 @@ for tgt_sensor in sensors:
     dx0 = -x[idl] * std_sign
     dy0 = -y[idl] * std_sign
 
-    # apply rotation to the deltas, but only after the first connection
-    rot_angle = std_sign*sdiff[idl]
-
     if idl == 0:
         dx = dx0
         dy = dy0
     else:
         dx = dx0 * math.cos(rot_angle) - dy0 * math.sin(rot_angle)
         dy = dx0 * math.sin(rot_angle) + dy0 * math.cos(rot_angle)
+
+    # apply rotation to the deltas, but only after the first connection
+    rot_angle -= std_sign*sdiff[idl]
 
     focal_plane.line([cx_0, dx + cx_0],
                      [cy_0, dy + cy_0],
