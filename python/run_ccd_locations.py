@@ -149,9 +149,6 @@ for tgt_sensor in sensors:
                      [cy_0, dy + cy_0],
                      line_color="red", line_width=2)
 
-    r0 = tgt_sensor[0:3]
-    s0 = tgt_sensor[4:7]
-
     cx_0 += dx
     cy_0 += dy
 
