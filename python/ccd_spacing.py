@@ -866,7 +866,8 @@ class ccd_spacing():
             self.x1_in = 0.
             self.y1_in = 2000.
 
-        centers = [2048., 2048.]
+#        centers = [2048., 2048.]
+        centers = [2100., 2100.]
 
         c1 = [centers[0] - self.x1_in, centers[1] - self.y1_in]
         c0 = [centers[0] - self.x0_in, centers[1] - self.y0_in]
@@ -1294,8 +1295,8 @@ class ccd_spacing():
         dxg = self.grid['DX']
         dyg = self.grid['DY']
 
-        ccd_gap = 129.  # pixels - 0.25 mm at 10 um/px with 4096 px wide sensor to give 4225 separation
-        raft_gap = 500.  # 0.5 mm
+        ccd_gap = 250.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
+        raft_gap = 500.  # 0.5 mm gap between rafts, which are 127 mm wide
 
         gap = ccd_gap
         if self.sim_inter_raft:
