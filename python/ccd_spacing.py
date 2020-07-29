@@ -1312,7 +1312,7 @@ class ccd_spacing():
         if self.sim_inter_raft:
             gap = raft_gap
 
-        distance_grid_ctr = 4096.
+        distance_grid_ctr = 4000.
 
         self.sim_x = [[], []]
         self.sim_y = [[], []]
@@ -1326,7 +1326,7 @@ class ccd_spacing():
             for idx, xs in enumerate(xg):
                 if xs < -gap / 2.:
                     x10 = distance_grid_ctr + xs + dxg[idx] * f_distort + gap/2.
-                    y10 = 2000. + yg[idx] + dyg[idx] * f_distort
+                    y10 = distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort
                     x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10
                     y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset
 
@@ -1334,13 +1334,13 @@ class ccd_spacing():
                     self.sim_y[1].append(y11)
                 elif xs > gap /2.:
                     self.sim_x[0].append(xs + dxg[idx] * f_distort - gap/2.)
-                    self.sim_y[0].append(2000. + yg[idx] + dyg[idx] * f_distort)
+                    self.sim_y[0].append(distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort)
 
         else:
             for idy, ys in enumerate(yg):
                 if ys < -gap / 2.:
                     y00 = distance_grid_ctr + ys + dyg[idy] * f_distort + gap/2.
-                    x00 = 2000. + xg[idy] + dxg[idy] * f_distort
+                    x00 = distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort
                     x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00
                     y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + self.sim_offset
 
@@ -1348,7 +1348,7 @@ class ccd_spacing():
                     self.sim_x[0].append(x01)
                 elif ys > gap / 2.:
                     self.sim_y[1].append(ys + dyg[idy] * f_distort - gap/2.)
-                    self.sim_x[1].append(2000. + xg[idy] + dxg[idy] * f_distort)
+                    self.sim_x[1].append(distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort)
         return
 
     def loop(self):
