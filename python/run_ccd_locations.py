@@ -19,6 +19,8 @@ parser.add_argument('-o', '--output', default='/Users/richard/LSST/Code/misc/CCD
                     help="output directory path")
 parser.add_argument('--in_params', default='CCD_grids_params.csv',
                     help="output params file spec")
+parser.add_argument('-i', '--invert', default='no',
+                    help="invert sensor order")
 parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
                     help="base html path")
 
@@ -114,7 +116,13 @@ sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R2
 #sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01",
 #           "R20_S11", "R20_S21", "R30_S01", "R30_S11", "R30_S21", "R30_S20"]
 
-#sensors = ["R30_S21", "R30_S22", "R30_S21", "R30_S20"]
+#sensors = ["R30_S11", "R30_S01", "R20_S21", "R20_S20", "R30_S00", "R30_S10", "R30_S20", "R30_S21"]
+#sensors = ["R30_S11",  "R30_S10", "R30_S20", "R30_S21"]
+
+#sensors = ["R30_S21", "R30_S22", "R30_S21"]
+
+if args.invert == "yes":
+    sensors.reverse()
 
 start_x = 0.
 start_y = 0.

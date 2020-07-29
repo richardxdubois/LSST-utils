@@ -333,6 +333,8 @@ class ccd_spacing():
             self.button_overlay_grid.button_type = "success"
         else:
             self.button_overlay_grid.button_type = "danger"
+
+        rc = self.setup_grid()
         pl = self.make_plots()
         m_new = column(self.max_layout, pl)
         self.layout.children = m_new.children
@@ -1199,9 +1201,10 @@ class ccd_spacing():
 
         source_g = None
         cg = None
-        if self.overlay_grid and self.use_fit:
+#        if self.overlay_grid and self.use_fit:
+        if self.overlay_grid:
             source_g = ColumnDataSource(dict(x=self.gX2, y=self.gY2))
-            cg = self.ccd1_scatter.circle(x="x", y="y", source=source_g, color="gray", size=10)
+            cg = self.ccd1_scatter.circle(x="x", y="y", source=source_g, color="gray", size=2)
 
         source_1 = ColumnDataSource(dict(x=x1, y=y1))
         c1 = self.ccd1_scatter.circle(x="x", y="y", source=source_1, color="blue")
@@ -1230,15 +1233,13 @@ class ccd_spacing():
             plots_layout = layout(row(self.ccd1_scatter, p2))
 
         if self.use_fit:
+            print("add grid to scatter plot")
             self.ccd1_scatter.circle(x=self.grid_x0-o1, y=self.grid_y0-o2, color="black")
             self.ccd1_scatter.circle(x=self.grid_x1-o3, y=self.grid_y1-o4, color="green")
 
         return plots_layout
 
-    def match(self):
-
-        print("start fitting with guesses ", self.grid_x0, self.grid_y0, self.grid_x1, self.grid_y1)
-        distortions = None
+    def setup_grid(self):
         if self.grid is None:
             self.grid = DistortedGrid.from_fits(self.grid_data_file)
 
@@ -1248,11 +1249,20 @@ class ccd_spacing():
         self.gY2 = self.grid["Y"]
 
         if self.sim_distort:
-            distortions = (self.grid["DY"], self.grid["DX"])
             self.gX1 += self.grid["DX"]
             self.gY1 += self.grid["DY"]
             self.gX2 += self.grid["DX"]
             self.gY2 += self.grid["DY"]
+
+    def match(self):
+
+        print("start fitting with guesses ", self.grid_x0, self.grid_y0, self.grid_x1, self.grid_y1)
+        distortions = None
+
+        rc = self.setup_grid()
+
+        if self.sim_distort:
+            distortions = (self.grid["DY"], self.grid["DX"])
 
         # Need an intelligent guess
 
