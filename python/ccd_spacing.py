@@ -128,7 +128,7 @@ class ccd_spacing():
         self.sim_doit = False
         self.sim_inter_raft = False
         self.sim_distort = True
-        self.sim_rotate = 0.002
+        self.sim_rotate = 0.
         self.sim_offset = 0.
 
         # flags
@@ -1305,14 +1305,14 @@ class ccd_spacing():
         dxg = self.grid['DX']
         dyg = self.grid['DY']
 
-        ccd_gap = 250.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
+        ccd_gap = 125.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
         raft_gap = 500.  # 0.5 mm gap between rafts, which are 127 mm wide
 
         gap = ccd_gap
         if self.sim_inter_raft:
             gap = raft_gap
 
-        distance_grid_ctr = 4000.
+        distance_grid_ctr = 4100.
 
         self.sim_x = [[], []]
         self.sim_y = [[], []]
@@ -1324,31 +1324,35 @@ class ccd_spacing():
         if self.ccd_relative_orientation == "horizontal":
 
             for idx, xs in enumerate(xg):
-                if xs < -gap / 2.:
-                    x10 = distance_grid_ctr + xs + dxg[idx] * f_distort + gap/2.
-                    y10 = distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort
-                    x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10
-                    y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset
 
-                    self.sim_x[1].append(x11)
-                    self.sim_y[1].append(y11)
-                elif xs > gap /2.:
+                # sensor 0 is the standard (pixels start at zero in its counting)
+                if xs > gap /2.:
                     self.sim_x[0].append(xs + dxg[idx] * f_distort - gap/2.)
                     self.sim_y[0].append(distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort)
-
+                else:
+                    # x10 is in sensor 1's frame
+                    x10 = xs + dxg[idx] * f_distort + gap/2.
+                    y10 = distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort
+                    x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10 + distance_grid_ctr
+                    y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset
+                    # cut out spots in sensor 1's frame
+                    if x11 - distance_grid_ctr < -gap / 2.:
+                        self.sim_x[1].append(x11)
+                        self.sim_y[1].append(y11)
         else:
             for idy, ys in enumerate(yg):
-                if ys < -gap / 2.:
-                    y00 = distance_grid_ctr + ys + dyg[idy] * f_distort + gap/2.
+                if ys > gap / 2.:
+                    self.sim_y[0].append(ys + dyg[idy] * f_distort - gap/2.)
+                    self.sim_x[0].append(distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort)
+                else:
+                    # y00 in sensor 1's frame
+                    y00 = ys + dyg[idy] * f_distort + gap/2.
                     x00 = distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort
-                    x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00
-                    y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + self.sim_offset
-
-                    self.sim_y[0].append(y01)
-                    self.sim_x[0].append(x01)
-                elif ys > gap / 2.:
-                    self.sim_y[1].append(ys + dyg[idy] * f_distort - gap/2.)
-                    self.sim_x[1].append(distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort)
+                    x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset
+                    y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr
+                    if y01 - distance_grid_ctr < -gap / 2.:
+                        self.sim_y[1].append(y01)
+                        self.sim_x[1].append(x01)
         return
 
     def loop(self):
