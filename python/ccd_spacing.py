@@ -604,10 +604,10 @@ class ccd_spacing():
         pitch_spot = []
 
         r_hist = figure(tools=self.TOOLS, title="residuals", x_axis_label='residuals',
-                        y_axis_label='counts',
+                        y_axis_label='counts', x_range=(0.5, 1.5),
                         width=600)
         gr_hist = figure(tools=self.TOOLS, title="gap residuals", x_axis_label='residuals',
-                         y_axis_label='counts',
+                         y_axis_label='counts', x_range=(-1.5, 1.5),
                          width=600)
 
         pitch_hist = figure(tools=self.TOOLS, title="Spot pitch ", x_axis_label='pitch',
@@ -674,12 +674,15 @@ class ccd_spacing():
                     pitch_spot.append(d)
 
             resid, bins = np.histogram(np.array(res), bins=200, range=(-2., 2.))
-
             w = bins[1] - bins[0]
-            r_hist.step(y=resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
             popt, _ = optimize.curve_fit(self.gaussian, bins[:-1]+w/2., resid)
-            print("residual for ", self.names_ccd[l], popt[1], abs(popt[2]))
+            r_sigma = abs(popt[2])
+            r_mu = 1. - popt[1]
+            print("residual for ", self.names_ccd[l], " mean: ", r_mu, " sigma: ", r_sigma)
+
+            r_hist.step(y=resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l] + " σ = " +
+                         f'{r_sigma:.3f}')
 
             g_resid, bins = np.histogram(np.array(g_res), bins=200, range=(-2., 2.))
 
@@ -750,7 +753,7 @@ class ccd_spacing():
         return gridplot(hist_list)
 
     def gaussian(self, x, amplitude, mean, stddev):
-        return amplitude * np.exp(-((x - mean) / 4 / stddev) ** 2)
+        return amplitude * np.exp(-0.5 * ((x - mean) / stddev) ** 2)
 
     def fit_line_pairs(self, line_list):
 
