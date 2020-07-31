@@ -3,7 +3,7 @@ import sys
 import os
 import math
 import numpy as np
-from scipy.stats import linregress
+from scipy import optimize
 from sklearn import linear_model
 
 from os.path import join
@@ -198,7 +198,7 @@ class ccd_spacing():
         self.button_enable_sims.on_click(self.do_enable_sims)
 
         self.button_sims_orient = Button(label="Toggle orientation", button_type="success", width=100)
-        self.button_sims_orient.label = "vertical"
+        self.button_sims_orient.label = "horizontal"
         self.button_sims_orient.on_click(self.do_sims_orient)
 
         self.button_sims_intra_raft = Button(label="Toggle intra-raft", button_type="danger", width=100)
@@ -616,7 +616,8 @@ class ccd_spacing():
 
         off_ccd = [[0., 0.], [0., 0.]]
         if self.use_fit:
-            off_ccd[self.ccd_standard] = [-self.dx0, -self.dy0]
+            off_ccd[0] = [-self.dx0, -self.dy0]
+            print("make_line_plots: use for fitted offsets ", off_ccd)
         elif self.use_offsets:
             off_ccd = [[self.x0_in, self.y0_in], [self.x1_in, self.y1_in]]
 
@@ -676,6 +677,9 @@ class ccd_spacing():
 
             w = bins[1] - bins[0]
             r_hist.step(y=resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
+
+            popt, _ = optimize.curve_fit(self.gaussian, bins[:-1]+w/2., resid)
+            print("residual for ", self.names_ccd[l], popt[1], abs(popt[2]))
 
             g_resid, bins = np.histogram(np.array(g_res), bins=200, range=(-2., 2.))
 
@@ -744,6 +748,9 @@ class ccd_spacing():
         print("Mean delta slope: ", mean_delta_slope
               )
         return gridplot(hist_list)
+
+    def gaussian(self, x, amplitude, mean, stddev):
+        return amplitude * np.exp(-((x - mean) / 4 / stddev) ** 2)
 
     def fit_line_pairs(self, line_list):
 
@@ -857,16 +864,16 @@ class ccd_spacing():
 
         if self.ccd_standard == 0:
             self.x1_in = self.med_shift_x
-            self.y1_in = 2000. + self.med_shift_y
+            self.y1_in = 2100. + self.med_shift_y
 
             self.x0_in = 0.
-            self.y0_in = 2000.
+            self.y0_in = 2100.
         else:
             self.x0_in = self.med_shift_x
-            self.y0_in = 2000. + self.med_shift_y
+            self.y0_in = self.med_shift_y
 
             self.x1_in = 0.
-            self.y1_in = 2000.
+            self.y1_in = 0.
 
 #        centers = [2048., 2048.]
         centers = [2100., 2100.]
@@ -875,7 +882,7 @@ class ccd_spacing():
         c0 = [centers[0] - self.x0_in, centers[1] - self.y0_in]
         self.center_to_center = np.array(c0) - np.array(c1)
 
-        print(" x1_in, y1_in = ", self.x1_in, self.y1_in)
+        print("x0_in, y0_in, x1_in, y1_in = ", self.x0_in, self.y0_in, self.x1_in, self.y1_in)
         print("shift x, y = ", self.med_shift_x, self.med_shift_y)
         print("standard CCD ", self.ccd_standard, self.names_ccd[self.ccd_standard],
               self.ccd_relative_orientation)
@@ -973,13 +980,11 @@ class ccd_spacing():
         infile2 = None
 
         if self.sim_doit:
-            if self.ccd_relative_orientation == "horizontal":
-                X1 = self.sim_x[0]
-                Y1 = self.sim_y[0]
-                self.extrap_dir = 1.
-            else:  # swap x and y for horizontal pairing
-                X1 = self.sim_x[0]
-                Y1 = self.sim_y[0]
+            X1 = self.sim_x[0]
+            Y1 = self.sim_y[0]
+            self.extrap_dir = 1.
+
+            if self.ccd_relative_orientation == "vertical":
                 self.extrap_dir = -1.
         else:
             dir_index = self.file_paths[combo_name]
@@ -1002,7 +1007,7 @@ class ccd_spacing():
             if int(s1[1]) == int(s2[1]):
                 self.ccd_relative_orientation = "horizontal"
             else:
-                self.ccd_relative_orientation = "vertical"  # swap x and y
+                self.ccd_relative_orientation = "vertical"
                 self.extrap_dir = -1.
 
         if self.show_rotate:
@@ -1072,52 +1077,27 @@ class ccd_spacing():
             #    self.ccd_standard = 1
             #    non_standard = 0
 
+            co = 0
             if self.ccd_relative_orientation == "vertical":
                 co = 1
-            else:
-                co = 0
+
             m_0 = self.sensor[0].lines[0][0][co]
-            m_1 = self.sensor[1].lines[1][0][co]
+            m_1 = self.sensor[1].lines[0][0][co]
             if m_1 < m_0:
                 self.ccd_standard = 1
 
-            fit_trunc = -1
             for s in self.sensor:
-                fst = 0
-                lst = fit_trunc
-
-                if self.ccd_relative_orientation == "horizontal":
-                    if s == self.ccd_standard:
-                        fst = 0
-                        lst = fit_trunc
-                    else:
-                        fst = fit_trunc
-                        lst = -1
-                else:
-                    if s == self.ccd_standard:
-                        fst = 0
-                        lst = fit_trunc
-                    else:
-                        fst = fit_trunc
-                        lst = -1
-
                 self.sensor[s].linfits = {}
 
                 for lc, lines in enumerate(self.sensor[s].lines):
                     outliers_count = [0, 0]
                     self.sensor[s].linfits.setdefault(lines, {})
 
-                    if fit_trunc != -1:
-                        slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines])
-                        for idel, pt in enumerate(self.sensor[s].lines[lines][fst:lst]):  # remove outliers from line
-                            if outlier_mask[idel]:
-                                del self.sensor[s].lines[lines][idel]
-                                outliers_count[s] += 1
-                    else:
-                        if lst == -1:
-                            slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines][-fst:])
-                        else:
-                            slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines][fst:lst])
+                    slope, intercept, outlier_mask = self.fit_line_pairs(self.sensor[s].lines[lines])
+                    for idel, pt in enumerate(self.sensor[s].lines[lines]):  # remove outliers from line
+                        if outlier_mask[idel]:
+                            del self.sensor[s].lines[lines][idel]
+                            outliers_count[s] += 1
 
                     self.sensor[s].linfits[lines] = [slope, intercept]
 
@@ -1190,6 +1170,7 @@ class ccd_spacing():
                 o2 = self.y0_in
                 o3 = self.x1_in
                 o4 = self.y1_in
+        print("make_plots: offset = ", o1,o2, o3, o4)
 
         x1 = np.array(self.sensor[0].spot_cln["x"]) - o1
         y1 = np.array(self.sensor[0].spot_cln["y"]) - o2
@@ -1233,7 +1214,7 @@ class ccd_spacing():
             plots_layout = layout(row(self.ccd1_scatter, p2))
 
         if self.use_fit:
-            print("add grid to scatter plot")
+            print("add grid center pt to scatter plot")
             self.ccd1_scatter.circle(x=self.grid_x0-o1, y=self.grid_y0-o2, color="black")
             self.ccd1_scatter.circle(x=self.grid_x1-o3, y=self.grid_y1-o4, color="green")
 
