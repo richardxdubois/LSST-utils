@@ -65,6 +65,7 @@ for combos in cS.file_paths:
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
+        rc = cS.iterate_fit()
         fx.append(cS.dx0)
         fy.append(cS.dy0)
         ftheta.append(cS.dtheta0)
@@ -132,13 +133,13 @@ results_table = DataTable(source=results_source, columns=results_columns, width=
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
 x_hist = figure(tools=cS.TOOLS, title="short offsets", x_axis_label='offsets (px)',
-                y_axis_label='counts', height=300, width=600)
+                y_axis_label='counts', height=400, width=600)
 x_hist.vbar(top=x_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
 y_off, bins = np.histogram(np.array(y_o), bins=10)
 w = bins[1] - bins[0]
 y_hist = figure(tools=cS.TOOLS, title="long offsets", x_axis_label='offsets (px)',
-                y_axis_label='counts', height=300, width=600)
+                y_axis_label='counts', height=400, width=600)
 y_hist.step(y=y_off, x=bins[:-1] + w / 2.)
 y_hist.vbar(top=y_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
@@ -151,19 +152,19 @@ if args.dofit:
     dx_off, bins = np.histogram(np.array(d_x), bins=10)
     w = bins[1] - bins[0]
     dx_hist = figure(tools=cS.TOOLS, title="x offset diff", x_axis_label='offsets (px)',
-                    y_axis_label='counts', height=300, width=600)
+                    y_axis_label='counts', height=400, width=600)
     dx_hist.vbar(top=dx_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
     dy_off, bins = np.histogram(np.array(d_y), bins=10)
     w = bins[1] - bins[0]
     dy_hist = figure(tools=cS.TOOLS, title="y offset diff", x_axis_label='offsets (px)',
-                    y_axis_label='counts', height=300, width=600)
+                    y_axis_label='counts', height=400, width=600)
     dy_hist.vbar(top=dy_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
     sd, bins = np.histogram(np.array(sdiff), bins=10)
     w = bins[1] - bins[0]
     sd_hist = figure(tools=cS.TOOLS, title="rotations (rad)", x_axis_label='rotation (rad)',
-                y_axis_label='counts', height=300, width=600)
+                y_axis_label='counts', height=400, width=600)
     sd_hist.vbar(top=sd, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
     out_lay = layout(row(results_table, column(x_hist, y_hist, sd_hist)), row(dx_hist, dy_hist))

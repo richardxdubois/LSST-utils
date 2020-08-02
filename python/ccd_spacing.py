@@ -345,10 +345,34 @@ class ccd_spacing():
         m_new = column(self.max_layout, p_grid)
         self.layout.children = m_new.children
 
+    def iterate_fit(self):
+        # hack in case fit and lines are off by a spot - inflate long edge guess by 5% and re-fit
+        if self.line_fitting:
+            if self.ccd_relative_orientation == "horizontal":
+                if abs(abs(self.center_to_center[0]) - abs(self.dx0)) > 0.75*self.pitch:
+                    if self.ccd_standard == 0:
+                        self.grid_x1 *= 1.015
+                    else:
+                        self.grid_x0 *= 1.015
+                    print("refit")
+                    rc = self.match()
+
+            else:
+                if abs(abs(self.center_to_center[1]) - abs(self.dy0)) > 0.75*self.pitch:
+                    if self.ccd_standard == 0:
+                        self.grid_y1 *= 1.015
+                    else:
+                        self.grid_y0 *= 1.015
+                    print("refit")
+                    rc = self.match()
+
+
     def do_fit(self):
         self.use_fit = True
         rc = self.match()
         self.redo_fit = False
+        rc = self.iterate_fit()
+
         # set slider values to zero to be offsets from grid centers
         self.slider_x.value = (0., 0.)
         self.slider_y.value = (0., 0.)
@@ -676,7 +700,9 @@ class ccd_spacing():
             resid, bins = np.histogram(np.array(res), bins=200, range=(-2., 2.))
             w = bins[1] - bins[0]
 
-            popt, _ = optimize.curve_fit(self.gaussian, bins[:-1]+w/2., resid)
+            popt = [0., 0., 0.]
+            if not (self.sim_doit and not self.sim_distort):
+                popt, _ = optimize.curve_fit(self.gaussian, bins[:-1]+w/2., resid)
             r_sigma = abs(popt[2])
             r_mu = 1. - popt[1]
             print("residual for ", self.names_ccd[l], " mean: ", r_mu, " sigma: ", r_sigma)
