@@ -14,7 +14,7 @@ from mixcoatl.sourcegrid import grid_fit, DistortedGrid
 from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
 from bokeh.layouts import row, column, layout, gridplot
-from bokeh.models.widgets import TextInput, Dropdown, Button, RangeSlider, FileInput
+from bokeh.models.widgets import TextInput, Dropdown, Button, Slider, FileInput
 from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, ColorBar, LogColorMapper
 
 
@@ -156,17 +156,23 @@ class ccd_spacing():
         self.button_line_fitting = Button(label="Enable Lines", button_type="success", width=100)
         self.button_line_fitting.on_click(self.do_line_fitting)
 
-        # sliders for offsetting spots patterns - each sets a pair of values for its coordinate
-        self.slider_x = RangeSlider(title="x0 Value Range", start=-1000, end=5000, value=(self.x0_in,
-                                                                                          self.x1_in),
+        # sliders for offsetting spots patterns
+        self.slider_x0 = Slider(title="x0 Value Range", start=-1000, end=5000, value=self.x0_in,
                                     width=900,
                                     format="0[.]0000")
-        self.slider_x.on_change('value_throttled', self.slider_x_select)
-        self.slider_y = RangeSlider(title="y0 Value Range", start=-1000, end=5000, value=(self.y0_in,
-                                                                                          self.y1_in),
+        self.slider_x0.on_change('value_throttled', self.slider_x0_select)
+        self.slider_y0 = Slider(title="y0 Value Range", start=-1000, end=5000, value=self.y0_in,
                                     width=900,
                                     format="0[.]0000")
-        self.slider_y.on_change('value_throttled', self.slider_y_select)
+        self.slider_y0.on_change('value_throttled', self.slider_y0_select)
+        self.slider_x1 = Slider(title="x1 Value Range", start=-1000, end=5000, value=self.x1_in,
+                                    width=900,
+                                    format="0[.]0000")
+        self.slider_x1.on_change('value_throttled', self.slider_x1_select)
+        self.slider_y1 = Slider(title="y1 Value Range", start=-1000, end=5000, value=self.y1_in,
+                                    width=900,
+                                    format="0[.]0000")
+        self.slider_y1.on_change('value_throttled', self.slider_y1_select)
 
         # button to submit slider values
         self.button_submit = Button(label="Submit slider", button_type="warning", width=100)
@@ -235,7 +241,8 @@ class ccd_spacing():
         self.min_layout = row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
                               self.button_line_fitting)
-        self.sliders_layout = column(self.slider_x, self.slider_y, self.button_submit)
+        self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
+                                     self.button_submit)
         self.max_layout = column(self.min_layout, sims_layout, self.sliders_layout,
                                  self.button_fit)
 
@@ -374,8 +381,10 @@ class ccd_spacing():
         rc = self.iterate_fit()
 
         # set slider values to zero to be offsets from grid centers
-        self.slider_x.value = (0., 0.)
-        self.slider_y.value = (0., 0.)
+        self.slider_x0.value = 0.
+        self.slider_y0.value = 0.
+        self.slider_x1.value = 0.
+        self.slider_y1.value = 0.
 
         pl = self.make_plots()
         m_new = column(self.max_layout, pl)
@@ -386,23 +395,27 @@ class ccd_spacing():
         self.use_offsets = True
         #self.use_fit = False
         if self.use_fit:
-            self.grid_x0 += self.slider_x.value[0]
-            self.grid_y0 += self.slider_y.value[0]
-            self.grid_x1 += self.slider_x.value[1]
-            self.grid_y1 += self.slider_y.value[1]
+            self.grid_x0 += self.slider_x0.value
+            self.grid_y0 += self.slider_y0.value
+            self.grid_x1 += self.slider_x1.value
+            self.grid_y1 += self.slider_y1.value
 
         pl = self.make_plots()
         m_new = column(self.max_layout, pl)
         self.layout.children = m_new.children
         return
 
-    def slider_x_select(self, sattr, old, new):
-        self.x0_in = self.slider_x.value[0]
-        self.x1_in = self.slider_x.value[1]
+    def slider_x0_select(self, sattr, old, new):
+        self.x0_in = self.slider_x0.value
 
-    def slider_y_select(self, sattr, old, new):
-        self.y0_in = self.slider_y.value[0]
-        self.y1_in = self.slider_y.value[1]
+    def slider_y0_select(self, sattr, old, new):
+        self.y0_in = self.slider_y0.value
+
+    def slider_x1_select(self, sattr, old, new):
+        self.x0_in = self.slider_x1.value
+
+    def slider_y1_select(self, sattr, old, new):
+        self.y0_in = self.slider_y1.value
 
     def do_get_data(self):
 
@@ -1140,8 +1153,10 @@ class ccd_spacing():
         print("# spots after cln ", self.name_ccd2, " ", num_spots_cln_1)
 
         print("removed outliers: ", outliers_count)
-        self.slider_x.value = (self.x0_in, self.x1_in)
-        self.slider_y.value = (self.y0_in, self.y1_in)
+        self.slider_x0.value = self.x0_in
+        self.slider_y0.value = self.y0_in
+        self.slider_x1.value = self.x1_in
+        self.slider_y1.value = self.y1_in
 
         return
 
