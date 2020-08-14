@@ -91,6 +91,10 @@ class ccd_spacing():
         self.srcX = [[], []]
         self.srcY = [[], []]
 
+        self.srcXErr = [[], []]  # derived from 2nd moments & flux for now
+        self.srcYErr = [[], []]
+        self.srcFlux = [[], []]
+
         self.gX1 = None
         self.gY1 = None
         self.gX2 = None
@@ -1088,6 +1092,9 @@ class ccd_spacing():
 
         kw_x = 'base_SdssShape_x'
         kw_y = 'base_SdssShape_y'
+        kw_xx = 'base_SdssShape_xx'
+        kw_yy = 'base_SdssShape_yy'
+        kw_flux = 'base_SdssShape_instFlux'
 
         # use simulation data
         if self.sim_doit:
@@ -1095,11 +1102,15 @@ class ccd_spacing():
             self.sensor[1].spot_input = dict(x=self.sim_x[1], y=self.sim_y[1])
         else:   # use projector data
             self.sensor[0].src = fits.getdata(infile1)
-            self.sensor[0].spot_input = dict(x=self.sensor[0].src[kw_x], y=self.sensor[0].src[kw_y])
+            self.sensor[0].spot_input = dict(x=self.sensor[0].src[kw_x], y=self.sensor[0].src[kw_y],
+                                             xx=self.sensor[0].src[kw_xx], yy=self.sensor[0].src[kw_yy],
+                                             flux=self.sensor[0].src[kw_flux])
             self.sensor[0].orientation = self.ccd_relative_orientation
 
             self.sensor[1].src = fits.getdata(infile2)
-            self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y])
+            self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y],
+                                             xx=self.sensor[1].src[kw_xx], yy=self.sensor[1].src[kw_yy],
+                                             flux=self.sensor[1].src[kw_flux])
             self.sensor[1].orientation = self.ccd_relative_orientation
 
         num_spots_0 = len(self.sensor[0].spot_input["x"])
@@ -1124,8 +1135,8 @@ class ccd_spacing():
         # process the data
 
             if self.line_fitting:
-                self.sensor[s].lines = self.find_lines(self.sensor[s].spot_cln["x"],
-                                                       self.sensor[s].spot_cln["y"])
+                self.sensor[s].lines = self.find_lines(x_in=self.sensor[s].spot_cln["x"],
+                                                       y_in=self.sensor[s].spot_cln["y"])
                 # decide which CCD is the standard - the other is then measured relative to it. Pick the one that
                 # is fatter on top.
 
@@ -1181,6 +1192,7 @@ class ccd_spacing():
     def do_clean(self, sensor, orientation):
 
         out_x = []
+        out_order = []
         out_y = []
         median_x = np.nanmedian(np.array(sensor["x"]))
         median_y = np.nanmedian(np.array(sensor["y"]))
@@ -1205,8 +1217,9 @@ class ccd_spacing():
                     sensor["y"][n] > y_min and sensor["y"][n] < y_max:
                 out_x.append(x)
                 out_y.append(sensor["y"][n])
+                out_order.append(n)
 
-        out_dict = dict(x=np.array(out_x), y=np.array(out_y))
+        out_dict = dict(x=np.array(out_x), y=np.array(out_y), order=out_order)
 
         return out_dict
 
@@ -1273,14 +1286,42 @@ class ccd_spacing():
             p2.circle(x="x", y="y", source=source_2, color="red")
             if self.overlay_grid and self.use_fit:
                 p2.circle(x="x", y="y", source=source_g, color="gray")
-            plots_layout = layout(row(self.ccd1_scatter, p2))
+            plots_layout = row(self.ccd1_scatter, p2)
 
         if self.use_fit:
             print("add grid center pt to scatter plot")
             self.ccd1_scatter.circle(x=self.grid_x0-o1, y=self.grid_y0-o2, color="black")
             self.ccd1_scatter.circle(x=self.grid_x1-o3, y=self.grid_y1-o4, color="green")
 
-        return plots_layout
+        # get errors and fluxes
+        color = ["blue", "red"]
+
+        flux_hist = figure(title="Spots Grid: fluxes  " + self.raft_ccd_combo, x_axis_label='flux (counts)',
+                           y_axis_label='y', tools=self.TOOLS)
+        xErr_hist = figure(title="Spots Grid: x errors  " + self.raft_ccd_combo, x_axis_label='dx (px)',
+                           y_axis_label='y', tools=self.TOOLS)
+        yErr_hist = figure(title="Spots Grid: y errors  " + self.raft_ccd_combo, x_axis_label='dy (px)',
+                           y_axis_label='y', tools=self.TOOLS)
+
+        for s, sensor in enumerate(self.sensor):
+            flux = self.sensor[sensor].spot_input["flux"][self.sensor[sensor].spot_cln["order"]]
+            fh, binh = np.histogram(flux)
+            w = binh[1] - binh[0]
+            flux_hist.step(y=fh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
+
+            dx = np.sqrt(self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]/flux)
+            dxh, binh = np.histogram(dx)
+            w = binh[1] - binh[0]
+            xErr_hist.step(y=dxh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
+
+            dy = np.sqrt(self.sensor[sensor].spot_input["yy"][self.sensor[sensor].spot_cln["order"]]/flux)
+            dyh, binh = np.histogram(dy)
+            w = binh[1] - binh[0]
+            yErr_hist.step(y=dyh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
+
+        final_layout = layout(plots_layout, row(xErr_hist, yErr_hist), flux_hist)
+
+        return final_layout
 
     def setup_grid(self):
         if self.grid is None:
