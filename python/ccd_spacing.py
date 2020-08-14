@@ -1211,7 +1211,7 @@ class ccd_spacing():
         y_max = median_y + dist_y
 
         for n, x in enumerate(sensor["x"]):
-            if np.isnan(x) or np.isnan(sensor["y"][n]):  # there be nan's in the input data!
+            if np.isnan(x) or np.isnan(sensor["y"][n]) or np.isnan(sensor["flux"][n]):  # there be nan's in the input data!
                 continue
             if x > x_min and x < x_max and \
                     sensor["y"][n] > y_min and sensor["y"][n] < y_max:
@@ -1305,6 +1305,7 @@ class ccd_spacing():
 
         for s, sensor in enumerate(self.sensor):
             flux = self.sensor[sensor].spot_input["flux"][self.sensor[sensor].spot_cln["order"]]
+            flux = np.nan_to_num(flux, nan=100000.)
             fh, binh = np.histogram(flux, bins=100)
             w = binh[1] - binh[0]
             flux_hist.step(y=fh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
