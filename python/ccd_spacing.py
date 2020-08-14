@@ -85,6 +85,9 @@ class ccd_spacing():
         self.src2 = None
 
         self.clean = True
+        self.cln_box_half = 16  # half size of box around grid for cleaning - half grid direction
+        self.cln_box_full = 27  # half size of box around grid for cleaning - full grid direction
+
         self.srcX = [[], []]
         self.srcY = [[], []]
 
@@ -178,6 +181,12 @@ class ccd_spacing():
         self.button_submit = Button(label="Submit slider", button_type="warning", width=100)
         self.button_submit.on_click(self.do_submit)
 
+        # text box for box sizes in cleanup step
+        self.text_box_half = TextInput(value=str(self.cln_box_half), title="Half size cln (px)")
+        self.text_box_half.on_change('value', self.update_box_half)
+        self.text_box_full = TextInput(value=str(self.cln_box_full), title="Full size cln (px)")
+        self.text_box_full.on_change('value', self.update_box_full)
+
         # button to change data source
         self.button_get_data = Button(label="Refresh Data", button_type="warning", width=100)
         self.button_get_data.on_click(self.do_get_data)
@@ -238,9 +247,11 @@ class ccd_spacing():
         sims_layout = row(self.button_enable_sims, self.button_sims_orient,
                           self.button_sims_intra_raft, self.button_sims_enable_distortions,
                           self.text_sims_offset, self.text_sims_rotate)
-        self.min_layout = row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
+
+        self.min_layout = column(row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
-                              self.button_line_fitting)
+                              self.button_line_fitting),
+                                 row(self.text_box_half, self.text_box_full))
         self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
                                      self.button_submit)
         self.max_layout = column(self.min_layout, sims_layout, self.sliders_layout,
@@ -257,6 +268,14 @@ class ccd_spacing():
 
         rc = self.do_get_data()
 
+        return
+
+    def update_box_half(self, sattr, old, new):
+        self.cln_box_half = float(self.text_box_half.value)
+        return
+
+    def update_box_full(self, sattr, old, new):
+        self.cln_box_full = float(self.text_box_full.value)
         return
 
     def do_exit(self):
@@ -373,7 +392,6 @@ class ccd_spacing():
                     print("refit")
                     rc = self.match()
 
-
     def do_fit(self):
         self.use_fit = True
         rc = self.match()
@@ -393,7 +411,6 @@ class ccd_spacing():
 
     def do_submit(self):
         self.use_offsets = True
-        #self.use_fit = False
         if self.use_fit:
             self.grid_x0 += self.slider_x0.value
             self.grid_y0 += self.slider_y0.value
@@ -440,8 +457,8 @@ class ccd_spacing():
 
         base_dir = self.dir_index
         self.file_paths = {}
-
         result_dirs = sorted(glob.glob(base_dir + "/*/*/"))
+
         for result_dir in result_dirs:
             try:  # bail if 2 files not found
                 infile1, infile2 = sorted(glob.glob(join(result_dir, '*_source_catalog.cat')))
@@ -451,6 +468,7 @@ class ccd_spacing():
             name_ccd1 = os.path.basename(infile1).split("_source")[0].strip()
             name_ccd2 = os.path.basename(infile2).split("_source")[0].strip()
             combo_name = name_ccd1 + "_" + name_ccd2
+
             try:
                 self.file_paths[combo_name] = result_dir
             except KeyError:
@@ -1167,11 +1185,11 @@ class ccd_spacing():
         median_x = np.nanmedian(np.array(sensor["x"]))
         median_y = np.nanmedian(np.array(sensor["y"]))
 
-        box_x = 16
-        box_y = 27
+        box_x = self.cln_box_half
+        box_y = self.cln_box_full
         if orientation == "vertical":
-            box_x = 27
-            box_y = 16
+            box_x = self.cln_box_full
+            box_y = self.cln_box_half
 
         dist_x = box_x * self.pitch
         dist_y = box_y * self.pitch
