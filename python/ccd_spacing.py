@@ -1297,25 +1297,25 @@ class ccd_spacing():
         color = ["blue", "red"]
 
         flux_hist = figure(title="Spots Grid: fluxes  " + self.raft_ccd_combo, x_axis_label='flux (counts)',
-                           y_axis_label='y', tools=self.TOOLS)
+                           y_axis_label='y', y_axis_type="log", tools=self.TOOLS)
         xErr_hist = figure(title="Spots Grid: x errors  " + self.raft_ccd_combo, x_axis_label='dx (px)',
-                           y_axis_label='y', tools=self.TOOLS)
+                           y_axis_label='y', y_axis_type="log", tools=self.TOOLS)
         yErr_hist = figure(title="Spots Grid: y errors  " + self.raft_ccd_combo, x_axis_label='dy (px)',
-                           y_axis_label='y', tools=self.TOOLS)
+                           y_axis_label='y', y_axis_type="log", tools=self.TOOLS)
 
         for s, sensor in enumerate(self.sensor):
             flux = self.sensor[sensor].spot_input["flux"][self.sensor[sensor].spot_cln["order"]]
-            fh, binh = np.histogram(flux)
+            fh, binh = np.histogram(flux, bins=100)
             w = binh[1] - binh[0]
             flux_hist.step(y=fh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
             dx = np.sqrt(self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]/flux)
-            dxh, binh = np.histogram(dx)
+            dxh, binh = np.histogram(dx, bins=100)
             w = binh[1] - binh[0]
             xErr_hist.step(y=dxh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
             dy = np.sqrt(self.sensor[sensor].spot_input["yy"][self.sensor[sensor].spot_cln["order"]]/flux)
-            dyh, binh = np.histogram(dy)
+            dyh, binh = np.histogram(dy, bins=100)
             w = binh[1] - binh[0]
             yErr_hist.step(y=dyh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
