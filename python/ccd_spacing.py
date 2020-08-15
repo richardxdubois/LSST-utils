@@ -1321,12 +1321,12 @@ class ccd_spacing():
             flux_hist.step(y=fh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
             xx = self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]
-            xxh, binh = np.histogram(xx, bins=100)
+            xxh, binh = np.histogram(xx, bins=100, range=(0.,10.))
             w = binh[1] - binh[0]
             xx_hist.step(y=xxh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
             yy = self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]
-            yyh, binh = np.histogram(yy, bins=100)
+            yyh, binh = np.histogram(yy, bins=100, range=(0.,10.))
             w = binh[1] - binh[0]
             yy_hist.step(y=yyh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
