@@ -131,6 +131,8 @@ class ccd_spacing():
 
         self.sim_x = None
         self.sim_y = None
+        self.sim_moments = None
+        self.sim_flux = None
 
         self.sim_doit = False
         self.sim_inter_raft = False
@@ -1098,8 +1100,10 @@ class ccd_spacing():
 
         # use simulation data
         if self.sim_doit:
-            self.sensor[0].spot_input = dict(x=self.sim_x[0], y=self.sim_y[0])
-            self.sensor[1].spot_input = dict(x=self.sim_x[1], y=self.sim_y[1])
+            self.sensor[0].spot_input = dict(x=self.sim_x[0], y=self.sim_y[0], xx=self.sim_moments[0],
+                                             yy=self.sim_moments[0], flux=self.sim_flux[0])
+            self.sensor[1].spot_input = dict(x=self.sim_x[1], y=self.sim_y[1], xx=self.sim_moments[1],
+                                             yy=self.sim_moments[1], flux=self.sim_flux[1])
         else:   # use projector data
             self.sensor[0].src = fits.getdata(infile1)
             self.sensor[0].spot_input = dict(x=self.sensor[0].src[kw_x], y=self.sensor[0].src[kw_y],
@@ -1297,30 +1301,46 @@ class ccd_spacing():
         color = ["blue", "red"]
 
         flux_hist = figure(title="Spots Grid: fluxes  " + self.raft_ccd_combo, x_axis_label='flux (counts)',
-                           y_axis_label='y', y_axis_type="log", tools=self.TOOLS)
+                           y_axis_label='y', y_axis_type="log", x_axis_type="log", tools=self.TOOLS)
+        xx_hist = figure(title="Spots Grid: x moment  " + self.raft_ccd_combo, x_axis_label='xx (px^2x)',
+                           y_axis_label='y', tools=self.TOOLS)
+        yy_hist = figure(title="Spots Grid: y moment  " + self.raft_ccd_combo, x_axis_label='yy (px^2)',
+                           y_axis_label='y', tools=self.TOOLS)
         xErr_hist = figure(title="Spots Grid: x errors  " + self.raft_ccd_combo, x_axis_label='dx (px)',
-                           y_axis_label='y', y_axis_type="log", tools=self.TOOLS)
+                           y_axis_label='y', y_axis_type="log", x_axis_type="log", tools=self.TOOLS)
         yErr_hist = figure(title="Spots Grid: y errors  " + self.raft_ccd_combo, x_axis_label='dy (px)',
-                           y_axis_label='y', y_axis_type="log", tools=self.TOOLS)
+                           y_axis_label='y', y_axis_type="log", x_axis_type="log", tools=self.TOOLS)
 
         for s, sensor in enumerate(self.sensor):
-            flux = self.sensor[sensor].spot_input["flux"][self.sensor[sensor].spot_cln["order"]]
+            fl = self.sensor[sensor].spot_input["flux"]
+            order = self.sensor[sensor].spot_cln["order"]
+            flux = fl[order]
             flux = np.nan_to_num(flux, nan=100000.)
             fh, binh = np.histogram(flux, bins=100)
             w = binh[1] - binh[0]
             flux_hist.step(y=fh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
-            dx = np.sqrt(self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]/flux)
+            xx = self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]
+            xxh, binh = np.histogram(xx, bins=100)
+            w = binh[1] - binh[0]
+            xx_hist.step(y=xxh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
+
+            yy = self.sensor[sensor].spot_input["xx"][self.sensor[sensor].spot_cln["order"]]
+            yyh, binh = np.histogram(yy, bins=100)
+            w = binh[1] - binh[0]
+            yy_hist.step(y=yyh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
+
+            dx = np.sqrt(xx/flux)
             dxh, binh = np.histogram(dx, bins=100)
             w = binh[1] - binh[0]
             xErr_hist.step(y=dxh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
-            dy = np.sqrt(self.sensor[sensor].spot_input["yy"][self.sensor[sensor].spot_cln["order"]]/flux)
+            dy = np.sqrt(yy/flux)
             dyh, binh = np.histogram(dy, bins=100)
             w = binh[1] - binh[0]
             yErr_hist.step(y=dyh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
-        final_layout = layout(plots_layout, row(xErr_hist, yErr_hist), flux_hist)
+        final_layout = layout(plots_layout, row(xx_hist, yy_hist), row(xErr_hist, yErr_hist), flux_hist)
 
         return final_layout
 
@@ -1401,6 +1421,8 @@ class ccd_spacing():
 
         self.sim_x = [[], []]
         self.sim_y = [[], []]
+        self.sim_moments = [[], []]
+        self.sim_flux = [[], []]
 
         f_distort = 0.
         if self.sim_distort:
@@ -1438,6 +1460,12 @@ class ccd_spacing():
                     if y01 - distance_grid_ctr < -gap / 2.:
                         self.sim_y[1].append(y01)
                         self.sim_x[1].append(x01)
+
+        self.sim_moments[0] = np.array([5.]*len(self.sim_x[0]))
+        self.sim_moments[1] = np.array([5.] * len(self.sim_x[1]))
+        self.sim_flux[0] = np.array([50000.]*len(self.sim_x[0]))
+        self.sim_flux[1] = np.array([50000.]*len(self.sim_x[1]))
+
         return
 
     def loop(self):
