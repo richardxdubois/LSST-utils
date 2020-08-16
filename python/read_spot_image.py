@@ -1,6 +1,7 @@
 import numpy as np
 from astropy.io import fits
 from bokeh.plotting import figure, output_file, show
+from bokeh.models import ColorBar, LogColorMapper, LogTicker
 import argparse
 
 
@@ -14,6 +15,10 @@ class get_spot_image():
 
         self.image_fig = figure(title="amp image", height=1000, width=1000,
                                 tooltips=[("x", "$x"), ("y", "$y"), ("value", "@image")])
+        self.cmapper = LogColorMapper(palette="Spectral11", low=0.001, high=75000.)
+        self.cbar = ColorBar(color_mapper=self.cmapper, label_standoff=12, ticker=LogTicker(),
+                             orientation="horizontal", location=(0,0))
+        self.image_fig.add_layout(self.cbar, "below")
 
         return
 
