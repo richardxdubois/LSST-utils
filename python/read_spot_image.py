@@ -31,12 +31,15 @@ class get_spot_image():
 
         seg = self.amp_ordering[amp-1] + 1
 
+        datasec = hdulist[amp].header['DATASEC'][1:-1].replace(':', ',').split(',')
+
         channel = hdulist[seg].header["CHANNEL"]
         extname = hdulist[seg].header["EXTNAME"]
         print("amp, seg, channel = ", amp, seg, channel, extname)
 
         allpixeldata = hdulist[seg].data
-        pixeldata = allpixeldata[1:2002, 11:522]
+        pixeldata = allpixeldata[int(datasec[2]): int(datasec[3]), int(datasec[0]): int(datasec[1])]
+
         bias = np.array(allpixeldata[1:2002, 513:562])
 
         pedestal = np.mean(bias.flatten())
@@ -89,7 +92,7 @@ if __name__ == "__main__":
         sI.get_image(fname=args.input, amp=amp)
         sI.show_image()
     if args.all == "no":
-        sI.ccd_image.title.text = ccd_name + "amp " + str(sI.amp)
+        sI.ccd_image.title.text = ccd_name + " : amp " + str(sI.amp)
     else:
         sI.image_fig.title.text = ccd_name
     show(sI.image_fig)
