@@ -1256,7 +1256,7 @@ class ccd_spacing():
         x2 = np.array(self.sensor[1].spot_cln["x"]) - o3
         y2 = np.array(self.sensor[1].spot_cln["y"]) - o4
 
-        self.ccd1_scatter = figure(title="Spots Grid:" + self.name_ccd1, x_axis_label='x',
+        self.ccd1_scatter = figure(title="Spots Grid:" + self.names_ccd[0], x_axis_label='x',
                                    y_axis_label='y', tools=self.TOOLS)
 
         source_g = None
@@ -1270,7 +1270,7 @@ class ccd_spacing():
         c1 = self.ccd1_scatter.circle(x="x", y="y", source=source_1, color="blue")
 
         source_2 = ColumnDataSource(dict(x=x2, y=y2))
-        p2 = figure(title="Spots Grid: " + self.name_ccd2, x_axis_label='x',
+        p2 = figure(title="Spots Grid: " + self.names_ccd[1], x_axis_label='x',
                     y_axis_label='y', tools=self.TOOLS)
 
         if self.overlay_ccd:
