@@ -10,6 +10,7 @@ from os.path import join
 from astropy.io import fits
 
 from mixcoatl.sourcegrid import grid_fit, DistortedGrid
+#from mixcoatl.gridFitTask import GridFitTask, DistortedGrid
 
 from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
@@ -81,6 +82,8 @@ class ccd_spacing():
 
         self.line_fitting = False
 
+        self.infile1 = None
+        self.infile2 = None
         self.src1 = None
         self.src2 = None
 
@@ -1058,12 +1061,12 @@ class ccd_spacing():
             for result_dir in results_dirs:
                 print(result_dir)
 
-            infile1, infile2 = sorted(glob.glob(join(results_dirs[0], '*_source_catalog.cat')))
-            print(infile1)
-            print(infile2)
+            self.infile1, self.infile2 = sorted(glob.glob(join(results_dirs[0], '*_source_catalog.cat')))
+            print(self.infile1)
+            print(self.infile2)
 
-            self.name_ccd1 = os.path.basename(infile1).split("_source")[0]
-            self.name_ccd2 = os.path.basename(infile2).split("_source")[0]
+            self.name_ccd1 = os.path.basename(self.infile1).split("_source")[0]
+            self.name_ccd2 = os.path.basename(self.infile2).split("_source")[0]
             self.names_ccd = [self.name_ccd1, self.name_ccd2]
 
             s1 = self.name_ccd1.split("_")[1]
@@ -1105,13 +1108,13 @@ class ccd_spacing():
             self.sensor[1].spot_input = dict(x=self.sim_x[1], y=self.sim_y[1], xx=self.sim_moments[1],
                                              yy=self.sim_moments[1], flux=self.sim_flux[1])
         else:   # use projector data
-            self.sensor[0].src = fits.getdata(infile1)
+            self.sensor[0].src = fits.getdata(self.infile1)
             self.sensor[0].spot_input = dict(x=self.sensor[0].src[kw_x], y=self.sensor[0].src[kw_y],
                                              xx=self.sensor[0].src[kw_xx], yy=self.sensor[0].src[kw_yy],
                                              flux=self.sensor[0].src[kw_flux])
             self.sensor[0].orientation = self.ccd_relative_orientation
 
-            self.sensor[1].src = fits.getdata(infile2)
+            self.sensor[1].src = fits.getdata(self.infile2)
             self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y],
                                              xx=self.sensor[1].src[kw_xx], yy=self.sensor[1].src[kw_yy],
                                              flux=self.sensor[1].src[kw_flux])
@@ -1229,10 +1232,13 @@ class ccd_spacing():
 
     def data_2_model(self, srcX, srcY, ncols, nrows, x0_guess, y0_guess, distortions=None):
 
-        fitted_grid = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
-                              y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
+        #fitted_grid = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
+        #                      y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
+        result = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
+                              y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
+                          brute_search=False, vary_theta=True)
 
-        return fitted_grid
+        return result
 
     def make_plots(self):
 
@@ -1348,16 +1354,16 @@ class ccd_spacing():
         if self.grid is None:
             self.grid = DistortedGrid.from_fits(self.grid_data_file)
 
-        self.gX1 = self.grid["X"]
-        self.gY1 = self.grid["Y"]
-        self.gX2 = self.grid["X"]
-        self.gY2 = self.grid["Y"]
+        self.gX1 = self.grid.x
+        self.gY1 = self.grid.y
+        self.gX2 = self.grid.x
+        self.gY2 = self.grid.y
 
         if self.sim_distort:
-            self.gX1 += self.grid["DX"]
-            self.gY1 += self.grid["DY"]
-            self.gX2 += self.grid["DX"]
-            self.gY2 += self.grid["DY"]
+            self.gX1 += self.grid.norm_dx
+            self.gY1 += self.grid.norm_dy
+            self.gX2 += self.grid.norm_dx
+            self.gY2 += self.grid.norm_dy
 
     def match(self):
 
@@ -1367,7 +1373,7 @@ class ccd_spacing():
         rc = self.setup_grid()
 
         if self.sim_distort:
-            distortions = (self.grid["DY"], self.grid["DX"])
+            distortions = (self.grid.norm_dy, self.grid.norm_dx)
 
         # Need an intelligent guess
 
@@ -1381,20 +1387,22 @@ class ccd_spacing():
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
                                         distortions=distortions)
 
-        print('Grid 1:', model_grid1.x0, model_grid1.y0, model_grid1.theta)
-        print('Grid 2:', model_grid2.x0, model_grid2.y0, model_grid2.theta)
+        print('Grid 1:', model_grid1.params['x0'].value, model_grid1.params['y0'].value,
+              model_grid1.params['theta'].value)
+        print('Grid 2:', model_grid2.params['x0'].value, model_grid2.params['y0'].value,
+              model_grid2.params['theta'].value)
 
-        self.dy0 = model_grid2.y0 - model_grid1.y0
-        self.dx0 = model_grid2.x0 - model_grid1.x0
-        self.dtheta0 = model_grid2.theta - model_grid1.theta
+        self.dy0 = model_grid2.params['y0'].value - model_grid1.params['y0'].value
+        self.dx0 = model_grid2.params['x0'].value - model_grid1.params['x0'].value
+        self.dtheta0 = model_grid2.params['theta'].value - model_grid1.params['theta'].value
         print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0)
 
         # reset grid guesses
 
-        self.grid_x0 = model_grid1.x0
-        self.grid_x1 = model_grid2.x0
-        self.grid_y0 = model_grid1.y0
-        self.grid_y1 = model_grid2.y0
+        self.grid_x0 = model_grid1.params['x0']
+        self.grid_x1 = model_grid2.params['x0']
+        self.grid_y0 = model_grid1.params['y0']
+        self.grid_y1 = model_grid2.params['y0']
 
     def simulate_response(self, distort=False):
 
@@ -1405,10 +1413,10 @@ class ccd_spacing():
         #  intra or extra-raft pairing
 
         self.grid = DistortedGrid.from_fits(self.grid_data_file)
-        xg = self.grid['X']
-        yg = self.grid['Y']
-        dxg = self.grid['DX']
-        dyg = self.grid['DY']
+        xg = self.grid.x
+        yg = self.grid.y
+        dxg = self.grid.dx * self.pitch  # distortions are now normalized to the spot pitch
+        dyg = self.grid.dy * self.pitch
 
         ccd_gap = 125.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
         raft_gap = 500.  # 0.5 mm gap between rafts, which are 127 mm wide
