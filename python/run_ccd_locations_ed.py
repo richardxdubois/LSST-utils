@@ -15,15 +15,17 @@ parser = argparse.ArgumentParser(
 # The following are 'convenience options' which could also be specified in
 # the filter string
 
-#parser.add_argument('-o', '--output', default='/Users/richard/LSST/Code/misc/CCD_grids/',
-parser.add_argument('-o', '--output', default='/Users/digel/Documents/LSSTCamera/python/LSST-utils/python/',
+parser.add_argument('-o', '--output', default='/Users/richard/LSST/Code/misc/CCD_grids/',
+#parser.add_argument('-o', '--output', default='/Users/digel/Documents/LSSTCamera/python/LSST-utils/python/',
                     help="output directory path")
 parser.add_argument('--in_params', default='CCD_grids_params.csv',
                     help="output params file spec")
 parser.add_argument('-i', '--invert', default='no',
                     help="invert sensor order")
-#parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
-parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~digel/LSST/CCD_grids/',
+parser.add_argument('-t', '--type', default='line',
+                    help="fit type to use (line or grid)")
+parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
+#parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~digel/LSST/CCD_grids/',
                     help="base html path")
 
 args = parser.parse_args()
@@ -35,26 +37,39 @@ id_col = combos_frame["name"]
 
 names = []
 orient = []
-x = []      # for the table
-y = []      # for the table
-sdiff = []
+lx = []      # for the table
+ly = []      # for the table
+ltheta = []
 fx = []
 fy = []
 ftheta = []
 st_name = []
+
+x = []
+y = []
+theta = []
 
 # load up the parameters
 
 for index, c_row in csv_assign.iterrows():
     names.append(c_row["name"])
     orient.append(c_row["orientation"])
-    x.append(c_row["dx_line"])
-    y.append(c_row["dy_line"])
-    sdiff.append(c_row["dtheta_line"])
+    lx.append(c_row["dx_line"])
+    ly.append(c_row["dy_line"])
+    ltheta.append(c_row["dtheta_line"])
     st_name.append(c_row["ref_CCD"])
     fx.append(c_row["dx_fit"])
     fy.append(c_row["dy_fit"])
     ftheta.append(c_row["dtheta_fit"])
+
+if args.type == "line":
+    x = lx
+    y = ly
+    theta = ltheta
+else:
+    x = fx
+    y = fy
+    theta = ftheta
 
 print("Found ", len(names), " good filesets")
 
@@ -110,7 +125,7 @@ sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R2
 
 #sensors = ['R30_S11', 'R30_S21', 'R30_S20', 'R30_S10']
 
-sensors = ['R30_S20', 'R30_S21', 'R30_S11', 'R30_S10']  # reverse direction of the above
+#sensors = ['R30_S20', 'R30_S21', 'R30_S11', 'R30_S10']  # reverse direction of the above
 #sensors = ['R30_S11', 'R30_S21', 'R30_S20', 'R30_S10', 'R30_S20', 'R30_S21', 'R30_S11','R30_S10']  # combination of the above two
 #sensors = ["R30_S10", "R30_S11", "R30_S12", "R30_S11"]
 #sensors = ["R30_S11", "R30_S12", "R30_S11", "R30_S10"]
@@ -167,13 +182,13 @@ for ids, tgt_sensor in enumerate(sensors):
         print('Reverse step: ' + tgt_sensor + ' ' + cur_sensor + ' ' + c)
         # Transform the offset and rotation to be in the reference frame of
         # the other sensor
-        theta = -sdiff[idl]
-        dx0 = (x[idl] * math.cos(np.pi + theta) - y[idl] * math.sin(np.pi + theta))
-        dy0 = (x[idl] * math.sin(np.pi + theta) + y[idl] * math.cos(np.pi + theta))
+        theta_r = -theta[idl]
+        dx0 = (x[idl] * math.cos(np.pi + theta_r) - y[idl] * math.sin(np.pi + theta_r))
+        dy0 = (x[idl] * math.sin(np.pi + theta_r) + y[idl] * math.cos(np.pi + theta_r))
     else:
         print('Forward step: ' + tgt_sensor + ' ' + cur_sensor + ' ' + c)
         # Keep the offset and rotation as they are
-        theta = sdiff[idl]
+        theta_r = theta[idl]
         dx0 = x[idl]
         dy0 = y[idl]
         print(dx0, dy0, theta)
@@ -184,7 +199,7 @@ for ids, tgt_sensor in enumerate(sensors):
     dy = dx0 * math.sin(rot_angle) + dy0 * math.cos(rot_angle)
 
     # apply rotation to the deltas, but only after the first connection
-    rot_angle += theta
+    rot_angle += theta_r
 
     r0 = tgt_sensor[0:3]
     s0 = tgt_sensor[4:7]
@@ -207,7 +222,7 @@ for ids, tgt_sensor in enumerate(sensors):
     dist_m = math.hypot(cx_0 - cx_m[ids], cy_0 - cy_m[ids])
 
     print(tgt_sensor, names[idl], running_x, running_y, "      ",
-          st_name[idl], sdiff[idl], rot_angle, orient[idl], dx, dx0, dy, dy0, dx_m[ids], dy_m[ids], dist_m)
+          st_name[idl], theta[idl], rot_angle, orient[idl], dx, dx0, dy, dy0, dx_m[ids], dy_m[ids], dist_m)
 
     cur_sensor = tgt_sensor
 

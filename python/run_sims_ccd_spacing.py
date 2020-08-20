@@ -168,13 +168,13 @@ results_table = DataTable(source=results_source, columns=results_columns, width=
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
-x_hist = figure(tools=cS.TOOLS, title="x offsets", x_axis_label='offsets (px)',
+x_hist = figure(tools=cS.TOOLS, title="short offsets", x_axis_label='offsets (px)',
                 y_axis_label='counts', height=400, width=600)
 x_hist.vbar(top=x_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)
 
-y_off, bins = np.histogram(np.array(y_o), bins=10)
+y_off, bins = np.histogram(np.abs(np.array(y_o)), bins=10)
 w = bins[1] - bins[0]
-y_hist = figure(tools=cS.TOOLS, title="y offsets", x_axis_label='offsets (px)',
+y_hist = figure(tools=cS.TOOLS, title="abs long offsets", x_axis_label='offsets (px)',
                 y_axis_label='counts', height=400, width=600)
 y_hist.step(y=y_off, x=bins[:-1] + w / 2.)
 y_hist.vbar(top=y_off, x=bins[:-1], width=bins[1] - bins[0], fill_color='red', fill_alpha=0.2)

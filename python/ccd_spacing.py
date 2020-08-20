@@ -1298,10 +1298,12 @@ class ccd_spacing():
                 p2.circle(x="x", y="y", source=source_g, color="gray")
             plots_layout = row(self.ccd1_scatter, p2)
 
-        if self.use_fit:
-            print("add grid center pt to scatter plot")
-            self.ccd1_scatter.circle(x=self.grid_x0-o1, y=self.grid_y0-o2, color="black")
+        print("add grid center pt to scatter plot")
+        self.ccd1_scatter.circle(x=self.grid_x0-o1, y=self.grid_y0-o2, color="black")
+        if self.overlay_ccd:
             self.ccd1_scatter.circle(x=self.grid_x1-o3, y=self.grid_y1-o4, color="green")
+        else:
+            p2.circle(x=self.grid_x1 - o3, y=self.grid_y1 - o4, color="green")
 
         # get errors and fluxes
         color = ["blue", "red"]
