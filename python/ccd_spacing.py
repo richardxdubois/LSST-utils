@@ -341,9 +341,9 @@ class ccd_spacing():
     def do_rotate(self):
         self.show_rotate = not self.show_rotate
         if self.show_rotate:
-            self.button_rotate.button_type = "danger"
-        else:
             self.button_rotate.button_type = "success"
+        else:
+            self.button_rotate.button_type = "danger"
 
     def do_line_fitting(self):
         self.line_fitting = not self.line_fitting
@@ -1079,18 +1079,6 @@ class ccd_spacing():
                 self.ccd_relative_orientation = "vertical"
                 self.extrap_dir = -1.
 
-        if self.show_rotate:
-            rad = self.rotate * self.extrap_dir
-            x1_rot = math.cos(rad) * self.srcX[0] - math.sin(rad) * self.srcY[0]
-            y1_rot = math.sin(rad) * self.srcX[0] + math.cos(rad) * self.srcY[0]
-            x2_rot = math.cos(rad) * self.srcX[1] - math.sin(rad) * self.srcY[1]
-            y2_rot = math.sin(rad) * self.srcX[1] + math.cos(rad) * self.srcY[1]
-
-            self.srcX[0] = x1_rot
-            self.srcY[0] = y1_rot
-            self.srcX[1] = x2_rot
-            self.srcY[1] = y2_rot
-
         self.sensor = {}
         self.sensor[0] = sensor()
         self.sensor[1] = sensor()
@@ -1261,6 +1249,15 @@ class ccd_spacing():
         y1 = np.array(self.sensor[0].spot_cln["y"]) - o2
         x2 = np.array(self.sensor[1].spot_cln["x"]) - o3
         y2 = np.array(self.sensor[1].spot_cln["y"]) - o4
+
+        if self.show_rotate:
+            rad = self.sim_rotate
+            x2_rot = math.cos(rad) * x2 - math.sin(rad) * y2
+            y2_rot = math.sin(rad) * x2 + math.cos(rad) * y2
+
+            x2 = x2_rot
+            y2 = y2_rot
+
 
         self.ccd1_scatter = figure(title="Spots Grid:" + self.name_ccd1, x_axis_label='x',
                                    y_axis_label='y', tools=self.TOOLS)
