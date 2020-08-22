@@ -52,6 +52,7 @@ theta = []
 # load up the parameters
 
 for index, c_row in csv_assign.iterrows():
+    flag = ""
     names.append(c_row["name"])
     orient.append(c_row["orientation"])
     lx.append(c_row["dx_line"])
@@ -61,6 +62,18 @@ for index, c_row in csv_assign.iterrows():
     fx.append(c_row["dx_fit"])
     fy.append(c_row["dy_fit"])
     ftheta.append(c_row["dtheta_fit"])
+
+    if abs(lx[index] - fx[index]) > 4:
+        flag += " x "
+    if abs(ly[index] - fy[index]) > 4:
+        flag += " y "
+    if abs(ltheta[index] - ftheta[index]) > 0.0005:
+        flag += " theta "
+
+    if flag != "":
+        print("%s,%s,%s,%.3f, %.3f,%s,%.3f, %.3f,%s,%.4f,%.4f " %
+              (flag, names[index], ":  x ", lx[index], fx[index], " y ", ly[index], fy[index], " theta ",
+              ltheta[index], ftheta[index]))
 
 if args.type == "line":
     x = lx
