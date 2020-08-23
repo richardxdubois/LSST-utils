@@ -382,22 +382,25 @@ class ccd_spacing():
 
     def iterate_fit(self):
         # hack in case fit and lines are off by a spot - inflate long edge guess by 5% and re-fit
+        inflate = 1.0075
+        pitch_frac = 0.3
+
         if self.line_fitting:
             if self.ccd_relative_orientation == "horizontal":
-                if abs(abs(self.center_to_center[0]) - abs(self.dx0)) > 0.75*self.pitch:
+                if abs(abs(self.center_to_center[0]) - abs(self.dx0)) > pitch_frac*self.pitch:
                     if self.ccd_standard == 0:
-                        self.grid_x1 *= 1.015
+                        self.grid_x1 *= inflate
                     else:
-                        self.grid_x0 *= 1.015
+                        self.grid_x0 *= inflate
                     print("refit")
                     rc = self.match()
 
             else:
-                if abs(abs(self.center_to_center[1]) - abs(self.dy0)) > 0.75*self.pitch:
+                if abs(abs(self.center_to_center[1]) - abs(self.dy0)) > pitch_frac*self.pitch:
                     if self.ccd_standard == 0:
-                        self.grid_y1 *= 1.015
+                        self.grid_y1 *= inflate
                     else:
-                        self.grid_y0 *= 1.015
+                        self.grid_y0 *= inflate
                     print("refit")
                     rc = self.match()
 
@@ -542,11 +545,11 @@ class ccd_spacing():
         nl = len(ccd)
         for n in range(nl):
             ccd[n] = sorted(ccd[n], key=lambda xy: xy[0])
-            # ensure end points make sense
-            if abs(ccd[n][0][0] - ccd[n][1][0]) > self.cut_spurious_spots:
-                del ccd[n][0]
-            if abs(ccd[n][-1][0] - ccd[n][-2][0]) > self.cut_spurious_spots:
-                del ccd[n][-1]
+        #    # ensure end points make sense
+        #    if abs(ccd[n][0][0] - ccd[n][1][0]) > self.cut_spurious_spots:
+        #        del ccd[n][0]
+        #    if abs(ccd[n][-1][0] - ccd[n][-2][0]) > self.cut_spurious_spots:
+        #        del ccd[n][-1]
 
         return ccd
 
@@ -888,10 +891,11 @@ class ccd_spacing():
             internal_hole = [self.missing_internal_spots(0, nl), self.missing_internal_spots(1, nl)]
             internal_hole_sums[0] += internal_hole[0]
             internal_hole_sums[1] += internal_hole[1]
-            missing_spots = self.num_spots - \
-                            (len(self.sensor[0].lines[nl]) + len(self.sensor[1].lines[nl]) +
-                             internal_hole[0] + internal_hole[1])
-            extrap_dist = (missing_spots + 1) * self.pitch  # n+1 gaps needed to add
+            nspots0 = len(self.sensor[0].lines[nl])
+            nspots1 = len(self.sensor[1].lines[nl])
+            missing_spots = self.num_spots - (nspots0 + nspots1 +
+                            internal_hole[0] + internal_hole[1])
+            extrap_dist = (missing_spots +1) * self.pitch  # gaps needed to add
             self.d_extrap.append(extrap_dist)
 
             near_end = 0
@@ -929,7 +933,14 @@ class ccd_spacing():
 
         self.med_shift_x = np.median(np.array(self.shift_x))
         self.med_shift_y = np.median(np.array(self.shift_y))
-        self.mean_slope_diff = np.mean(np.array(slope_difference))
+        #if self.ccd_relative_orientation == "horizontal":
+        #    self.med_shift_x = np.min(np.array(self.shift_x))
+        #    self.med_shift_y = np.median(np.array(self.shift_y))
+        #else:
+        #    self.med_shift_x = np.median(np.array(self.shift_x))
+        #    self.med_shift_y = np.min(np.array(self.shift_y))
+
+        self.mean_slope_diff = np.mean(np.array(slope_difference[18:25]))  # try middle of line range
 
         if self.ccd_standard == 0:
             self.x1_in = self.med_shift_x
@@ -1208,8 +1219,12 @@ class ccd_spacing():
         for n, x in enumerate(sensor["x"]):
             if np.isnan(x) or np.isnan(sensor["y"][n]) or np.isnan(sensor["flux"][n]):  # there be nan's in the input data!
                 continue
+            if sensor["xx"][n] < 4.5 or sensor["xx"][n] > 7.:  # spots with sensible moments
+                continue
+            if sensor["yy"][n] < 4.5 or sensor["yy"][n] > 7.:  # spots with sensible moments
+                continue
             if x > x_min and x < x_max and \
-                    sensor["y"][n] > y_min and sensor["y"][n] < y_max:
+                sensor["y"][n] > y_min and sensor["y"][n] < y_max:
                 out_x.append(x)
                 out_y.append(sensor["y"][n])
                 out_order.append(n)
@@ -1224,7 +1239,7 @@ class ccd_spacing():
         #                      y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
         result = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
                               y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
-                          brute_search=False, vary_theta=True)
+                          brute_search=True, vary_theta=True)
 
         return result
 
@@ -1376,12 +1391,12 @@ class ccd_spacing():
 
         # Need an intelligent guess
 
-        model_grid1 = self.data_2_model(srcX=self.sensor[0].spot_cln["x"], srcY=self.sensor[0].spot_cln["y"],
+        model_grid1 = self.data_2_model(srcX=self.sensor[0].spot_input["x"], srcY=self.sensor[0].spot_input["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x0, y0_guess=self.grid_y0,
                                         distortions=distortions)
 
-        model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_cln["x"], srcY=self.sensor[1].spot_cln["y"],
+        model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_input["x"], srcY=self.sensor[1].spot_input["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
                                         distortions=distortions)
@@ -1398,10 +1413,10 @@ class ccd_spacing():
 
         # reset grid guesses
 
-        self.grid_x0 = model_grid1.params['x0']
-        self.grid_x1 = model_grid2.params['x0']
-        self.grid_y0 = model_grid1.params['y0']
-        self.grid_y1 = model_grid2.params['y0']
+        self.grid_x0 = model_grid1.params['x0'].value
+        self.grid_x1 = model_grid2.params['x0'].value
+        self.grid_y0 = model_grid1.params['y0'].value
+        self.grid_y1 = model_grid2.params['y0'].value
 
     def simulate_response(self, distort=False):
 
