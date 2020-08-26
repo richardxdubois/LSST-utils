@@ -38,12 +38,17 @@ class sensor():
         self.fitted_grid = None
 
         self.name = None
+        self.sensor_type = None
 
         # found lines
         self.lines = {}
 
         # fitted lines
         self.linfits = {}
+
+        # grid fit results
+
+        self.grid_fit_results = None
 
 
 class ccd_spacing():
@@ -267,6 +272,14 @@ class ccd_spacing():
                                  self.button_fit)
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
+
+        # set up DistortedGrid
+
+        self.grid = DistortedGrid.from_fits(self.grid_data_file)
+        normalized_shifts = (self.grid.norm_dy, self.grid.norm_dx)
+        self.distorted_grid = DistortedGrid(xstep=self.pitch, ystep=self.pitch, theta=-self.rotate, x0=0, y0=0,
+                                            ncols=self.num_spots, nrows=self.num_spots,
+                                            normalized_shifts=normalized_shifts)
 
     # handlers
 
@@ -895,7 +908,9 @@ class ccd_spacing():
             nspots1 = len(self.sensor[1].lines[nl])
             missing_spots = self.num_spots - (nspots0 + nspots1 +
                             internal_hole[0] + internal_hole[1])
-            extrap_dist = (missing_spots +1) * self.pitch  # gaps needed to add
+
+            # distance between first spot on standard CCD and last spot on the other
+            extrap_dist = (missing_spots + 1) * self.pitch  # gaps needed to add
             self.d_extrap.append(extrap_dist)
 
             near_end = 0
@@ -911,17 +926,25 @@ class ccd_spacing():
             y2 = self.sensor[self.ccd_standard].linfits[nl][1] + \
                  self.sensor[self.ccd_standard].linfits[nl][0] * x2
 
+            # work out how to extrapolate along the line a given distance
+
             length = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
             unitSlopeX = (x2 - x1) / length
             unitSlopeY = (y2 - y1) / length
 
+            # new_ is coordinate of other sensor last spot in the standard sensor's system
+
             new_x = x1 - extrap_dist * unitSlopeX
             new_y = y1 - extrap_dist * unitSlopeY
+
+            # old_ is the coordinate of the last spot in the non-standard's system
 
             old_x = self.sensor[non_standard].lines[nl][far_end][0]
             old_y = self.sensor[non_standard].linfits[nl][1] + \
                     self.sensor[non_standard].linfits[nl][0] * old_x
+
+            # shift is the offset per line to move the non-standard sensor into the standard's system
 
             self.shift_x.append(old_x - new_x)
             self.shift_y.append(old_y - new_y)
@@ -941,6 +964,10 @@ class ccd_spacing():
         #    self.med_shift_y = np.min(np.array(self.shift_y))
 
         self.mean_slope_diff = np.mean(np.array(slope_difference[18:25]))  # try middle of line range
+
+        xc, yc = self.find_center_spots()
+        self.med_shift_x = (np.mean(np.array(xc[1])) - np.mean(np.array(xc[0]))) * self.extrap_dir
+        self.med_shift_y = (np.mean(np.array(yc[1])) - np.mean(np.array(yc[0]))) * self.extrap_dir
 
         if self.ccd_standard == 0:
             self.x1_in = self.med_shift_x
@@ -968,9 +995,119 @@ class ccd_spacing():
               self.ccd_relative_orientation)
         print("(x, y) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
 
-        rc = self.guess_grid_centers()
+        #rc = self.guess_grid_centers()
+        self.grid_x0 = np.mean(np.array(xc[0]))
+        self.grid_y0 = np.mean(np.array(yc[0]))
+
+        self.grid_x1 = np.mean(np.array(xc[1]))
+        self.grid_y1 = np.mean(np.array(yc[1]))
 
         return
+
+    def select_ends(self, sensor=None):
+
+        #  For horizontal pairings, lines are extrapolated towards the grid center for both sensors:
+        #  in the negative direction from the near end for the sensor whose x coordinates start at zero and positive
+        #  from the far end for those with coordinates ending around 4000.
+        #
+        #  Similarly for vertically paired, the direction is negative for y coords near zero and positive
+        #  for those near 4000. Near and far ends follow the same pattern
+        #
+        # self.ccd_standard is set by this criteria, and in all cases, ccd_standard == 0 for horizontal
+        # and 1 for vertical pairings.
+
+        low_end = 0
+        high_end = 1
+        extrap_dir = 1.
+        coord = 0    # x
+
+        if self.ccd_relative_orientation == "vertical":
+            coord = 1   # y
+
+        if sensor != self.ccd_standard:
+            low_end = 1
+            high_end = 0
+            extrap_dir = -1.
+
+        return low_end, high_end, extrap_dir, coord
+
+    def find_center_spots(self):
+
+        # Reminder of what needs doing:
+        #  For horizontal pairings, lines are extrapolated towards the grid center for both sensors:
+        #  in the negative direction from the near end for the sensor whose x coordinates start at zero and positive
+        #  from the far end for those with coordinates ending around 4000.
+        #
+        #  Similarly for vertically paired, the direction is negative for y coords near zero and positive
+        #  for those near 4000. Near and far ends follow the same pattern
+        #
+        # self.ccd_standard is set by this criteria, and in all cases, ccd_standard == 0 for horizontal
+        # and 1 for vertical pairings.
+
+        non_standard = 1
+        xc = {}
+        yc = {}
+
+        for s in self.sensor:
+            lxc = xc.setdefault(s, [])
+            lyc = yc.setdefault(s, [])
+
+            low_end, high_end, extrap_dir, coord = self.select_ends(sensor=s)
+
+            for nl in range(49):
+
+                # count spots and calculate the spots gap between the CCDs
+                internal_hole = [self.missing_internal_spots(0, nl), self.missing_internal_spots(1, nl)]
+                nspots = len(self.sensor[s].lines[nl])
+                missing_spots = 25 - (nspots + internal_hole[s])
+
+                # distance first spot on standard CCD or last spot on the other to the grid center spot
+                extrap_dist = (missing_spots) * self.pitch  # gaps needed to add
+
+                x1 = self.sensor[s].lines[nl][0][0]
+                y1 = self.sensor[s].linfits[nl][1] +  \
+                     self.sensor[s].linfits[nl][0] * x1
+                x2 = self.sensor[s].lines[nl][-1][0]
+                y2 = self.sensor[s].linfits[nl][1] + \
+                     self.sensor[s].linfits[nl][0] * x2
+
+                # work out how to extrapolate along the line a given distance
+
+                length = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+                unitSlopeX = (x2 - x1) / length
+                unitSlopeY = (y2 - y1) / length
+
+                #if self.ccd_relative_orientation == "horizontal":
+                #    unitSlopeY = self.sensor[s].linfits[nl][0]
+                #    unitSlopeX = math.sqrt(1.-unitSlopeY**2)
+                #else:
+                #    unitSlopeX = self.sensor[s].linfits[nl][0]
+                #    unitSlopeY = math.sqrt(1. - unitSlopeX ** 2)
+
+                # new_ is coordinate of other sensor last spot in the standard sensor's system
+
+                if s == self.ccd_standard:
+                    new_x = x1 - extrap_dist * unitSlopeX
+                    new_y = y1 - extrap_dist * unitSlopeY
+                else:
+                    new_x = x2 + extrap_dist * unitSlopeX
+                    new_y = y2 + extrap_dist * unitSlopeY
+
+                # old_ is the coordinate of the last spot in the non-standard's system
+
+                old_x = self.sensor[non_standard].lines[nl][-1][0]
+                old_y = self.sensor[non_standard].linfits[nl][1] + \
+                        self.sensor[non_standard].linfits[nl][0] * old_x
+
+                shift_old_x = new_x
+                shift_old_y = new_y
+
+                xc[s].append(shift_old_x)
+                yc[s].append(shift_old_y)
+            print("spot centers ", s, " x: ", np.mean(np.array(xc[s])), " y:", np.mean(np.array(yc[s])))
+
+        return xc, yc
 
     def guess_grid_centers(self):
 
@@ -1239,7 +1376,7 @@ class ccd_spacing():
         #                      y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
         result = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
                               y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
-                          brute_search=True, vary_theta=True)
+                          brute_search=False, vary_theta=True)
 
         return result
 
@@ -1273,7 +1410,6 @@ class ccd_spacing():
             x2 = x2_rot
             y2 = y2_rot
 
-
         self.ccd1_scatter = figure(title="Spots Grid:" + self.name_ccd1, x_axis_label='x',
                                    y_axis_label='y', tools=self.TOOLS)
 
@@ -1281,7 +1417,11 @@ class ccd_spacing():
         cg = None
 #        if self.overlay_grid and self.use_fit:
         if self.overlay_grid:
-            source_g = ColumnDataSource(dict(x=self.gX2, y=self.gY2))
+            gY, gX = self.distorted_grid.get_source_centroids()
+            gY += self.grid_y1-o4
+            gX += self.grid_x1-o3
+
+            source_g = ColumnDataSource(dict(x=gX, y=gY))
             cg = self.ccd1_scatter.circle(x="x", y="y", source=source_g, color="gray", size=2)
 
         source_1 = ColumnDataSource(dict(x=x1, y=y1))
@@ -1410,6 +1550,9 @@ class ccd_spacing():
         self.dx0 = model_grid2.params['x0'].value - model_grid1.params['x0'].value
         self.dtheta0 = model_grid2.params['theta'].value - model_grid1.params['theta'].value
         print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0)
+
+        self.sensor[0].grid_fit_results = model_grid1
+        self.sensor[1].grid_fit_results = model_grid2
 
         # reset grid guesses
 
