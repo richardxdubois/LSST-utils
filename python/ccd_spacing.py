@@ -5,6 +5,7 @@ import math
 import numpy as np
 from scipy import optimize
 from sklearn import linear_model
+from scipy.spatial import distance
 
 from os.path import join
 from astropy.io import fits
@@ -1052,9 +1053,17 @@ class ccd_spacing():
             lxc = xc.setdefault(s, [])
             lyc = yc.setdefault(s, [])
 
-            low_end, high_end, extrap_dir, coord = self.select_ends(sensor=s)
-
             for nl in range(49):
+
+                # get the spot pitches near the sensor edges
+                distances = distance.cdist(self.sensor[s].lines[nl],
+                                                self.sensor[s].lines[nl],
+                                                metric="euclidean")
+                dists_near = [distances[d, d+1] for d in range(4)]
+                pitch_near = np.mean(np.array(dists_near))
+                len_line = len(self.sensor[s].lines[nl])
+                dists_far = [distances[d, d + 1] for d in range(len_line-5,len_line-1)]
+                pitch_far = np.mean(np.array(dists_far))
 
                 # count spots and calculate the spots gap between the CCDs
                 internal_hole = [self.missing_internal_spots(0, nl), self.missing_internal_spots(1, nl)]
@@ -1088,9 +1097,11 @@ class ccd_spacing():
                 # new_ is coordinate of other sensor last spot in the standard sensor's system
 
                 if s == self.ccd_standard:
+                    extrap_dist = (missing_spots) * pitch_near  # gaps needed to add
                     new_x = x1 - extrap_dist * unitSlopeX
                     new_y = y1 - extrap_dist * unitSlopeY
                 else:
+                    extrap_dist = (missing_spots) * pitch_far  # gaps needed to add
                     new_x = x2 + extrap_dist * unitSlopeX
                     new_y = y2 + extrap_dist * unitSlopeY
 
