@@ -6,6 +6,8 @@ import numpy as np
 from scipy import optimize
 from sklearn import linear_model
 from scipy.spatial import distance
+from exploreFocalPlane import exploreFocalPlane
+from exploreRaft import exploreRaft
 
 from os.path import join
 from astropy.io import fits
@@ -74,6 +76,13 @@ class ccd_spacing():
         self.pitch = 65.34        # obtained from undistorted grid model
         self.cut_spurious_spots = 68.  # spots need to be closer to another spot to include in lines
         self.num_spots = 49
+
+        self.raft_types = {}
+        eFP = exploreFocalPlane()
+        eR = exploreRaft()
+        raft_list = eFP.focalPlaneContents()
+        for raft in raft_list:
+            self.raft_types[raft[1]] = eR.raft_type(raft[0])
 
         self.ccd1_scatter = None
 
@@ -862,13 +871,17 @@ class ccd_spacing():
 
     def missing_internal_spots(self, sensor_num, line_num):
 
+        coord = 0
+        if self.ccd_relative_orientation == "vertical":
+            coord = 1
+
         num_holes = 0
         len_line = len(self.sensor[sensor_num].lines[line_num])
         for spot in range(len_line-1):   # check for internal gaps
-            if abs(self.sensor[sensor_num].lines[line_num][spot+1][0] -
-                   self.sensor[sensor_num].lines[line_num][spot][0]) \
-                  > self.cut_spurious_spots:
-                num_holes += 1
+            dist = abs(self.sensor[sensor_num].lines[line_num][spot+1][coord] -
+                   self.sensor[sensor_num].lines[line_num][spot][coord])
+            if dist > self.cut_spurious_spots:
+                num_holes += int(dist/self.pitch/0.95 - 1)  # estimate number missing spots from length of hole
 
         return num_holes
 
@@ -970,7 +983,7 @@ class ccd_spacing():
         self.med_shift_x = (np.mean(np.array(xc[1])) - np.mean(np.array(xc[0]))) * self.extrap_dir
         self.med_shift_y = (np.mean(np.array(yc[1])) - np.mean(np.array(yc[0]))) * self.extrap_dir
 
-        if self.ccd_standard == 0:
+        if self.ccd_relative_orientation == "horizontal":
             self.x1_in = self.med_shift_x
             self.y1_in = 2100. + self.med_shift_y
 
@@ -1228,6 +1241,8 @@ class ccd_spacing():
             self.name_ccd2 = os.path.basename(self.infile2).split("_source")[0]
             self.names_ccd = [self.name_ccd1, self.name_ccd2]
 
+            r1 = self.name_ccd1.split("_")[0]
+            r2 = self.name_ccd2.split(("_"))[0]
             s1 = self.name_ccd1.split("_")[1]
             s2 = self.name_ccd2.split(("_"))[1]
             self.extrap_dir = 1.
@@ -1260,12 +1275,14 @@ class ccd_spacing():
                                              xx=self.sensor[0].src[kw_xx], yy=self.sensor[0].src[kw_yy],
                                              flux=self.sensor[0].src[kw_flux])
             self.sensor[0].orientation = self.ccd_relative_orientation
+            self.sensor[0].sensor_type = self.raft_types[r1]
 
             self.sensor[1].src = fits.getdata(self.infile2)
             self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y],
                                              xx=self.sensor[1].src[kw_xx], yy=self.sensor[1].src[kw_yy],
                                              flux=self.sensor[1].src[kw_flux])
             self.sensor[1].orientation = self.ccd_relative_orientation
+            self.sensor[1].sensor_type = self.raft_types[r2]
 
         num_spots_0 = len(self.sensor[0].spot_input["x"])
         num_spots_1 = len(self.sensor[1].spot_input["x"])
@@ -1542,12 +1559,12 @@ class ccd_spacing():
 
         # Need an intelligent guess
 
-        model_grid1 = self.data_2_model(srcX=self.sensor[0].spot_input["x"], srcY=self.sensor[0].spot_input["y"],
+        model_grid1 = self.data_2_model(srcX=self.sensor[0].spot_cln["x"], srcY=self.sensor[0].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x0, y0_guess=self.grid_y0,
                                         distortions=distortions)
 
-        model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_input["x"], srcY=self.sensor[1].spot_input["y"],
+        model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_cln["x"], srcY=self.sensor[1].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
                                         distortions=distortions)
@@ -1580,11 +1597,7 @@ class ccd_spacing():
         #  vertical or horizontal pairing
         #  intra or extra-raft pairing
 
-        self.grid = DistortedGrid.from_fits(self.grid_data_file)
-        xg = self.grid.x
-        yg = self.grid.y
-        dxg = self.grid.dx * self.pitch  # distortions are now normalized to the spot pitch
-        dyg = self.grid.dy * self.pitch
+        yg, xg = self.distorted_grid.get_source_centroids(distorted=self.sim_distort)
 
         ccd_gap = 125.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
         raft_gap = 500.  # 0.5 mm gap between rafts, which are 127 mm wide
@@ -1600,22 +1613,18 @@ class ccd_spacing():
         self.sim_moments = [[], []]
         self.sim_flux = [[], []]
 
-        f_distort = 0.
-        if self.sim_distort:
-            f_distort = 1.
-
         if self.ccd_relative_orientation == "horizontal":
 
             for idx, xs in enumerate(xg):
 
                 # sensor 0 is the standard (pixels start at zero in its counting)
                 if xs > gap /2.:
-                    self.sim_x[0].append(xs + dxg[idx] * f_distort - gap/2.)
-                    self.sim_y[0].append(distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort)
+                    self.sim_x[0].append(xs - gap/2.)
+                    self.sim_y[0].append(distance_grid_ctr/2. + yg[idx])
                 else:
                     # x10 is in sensor 1's frame
-                    x10 = xs + dxg[idx] * f_distort + gap/2.
-                    y10 = distance_grid_ctr/2. + yg[idx] + dyg[idx] * f_distort
+                    x10 = xs + gap/2.
+                    y10 = distance_grid_ctr/2. + yg[idx]
                     x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10 + distance_grid_ctr
                     y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset
                     # cut out spots in sensor 1's frame
@@ -1625,12 +1634,12 @@ class ccd_spacing():
         else:
             for idy, ys in enumerate(yg):
                 if ys > gap / 2.:
-                    self.sim_y[0].append(ys + dyg[idy] * f_distort - gap/2.)
-                    self.sim_x[0].append(distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort)
+                    self.sim_y[0].append(ys - gap/2.)
+                    self.sim_x[0].append(distance_grid_ctr/2. + xg[idy])
                 else:
                     # y00 in sensor 1's frame
-                    y00 = ys + dyg[idy] * f_distort + gap/2.
-                    x00 = distance_grid_ctr/2. + xg[idy] + dxg[idy] * f_distort
+                    y00 = ys + gap/2.
+                    x00 = distance_grid_ctr/2. + xg[idy]
                     x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset
                     y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr
                     if y01 - distance_grid_ctr < -gap / 2.:
