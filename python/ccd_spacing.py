@@ -1622,11 +1622,16 @@ class ccd_spacing():
                     self.sim_x[0].append(xs - gap/2.)
                     self.sim_y[0].append(distance_grid_ctr/2. + yg[idx])
                 else:
-                    # x10 is in sensor 1's frame
-                    x10 = xs + gap/2.
+                    # x10 is in sensor 1's frame - will rotate sensor 1 relative to sensor 0
+                    # shift x10, y10 to center on the middle of the sensor
+                    x10 = distance_grid_ctr/2. + xs + gap/2.
                     y10 = distance_grid_ctr/2. + yg[idx]
-                    x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10 + distance_grid_ctr
-                    y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset
+
+                    # rotate around the sensor center and then shift back to (0,0) frame in corner of sensor
+                    x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10 + distance_grid_ctr/2.
+                    y11 = math.sin(self.sim_rotate) * x10 + math.cos(self.sim_rotate) * y10 + self.sim_offset \
+                        + distance_grid_ctr/2.
+
                     # cut out spots in sensor 1's frame
                     if x11 - distance_grid_ctr < -gap / 2.:
                         self.sim_x[1].append(x11)
@@ -1638,10 +1643,11 @@ class ccd_spacing():
                     self.sim_x[0].append(distance_grid_ctr/2. + xg[idy])
                 else:
                     # y00 in sensor 1's frame
-                    y00 = ys + gap/2.
+                    y00 = distance_grid_ctr/2. + ys + gap/2.
                     x00 = distance_grid_ctr/2. + xg[idy]
+
                     x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset
-                    y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr
+                    y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr/2.
                     if y01 - distance_grid_ctr < -gap / 2.:
                         self.sim_y[1].append(y01)
                         self.sim_x[1].append(x01)
