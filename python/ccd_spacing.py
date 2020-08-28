@@ -1597,6 +1597,8 @@ class ccd_spacing():
         #  vertical or horizontal pairing
         #  intra or extra-raft pairing
 
+        # grid is centered on (0,0) and rotated by self.rotate
+
         yg, xg = self.distorted_grid.get_source_centroids(distorted=self.sim_distort)
 
         ccd_gap = 125.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
@@ -1624,8 +1626,8 @@ class ccd_spacing():
                 else:
                     # x10 is in sensor 1's frame - will rotate sensor 1 relative to sensor 0
                     # shift x10, y10 to center on the middle of the sensor
-                    x10 = distance_grid_ctr/2. + xs + gap/2.
-                    y10 = distance_grid_ctr/2. + yg[idx]
+                    x10 = distance_grid_ctr/2. + xs + gap/2.   # x ~2048 means near end of sensor
+                    y10 = yg[idx]                              # y ~0 for center of sensor
 
                     # rotate around the sensor center and then shift back to (0,0) frame in corner of sensor
                     x11 = math.cos(self.sim_rotate) * x10 - math.sin(self.sim_rotate) * y10 + distance_grid_ctr/2.
@@ -1644,7 +1646,7 @@ class ccd_spacing():
                 else:
                     # y00 in sensor 1's frame
                     y00 = distance_grid_ctr/2. + ys + gap/2.
-                    x00 = distance_grid_ctr/2. + xg[idy]
+                    x00 = xg[idy]
 
                     x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset
                     y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr/2.
