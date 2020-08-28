@@ -1601,14 +1601,15 @@ class ccd_spacing():
 
         yg, xg = self.distorted_grid.get_source_centroids(distorted=self.sim_distort)
 
-        ccd_gap = 125.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
-        raft_gap = 500.  # 0.5 mm gap between rafts, which are 127 mm wide
+        ccd_gap = 28.  # pixels - 0.25 mm at 10 um/px with 42 mm wide sensor to give 42.25 mm separation
+        dead_region = 100.
+        raft_gap = 50.  # 0.5 mm gap between rafts, which are 127 mm wide
 
         gap = ccd_gap
         if self.sim_inter_raft:
             gap = raft_gap
 
-        distance_grid_ctr = 4100.
+        distance_grid_ctr = 4197.
 
         self.sim_x = [[], []]
         self.sim_y = [[], []]
@@ -1620,7 +1621,7 @@ class ccd_spacing():
             for idx, xs in enumerate(xg):
 
                 # sensor 0 is the standard (pixels start at zero in its counting)
-                if xs > gap /2.:
+                if xs > (gap /2. + dead_region):
                     self.sim_x[0].append(xs - gap/2.)
                     self.sim_y[0].append(distance_grid_ctr/2. + yg[idx])
                 else:
@@ -1635,12 +1636,12 @@ class ccd_spacing():
                         + distance_grid_ctr/2.
 
                     # cut out spots in sensor 1's frame
-                    if x11 - distance_grid_ctr < -gap / 2.:
+                    if x11 - distance_grid_ctr < (-gap / 2. - dead_region):
                         self.sim_x[1].append(x11)
                         self.sim_y[1].append(y11)
         else:
             for idy, ys in enumerate(yg):
-                if ys > gap / 2.:
+                if ys > (gap / 2. + dead_region):
                     self.sim_y[0].append(ys - gap/2.)
                     self.sim_x[0].append(distance_grid_ctr/2. + xg[idy])
                 else:
@@ -1650,7 +1651,7 @@ class ccd_spacing():
 
                     x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset
                     y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr/2.
-                    if y01 - distance_grid_ctr < -gap / 2.:
+                    if y01 - distance_grid_ctr < (-gap / 2. - dead_region):
                         self.sim_y[1].append(y01)
                         self.sim_x[1].append(x01)
 
