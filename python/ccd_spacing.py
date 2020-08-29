@@ -996,54 +996,46 @@ class ccd_spacing():
             self.x1_in = 0.
             self.y1_in = 0.
 
-#        centers = [2048., 2048.]
-        centers = [2100., 2100.]
+        # grid centers are in the coordinate system of the respective sensor
 
-        c1 = [centers[0] - self.x1_in, centers[1] - self.y1_in]
-        c0 = [centers[0] - self.x0_in, centers[1] - self.y0_in]
-        self.center_to_center = np.array(c0) - np.array(c1)
-
-        print("x0_in, y0_in, x1_in, y1_in = ", self.x0_in, self.y0_in, self.x1_in, self.y1_in)
-        print("shift x, y = ", self.med_shift_x, self.med_shift_y)
-        print("standard CCD ", self.ccd_standard, self.names_ccd[self.ccd_standard],
-              self.ccd_relative_orientation)
-        print("(x, y) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
-
-        #rc = self.guess_grid_centers()
         self.grid_x0 = np.mean(np.array(xc[0]))
         self.grid_y0 = np.mean(np.array(yc[0]))
 
         self.grid_x1 = np.mean(np.array(xc[1]))
         self.grid_y1 = np.mean(np.array(yc[1]))
 
+        print("line fitter grid centers: x0, y0, x1, y1 ", self.grid_x0, self.grid_y0, self.grid_x1, self.grid_y1)
+
+        # rotate the non-standard sensor into the standard sensor's frame to get the offsets estimate
+
+        #        centers = [2048., 2048.]
+        centers = [2100., 2100.]
+
+        if self.ccd_standard == 0:
+            x0 = self.grid_x0
+            y0 = self.grid_y0
+            x1, y1 = self.rotate_xy(self.grid_x1-2048., self.grid_y1-2048., -self.mean_slope_diff)
+            x1 += 2048.
+            y1 += 2048.
+        else:
+            x1 = self.grid_x1
+            y1 = self.grid_y1
+            x0, y0 = self.rotate_xy(self.grid_x0-2048., self.grid_y0-2048., -self.mean_slope_diff)
+            x0 += 2048.
+            y0 += 2048.
+
+        c1 = [centers[0] - x1, centers[1] - y1]
+        c0 = [centers[0] - x0, centers[1] - y0]
+        self.center_to_center = np.array(c0) - np.array(c1)
+
+        print("line fit final coords: , x0, y0, x1, y1 ", x0, y0, x1, y1)
+        print("x0_in, y0_in, x1_in, y1_in = ", self.x0_in, self.y0_in, self.x1_in, self.y1_in)
+        print("shift x, y = ", self.med_shift_x, self.med_shift_y)
+        print("standard CCD ", self.ccd_standard, self.names_ccd[self.ccd_standard],
+              self.ccd_relative_orientation)
+        print("(x, y) center to center = ", self.center_to_center, "mean slope diff ", self.mean_slope_diff)
+
         return
-
-    def select_ends(self, sensor=None):
-
-        #  For horizontal pairings, lines are extrapolated towards the grid center for both sensors:
-        #  in the negative direction from the near end for the sensor whose x coordinates start at zero and positive
-        #  from the far end for those with coordinates ending around 4000.
-        #
-        #  Similarly for vertically paired, the direction is negative for y coords near zero and positive
-        #  for those near 4000. Near and far ends follow the same pattern
-        #
-        # self.ccd_standard is set by this criteria, and in all cases, ccd_standard == 0 for horizontal
-        # and 1 for vertical pairings.
-
-        low_end = 0
-        high_end = 1
-        extrap_dir = 1.
-        coord = 0    # x
-
-        if self.ccd_relative_orientation == "vertical":
-            coord = 1   # y
-
-        if sensor != self.ccd_standard:
-            low_end = 1
-            high_end = 0
-            extrap_dir = -1.
-
-        return low_end, high_end, extrap_dir, coord
 
     def find_center_spots(self):
 
@@ -1132,69 +1124,6 @@ class ccd_spacing():
             print("spot centers ", s, " x: ", np.mean(np.array(xc[s])), " y:", np.mean(np.array(yc[s])))
 
         return xc, yc
-
-    def guess_grid_centers(self):
-
-        # estimate grid center from lines around line 24
-
-        non_standard = 1 - self.ccd_standard
-        near_end = 0
-        far_end = -1
-        if self.ccd_standard == 1:
-            far_end = 0
-            near_end = -1
-
-        sgn = 2.*self.ccd_standard - 1.
-
-        nl = 24
-
-        x10_list = []
-        y10_list = []
-        x21_list = []
-        y21_list = []
-        x_shift_list = []
-        y_shift_list = []
-
-        #  always zero and one going into the fitter
-        for num_lin in range(nl-2, nl+3):
-            x10 = self.sensor[0].lines[num_lin][near_end][0]
-            y10 = self.sensor[0].linfits[num_lin][1] + \
-                 self.sensor[0].linfits[num_lin][0] * x10
-            x21 = self.sensor[1].lines[num_lin][far_end][0]
-            y21 = self.sensor[1].linfits[num_lin][1] + \
-                  self.sensor[1].linfits[num_lin][0] * x21
-
-            x21 -= self.shift_x[num_lin]
-            y21 -= self.shift_y[num_lin]
-
-            x10_list.append(x10)
-            y10_list.append(y10)
-            x21_list.append(x21)
-            y21_list.append(y21)
-            x_shift_list.append(self.shift_x[num_lin])
-            y_shift_list.append(self.shift_y[num_lin])
-
-        x10_med = np.median(np.array(x10_list))
-        y10_med = np.median(np.array(y10_list))
-        x21_med = np.median(np.array(x21_list))
-        y21_med = np.median(np.array(y21_list))
-        x_shift = np.median(np.array(x_shift_list))
-        y_shift = np.median(np.array(y_shift_list))
-
-        if self.ccd_standard == 0:
-            self.grid_x0 = (x21_med + x10_med)/2.
-            self.grid_y0 = (y21_med + y10_med)/2.
-
-            self.grid_x1 = self.grid_x0 + x_shift
-            self.grid_y1 = self.grid_y0 + y_shift
-        else:
-            self.grid_x1 = (x21_med + x10_med) / 2.
-            self.grid_y1 = (y21_med + y10_med) / 2.
-
-            self.grid_x0 = self.grid_x1 + x_shift
-            self.grid_y0 = self.grid_y1 + y_shift
-
-        return
 
     def get_data(self, combo_name=None):
 
@@ -1569,18 +1498,30 @@ class ccd_spacing():
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
                                         distortions=distortions)
 
+        self.sensor[0].grid_fit_results = model_grid1
+        self.sensor[1].grid_fit_results = model_grid2
+
         print('Grid 1:', model_grid1.params['x0'].value, model_grid1.params['y0'].value,
               model_grid1.params['theta'].value)
         print('Grid 2:', model_grid2.params['x0'].value, model_grid2.params['y0'].value,
               model_grid2.params['theta'].value)
 
-        self.dy0 = model_grid2.params['y0'].value - model_grid1.params['y0'].value
-        self.dx0 = model_grid2.params['x0'].value - model_grid1.params['x0'].value
         self.dtheta0 = model_grid2.params['theta'].value - model_grid1.params['theta'].value
-        print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0)
 
-        self.sensor[0].grid_fit_results = model_grid1
-        self.sensor[1].grid_fit_results = model_grid2
+        # rotate the non standard sensor center by -dtheta0 to get back into the standard sensor frame
+        non_standard = (1 - self.ccd_standard)
+        x0n = self.sensor[non_standard].grid_fit_results.params["x0"] - 2048.
+        y0n = self.sensor[non_standard].grid_fit_results.params["y0"] - 2048.
+        xn, yn = self.rotate_xy(x=x0n, y=y0n, theta=-self.dtheta0)
+        # restore coordinate system back to (0,0) in corner
+        xn += 2048.
+        yn += 2048.
+        print("fit rotating sensor ", non_standard, " : ", xn, yn)
+
+        sgn = (1 - 2*self.ccd_standard)
+        self.dx0 = (xn - self.sensor[self.ccd_standard].grid_fit_results.params["x0"]) * sgn
+        self.dy0 = (yn - self.sensor[self.ccd_standard].grid_fit_results.params["y0"]) * sgn
+        print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0)
 
         # reset grid guesses
 
@@ -1588,6 +1529,13 @@ class ccd_spacing():
         self.grid_x1 = model_grid2.params['x0'].value
         self.grid_y0 = model_grid1.params['y0'].value
         self.grid_y1 = model_grid2.params['y0'].value
+
+    def rotate_xy(self, x=None, y=None, theta=None):
+
+        xn = x * math.cos(theta) - y * math.sin(theta)
+        yn = x * math.sin(theta) + y * math.cos(theta)
+
+        return xn, yn
 
     def simulate_response(self, distort=False):
 
@@ -1649,7 +1597,8 @@ class ccd_spacing():
                     y00 = distance_grid_ctr/2. + ys + gap/2.
                     x00 = xg[idy]
 
-                    x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset
+                    x01 = math.cos(self.sim_rotate) * x00 - math.sin(self.sim_rotate) * y00 + self.sim_offset \
+                          + distance_grid_ctr / 2.
                     y01 = math.sin(self.sim_rotate) * x00 + math.cos(self.sim_rotate) * y00 + distance_grid_ctr/2.
                     if y01 - distance_grid_ctr < (-gap / 2. - dead_region):
                         self.sim_y[1].append(y01)
