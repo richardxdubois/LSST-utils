@@ -8,6 +8,7 @@ from sklearn import linear_model
 from scipy.spatial import distance
 from exploreFocalPlane import exploreFocalPlane
 from exploreRaft import exploreRaft
+import lmfit
 
 from os.path import join
 from astropy.io import fits
@@ -1329,10 +1330,8 @@ class ccd_spacing():
 
     def data_2_model(self, srcX, srcY, ncols, nrows, x0_guess, y0_guess, distortions=None):
 
-        #fitted_grid = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
-        #                      y0_guess=y0_guess, x0_guess=x0_guess, distortions=distortions)
         result = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
-                              y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
+                          y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
                           brute_search=False, vary_theta=True)
 
         return result
@@ -1492,11 +1491,18 @@ class ccd_spacing():
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x0, y0_guess=self.grid_y0,
                                         distortions=distortions)
+        s = model_grid1.params["x0"].stderr
+        if s is None:
+            print(self.name_ccd1, lmfit.fit_report(model_grid1))
 
         model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_cln["x"], srcY=self.sensor[1].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
                                         distortions=distortions)
+
+        s = model_grid2.params["x0"].stderr
+        if s is None:
+            print(self.name_ccd2, lmfit.fit_report(model_grid2))
 
         self.sensor[0].grid_fit_results = model_grid1
         self.sensor[1].grid_fit_results = model_grid2
