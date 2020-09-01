@@ -1536,12 +1536,44 @@ class ccd_spacing():
         self.grid_y0 = model_grid1.params['y0'].value
         self.grid_y1 = model_grid2.params['y0'].value
 
+        # look at fit results
+
+        rc = self.match_line_spots_to_grid(id_sensor=0)
+
+        return
+
     def rotate_xy(self, x=None, y=None, theta=None):
 
         xn = x * math.cos(theta) - y * math.sin(theta)
         yn = x * math.sin(theta) + y * math.cos(theta)
 
         return xn, yn
+
+    def match_line_spots_to_grid(self, id_sensor):
+
+        # loop over lines starting from the outer edges of the grid
+
+        spots_grid_index = []
+
+        num_lines = len(self.sensor[id_sensor].lines)
+        for lines in range(num_lines):
+            # get distances between spots
+            distances = distance.cdist(self.sensor[id_sensor].lines[lines],
+                                       self.sensor[id_sensor].lines[lines],
+                                       metric="euclidean")
+            num_spots = len(self.sensor[id_sensor].lines[lines])
+            grid_index = 0
+            dist_2_next = 0
+            # loop over spots on the line and jump grid index values if there are gaps
+            for sp in range(num_spots):
+                grid_index += lines*self.num_spots + round(dist_2_next/self.pitch)
+                spots_grid_index.append(grid_index)
+                try:
+                    dist_2_next = distances[sp, sp+1]  # distance to previous spot
+                except:  # bail on the last point
+                    pass
+
+        return
 
     def simulate_response(self, distort=False):
 
