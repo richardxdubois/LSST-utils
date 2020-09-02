@@ -133,8 +133,8 @@ for n in names:
 
 focal_plane.circle(x=0., y=0., color="green", size=8)
 
-sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R20_S02",
-           "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22", "R30_S21", "R30_S20"]
+#sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R20_S02",
+#           "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22", "R30_S21", "R30_S20"]
 
 #sensors = ['R30_S11', 'R30_S21', 'R30_S20', 'R30_S10']
 
@@ -157,7 +157,11 @@ sensors = ["R30_S10", "R30_S00", "R20_S20", "R20_S10", "R20_S00", "R20_S01", "R2
 #sensors = ["R30_S11", "R30_S01", "R20_S21", "R20_S20", "R30_S00", "R30_S10", "R30_S20", "R30_S21"]
 #sensors = ["R30_S11",  "R30_S10", "R30_S20", "R30_S21"]
 
-#sensors = ["R30_S21", "R30_S22", "R30_S21"]
+#sensors = ["R30_S10", "R30_S11", "R30_S21", "R30_S20"]
+#sensors = ["R20_S11", "R20_S01", "R20_S02", "R20_S12"]
+
+sensors = ["R30_S21", "R30_S11", "R30_S01", "R20_S21", "R20_S11", "R20_S01", "R20_S02",
+           "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22"]
 
 if args.invert == "yes":
     sensors.reverse()
@@ -190,20 +194,22 @@ for ids, tgt_sensor in enumerate(sensors):
             if cur_sensor in c:
                 idl = ic
                 break
+    xic = x[idl]
+    yic = y[idl]
 
     if tgt_sensor == st_name[idl]:
         print('Reverse step: ' + tgt_sensor + ' ' + cur_sensor + ' ' + c)
         # Transform the offset and rotation to be in the reference frame of
         # the other sensor
         theta_r = -theta[idl]
-        dx0 = (x[idl] * math.cos(np.pi + theta_r) - y[idl] * math.sin(np.pi + theta_r))
-        dy0 = (x[idl] * math.sin(np.pi + theta_r) + y[idl] * math.cos(np.pi + theta_r))
+        dx0 = (xic * math.cos(np.pi + theta_r) - yic * math.sin(np.pi + theta_r))
+        dy0 = (xic * math.sin(np.pi + theta_r) + yic * math.cos(np.pi + theta_r))
     else:
         print('Forward step: ' + tgt_sensor + ' ' + cur_sensor + ' ' + c)
         # Keep the offset and rotation as they are
         theta_r = theta[idl]
-        dx0 = x[idl]
-        dy0 = y[idl]
+        dx0 = xic
+        dy0 = yic
         print(dx0, dy0, theta)
 
     # Now transform the offsets for the accumulated rotation angles (so they are

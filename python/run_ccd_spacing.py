@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import math
 from ccd_spacing import ccd_spacing
 from bokeh.plotting import curdoc, output_file, save, reset_output, figure
 from bokeh.layouts import row, column, layout
@@ -17,15 +18,16 @@ parser.add_argument('-d', '--dir',
                     help="default directory to use")
 parser.add_argument('-c', '--combo', default='R22_S10_S11', help="raft, sensor combo name")
 parser.add_argument('-f', '--dofit', default='yes', help="do full fit yes/no")
-parser.add_argument('-o', '--output', default='/Users/richard/LSST/Code/misc/CCD_grids/',
+parser.add_argument('-o', '--output', default=None,
                     help="output directory path")
 parser.add_argument('--out_params', default='CCD_grids_params.csv',
                     help="output params file spec")
 parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
                     help="base html path")
 parser.add_argument('-g', '--grid', default=
-                    '/Users/richard/LSST/Code/misc/CCD_grids/optical_distortion_grid.fits',
+                    '/Volumes/External_SSD_Deb/LSST/misc/CCD_grids/optics_distorted_grid_norm.fits',
                     help="grid distortions file")
+parser.add_argument('--single', default="no", help="run single combo")
 
 args = parser.parse_args()
 print(args.dir)
@@ -51,9 +53,19 @@ urls = []
 fx = []
 fy = []
 ftheta = []
+dfx = []
+dfy = []
+dftheta = []
 st_name = []
+t1 = []
+t2 = []
 
 for combos in cS.file_paths:
+    if args.singles == "yes" and combos != args.combo:
+        continue
+
+    if combos == "R30_S00_R30_S10":    # problems with data
+        continue
     try:
         rc = cS.get_data(combo_name=combos)
     except ValueError:
@@ -69,6 +81,17 @@ for combos in cS.file_paths:
         fx.append(cS.dx0)
         fy.append(cS.dy0)
         ftheta.append(cS.dtheta0)
+        try:
+            dfx.append(math.sqrt(cS.sensor[0].grid_fit_results.params["x0"].stderr**2 +
+                                 cS.sensor[1].grid_fit_results.params["x0"].stderr**2))
+            dfy.append(math.sqrt(cS.sensor[0].grid_fit_results.params["y0"].stderr**2 +
+                       cS.sensor[1].grid_fit_results.params["y0"].stderr**2))
+            dftheta.append(math.sqrt(cS.sensor[0].grid_fit_results.params["theta"].stderr**2 +
+                           cS.sensor[1].grid_fit_results.params["theta"].stderr ** 2))
+        except:
+            dfx.append(-1.)
+            dfy.append(-1.)
+            dftheta.append(-1.)
 
     rc = cS.make_plots()
     line_layout = cS.make_line_plots()
@@ -77,6 +100,8 @@ for combos in cS.file_paths:
     orient.append(cS.ccd_relative_orientation)
 
     c2c = cS.center_to_center
+    t1.append(cS.sensor[0].sensor_type)
+    t2.append(cS.sensor[1].sensor_type)
 
     x.append(str(c2c[0]))
     y.append(str(c2c[1]))
@@ -103,13 +128,16 @@ print("Found ", successes, " good filesets and", problems, " problem filesets")
 
 if args.dofit:
     results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, fx=fx, fy=fy, ftheta=ftheta,
-                                           sdiff=sdiff, st_name=st_name, url=urls))
+                                           sdiff=sdiff, st_name=st_name, t1=t1, t2=t2, url=urls,
+                                           dfx=dfx, dfy=dfy, dftheta=dftheta))
 else:
     results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, st_name=st_name, url=urls))
 
 results_columns = [
     TableColumn(field="names", title="Raft-sensors", width=75),
     TableColumn(field="o", title="Sensor Orientation", width=50),
+    TableColumn(field="t1", title="S1 type", width=30),
+    TableColumn(field="t2", title="S2 type", width=30),
     TableColumn(field="st_name", title="Ref CCD", width=30),
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="y", title="y offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
@@ -117,10 +145,16 @@ results_columns = [
 ]
 if args.dofit:
     results_columns.append(TableColumn(field="fx", title="fit x offset (px)", width=50,
-                                       formatter=NumberFormatter(format='0.00')))
+                                       formatter=NumberFormatter(format='0.003')))
+    results_columns.append(TableColumn(field="dfx", title="fit x error (px)", width=50,
+                                       formatter=NumberFormatter(format='0.003')))
     results_columns.append(TableColumn(field="fy", title="fit y offset (px)", width=50,
-                                       formatter=NumberFormatter(format='0.00')))
+                                       formatter=NumberFormatter(format='0.003')))
+    results_columns.append(TableColumn(field="dfy", title="fit y error (px)", width=50,
+                                       formatter=NumberFormatter(format='0.003')))
     results_columns.append(TableColumn(field="ftheta", title="fit theta diff (rad)", width=50,
+                                       formatter=NumberFormatter(format='0.00000')))
+    results_columns.append(TableColumn(field="dftheta", title="fit theta error (rad)", width=50,
                                        formatter=NumberFormatter(format='0.0000')))
 
 results_columns.append(TableColumn(field="url", title="Links to plots",
@@ -128,7 +162,7 @@ results_columns.append(TableColumn(field="url", title="Links to plots",
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=1000, height=1200)
+results_table = DataTable(source=results_source, columns=results_columns, width=1300, height=1200)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]

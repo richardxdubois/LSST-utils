@@ -6,8 +6,8 @@ import numpy as np
 from scipy import optimize
 from sklearn import linear_model
 from scipy.spatial import distance
-from exploreFocalPlane import exploreFocalPlane
-from exploreRaft import exploreRaft
+#from exploreFocalPlane import exploreFocalPlane
+#from exploreRaft import exploreRaft
 import lmfit
 
 from os.path import join
@@ -46,6 +46,7 @@ class sensor():
 
         # found lines
         self.lines = {}
+        self.grid_index = None
 
         # fitted lines
         self.linfits = {}
@@ -78,12 +79,20 @@ class ccd_spacing():
         self.cut_spurious_spots = 68.  # spots need to be closer to another spot to include in lines
         self.num_spots = 49
 
-        self.raft_types = {}
-        eFP = exploreFocalPlane()
-        eR = exploreRaft()
-        raft_list = eFP.focalPlaneContents()
-        for raft in raft_list:
-            self.raft_types[raft[1]] = eR.raft_type(raft[0])
+        #self.raft_types = {}
+        #eFP = exploreFocalPlane()
+        #eR = exploreRaft()
+        #raft_list = eFP.focalPlaneContents()
+        #for raft in raft_list:
+        #    self.raft_types[raft[1]] = eR.raft_type(raft[0])
+        #print(self.raft_types)
+
+        self.raft_types = {'R00': 'ITL', 'R04': 'ITL', 'R40': 'ITL', 'R44': 'ITL', 'R01': 'ITL', 'R02': 'ITL',
+                           'R03': 'ITL', 'R10': 'ITL', 'R11': 'e2v', 'R12': 'e2v', 'R13': 'e2v', 'R14': 'e2v',
+                           'R20': 'ITL', 'R21': 'e2v', 'R22': 'e2v', 'R23': 'e2v', 'R24': 'e2v', 'R30': 'e2v',
+                           'R31': 'e2v', 'R32': 'e2v', 'R33': 'e2v', 'R34': 'e2v', 'R41': 'ITL', 'R42': 'ITL',
+                           'R43': 'ITL'}
+
 
         self.ccd1_scatter = None
 
@@ -1538,7 +1547,7 @@ class ccd_spacing():
 
         # look at fit results
 
-        rc = self.match_line_spots_to_grid(id_sensor=0)
+        rc = self.match_line_spots_to_grid(id_sensor=1)
 
         return
 
@@ -1552,26 +1561,44 @@ class ccd_spacing():
     def match_line_spots_to_grid(self, id_sensor):
 
         # loop over lines starting from the outer edges of the grid
+        # assumes spots on lines are all good (cleaning has been done) and that every first spot per line is there
+        # Todo - take care of 2nd sensor and horizontal vs vertical pairings  <==
 
         spots_grid_index = []
+        self.sensor[id_sensor].grid_index = {}
 
         num_lines = len(self.sensor[id_sensor].lines)
+
         for lines in range(num_lines):
+            gi = self.sensor[id_sensor].grid_index.setdefault(lines, [])
+
             # get distances between spots
             distances = distance.cdist(self.sensor[id_sensor].lines[lines],
                                        self.sensor[id_sensor].lines[lines],
                                        metric="euclidean")
             num_spots = len(self.sensor[id_sensor].lines[lines])
-            grid_index = 0
-            dist_2_next = 0
-            # loop over spots on the line and jump grid index values if there are gaps
-            for sp in range(num_spots):
-                grid_index += lines*self.num_spots + round(dist_2_next/self.pitch)
-                spots_grid_index.append(grid_index)
-                try:
-                    dist_2_next = distances[sp, sp+1]  # distance to previous spot
-                except:  # bail on the last point
-                    pass
+            if self.ccd_relative_orientation == "horizontal":
+                grid_index = lines*self.num_spots
+                dist_2_next = 0
+                # loop over spots on the line and jump grid index values if there are gaps
+                sp_order = list(range(num_spots))
+                if self.ccd_standard == id_sensor:
+                    sp_order = sp_order[::-1]
+                    grid_index = (lines + 1) * self.num_spots -1
+
+                for sp in sp_order:
+                    sgn = 1.
+                    if self.ccd_standard == id_sensor:
+                        sgn = -1
+                    grid_index += round(dist_2_next/self.pitch) * sgn
+                    gi.append(int(grid_index))
+                    try:
+                        if self.ccd_standard == id_sensor:
+                            dist_2_next = distances[sp-1, sp]  # distance to previous spot
+                        else:
+                            dist_2_next = distances[sp, sp + 1]  # distance to previous spot
+                    except:  # bail on the last point
+                        pass
 
         return
 
