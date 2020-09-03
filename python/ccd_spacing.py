@@ -1501,8 +1501,7 @@ class ccd_spacing():
                                         x0_guess=self.grid_x0, y0_guess=self.grid_y0,
                                         distortions=distortions)
         s = model_grid1.params["x0"].stderr
-        if s is None:
-            print(self.name_ccd1, lmfit.fit_report(model_grid1))
+        print(self.name_ccd1, lmfit.fit_report(model_grid1))
 
         model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_cln["x"], srcY=self.sensor[1].spot_cln["y"],
                                         ncols=49, nrows=49,
@@ -1510,8 +1509,7 @@ class ccd_spacing():
                                         distortions=distortions)
 
         s = model_grid2.params["x0"].stderr
-        if s is None:
-            print(self.name_ccd2, lmfit.fit_report(model_grid2))
+        print(self.name_ccd2, lmfit.fit_report(model_grid2))
 
         self.sensor[0].grid_fit_results = model_grid1
         self.sensor[1].grid_fit_results = model_grid2
