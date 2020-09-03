@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-d', '--dir',
                     default='/Users/richard/LSST/Data/GridSpacing/',
                     help="default directory to use")
-parser.add_argument('-c', '--combo', default='R22_S10_S11', help="raft, sensor combo name")
+parser.add_argument('-c', '--combo', default='R22_S10_R22_S11', help="raft, sensor combo name")
 parser.add_argument('-f', '--dofit', default='yes', help="do full fit yes/no")
 parser.add_argument('-o', '--output', default=None,
                     help="output directory path")
@@ -63,7 +63,7 @@ t1 = []
 t2 = []
 
 for combos in cS.file_paths:
-    if args.singles == "yes" and combos != args.combo:
+    if args.single == "yes" and combos != args.combo:
         continue
 
     if combos == "R30_S00_R30_S10":    # problems with data
