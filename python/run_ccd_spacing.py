@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import math
+import pickle
 from ccd_spacing import ccd_spacing
 from bokeh.plotting import curdoc, output_file, save, reset_output, figure
 from bokeh.layouts import row, column, layout
@@ -20,6 +21,7 @@ parser.add_argument('-c', '--combo', default='R22_S10_S11', help="raft, sensor c
 parser.add_argument('-f', '--dofit', default='yes', help="do full fit yes/no")
 parser.add_argument('-o', '--output', default=None,
                     help="output directory path")
+parser.add_argument('--pickle', default=None, help="output directory for pickle of cS.sensor")
 parser.add_argument('--out_params', default='CCD_grids_params.csv',
                     help="output params file spec")
 parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
@@ -73,6 +75,10 @@ for combos in cS.file_paths:
         problems += 1
         continue
     successes += 1
+
+    if args.pickle is not None:
+        p_fn = args.pickle + "/" + combos + ".p"
+        pickle.dump(cS.sensor, open(p_fn, "wb"))
 
     if args.dofit == "yes":
         cS.use_fit = True
