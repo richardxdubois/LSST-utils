@@ -13,8 +13,8 @@ parser.add_argument('-d', '--dir',
                     default=None, help="default directory to use")
 parser.add_argument('-o', '--output', default=None, help="output directory path")
 parser.add_argument('-e', '--executable', default="../bin/", help="path to shell script")
-parser.add_argument('--out_params', default='CCD_grids_params.csv',
-                    help="output params file spec")
+parser.add_argument('--out_params', default=None,
+                    help="output params directory spec")
 parser.add_argument('--pickle', default=None, help="output directory for pickle of cS.sensor")
 parser.add_argument('--logs', default=None, help="output directory for batch logs")
 parser.add_argument('-g', '--grid', default=None, help="grid distortions file")
