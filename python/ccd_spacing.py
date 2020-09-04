@@ -164,7 +164,7 @@ class ccd_spacing():
 
         self.sim_doit = False
         self.sim_inter_raft = False
-        self.sim_distort = True
+        self.sim_distort = False
         self.sim_rotate = 0.
         self.sim_offset = 0.
 
