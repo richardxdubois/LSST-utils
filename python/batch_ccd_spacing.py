@@ -33,8 +33,8 @@ for combos in cS.file_paths:
     batch_bits = "-W 20 -R rhel7 -o " + log_file
     batch_bits = ""
 
-    command_args = batch_bits + " bash batch_ccd_spacing.sh --single " \
-                  + args.single + " --pickle " + args.pickle + " -c " + combos
+    command_args = batch_bits + " bash batch_ccd_spacing.sh --single yes " \
+                  + " --pickle " + args.pickle + " -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
     #subprocess.run(["bsub", command_args])
