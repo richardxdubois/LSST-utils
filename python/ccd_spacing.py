@@ -50,6 +50,8 @@ class sensor():
 
         # fitted lines
         self.linfits = {}
+        self.x_center = None
+        self.y_center = None
 
         # grid fit results
 
@@ -990,6 +992,11 @@ class ccd_spacing():
         self.mean_slope_diff = np.mean(np.array(slope_difference[18:25]))  # try middle of line range
 
         xc, yc = self.find_center_spots()
+        self.sensor[0].x_center = xc[0]
+        self.sensor[0].y_center = yc[0]
+        self.sensor[1].x_center = xc[1]
+        self.sensor[1].y_center = yc[1]
+
         self.med_shift_x = (np.mean(np.array(xc[1])) - np.mean(np.array(xc[0]))) * self.extrap_dir
         self.med_shift_y = (np.mean(np.array(yc[1])) - np.mean(np.array(yc[0]))) * self.extrap_dir
 

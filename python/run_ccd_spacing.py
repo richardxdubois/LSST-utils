@@ -216,14 +216,16 @@ save(out_lay, title="CCD grid plots")
 
 f = open(args.out_params, "w+")
 
-header_line = "name, orientation, ref_CCD, dx_line, dy_line, dtheta_line, dx_fit, dy_fit, dtheta_fit\n"
+header_line = "name, orientation, ref_CCD, dx_line, dy_line, dtheta_line, dx_fit, ddxfit, dy_fit, " \
+              "ddyfit, dtheta_fit, ddthetafit\n"
 f.write(header_line)
 
 for idn, name in enumerate(names):
 
     line_out = str(name) + ", " + str(orient[idn]) + ", " + str(st_name[idn]) + ", " + str(x[idn]) + ", ", \
                str(y[idn]) + \
-               ", " + str(sdiff[idn]) + ", " + str(fx[idn]) + ", " + str(fy[idn]) + ", " + str(ftheta[idn]) + " \n"
+               ", " + str(sdiff[idn]) + ", " + str(fx[idn]) + ", " + str(dfx[idn]) + ", " \
+               + str(fy[idn]) + ", " + str(dfy[idn]) + ", " + str(ftheta[idn]) + ", " + str(dftheta[idn]) + " \n"
 
     f.write("".join(line_out))
 
