@@ -1487,12 +1487,15 @@ class ccd_spacing():
     def match(self):
 
         print("start fitting with guesses ", self.grid_x0, self.grid_y0, self.grid_x1, self.grid_y1)
+        print("add distortions ", self.sim_distort)
         distortions = None
 
         rc = self.setup_grid()
 
         if self.sim_distort:
             distortions = (self.grid.norm_dy, self.grid.norm_dx)
+        else:
+            print("distortions disabled ", distortions)
 
         # Need an intelligent guess
 
