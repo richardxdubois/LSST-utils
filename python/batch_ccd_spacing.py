@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-d', '--dir',
                     default=None, help="default directory to use")
 parser.add_argument('-o', '--output', default=None, help="output directory path")
+parser.add_argument('-e', '--executable', default="../bin/", help="path to shell script")
 parser.add_argument('--out_params', default='CCD_grids_params.csv',
                     help="output params file spec")
 parser.add_argument('--pickle', default=None, help="output directory for pickle of cS.sensor")
@@ -32,11 +33,10 @@ for combos in cS.file_paths:
     log_file = args.logs + combos + ".log"
     batch_bits = "-W 4 -R centos7 -o " + log_file
 
-    command_args = batch_bits + " bash batch_ccd_spacing.sh --single yes " \
+    command_args = batch_bits + "bash " + args.executable + "/batch_ccd_spacing.sh --single yes " \
                   + " --pickle " + args.pickle + " -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
     subprocess.Popen("bsub " + command_args, shell=True)
-    #subprocess.Popen(["bsub -W 1 ls -l"])
     if args.single == "yes":
         break
