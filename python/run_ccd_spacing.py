@@ -38,7 +38,7 @@ cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.gr
 cS.line_fitting = True
 cS.use_offsets = True
 cS.overlay_ccd = True
-cS.sim_distort = True
+cS.sim_distort = False
 
 # loop over file sets
 
