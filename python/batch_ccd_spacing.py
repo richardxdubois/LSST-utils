@@ -14,6 +14,8 @@ parser.add_argument('-d', '--dir',
 parser.add_argument('-o', '--output', default=None, help="output directory path")
 parser.add_argument('--out_params', default='CCD_grids_params.csv',
                     help="output params file spec")
+parser.add_argument('--pickle', default=None, help="output directory for pickle of cS.sensor")
+parser.add_argument('--logs', default=None, help="output directory for batch logs")
 parser.add_argument('-g', '--grid', default=None, help="grid distortions file")
 parser.add_argument('-s', '--single', default="yes", help="run first combo")
 
@@ -23,11 +25,13 @@ cS = ccd_spacing(dir_index=args.dir, distort_file=args.grid)
 
 distort_file = " -g " + args.grid
 spot_files = " -d " + args.dir
-out_csv = " --out_params " + args.out_params
 out_files = " --output " + args.output
 
 for combos in cS.file_paths:
-    command_args = "-W 20 -R rhel7 python batch_ccd_spacing.sh --single yes -c " + combos
+    out_csv = " --out_params " + args.out_params + combos + ".csv"
+    log_file = args.logs + combos + ".log"
+
+    command_args = "-W 20 -R rhel7 -o " + log_file + " python batch_ccd_spacing.sh --single yes -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
     #subprocess.run(["bsub", command_args])
