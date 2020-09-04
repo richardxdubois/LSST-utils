@@ -30,8 +30,10 @@ out_files = " --output " + args.output
 for combos in cS.file_paths:
     out_csv = " --out_params " + args.out_params + combos + ".csv"
     log_file = args.logs + combos + ".log"
+    batch_bits = "-W 20 -R rhel7 -o " + log_file
+    batch_bits = ""
 
-    command_args = "-W 20 -R rhel7 -o " + log_file + " bash batch_ccd_spacing.sh --single " \
+    command_args = batch_bits + "-W 20 -R rhel7 -o " + log_file + " bash batch_ccd_spacing.sh --single " \
                   + args.single + " --pickle " + args.pickle + " -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
