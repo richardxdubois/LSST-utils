@@ -33,7 +33,7 @@ for combos in cS.file_paths:
     log_file = args.logs + combos + ".log"
     batch_bits = "-W 4 -R centos7 -o " + log_file
 
-    command_args = batch_bits + "bash " + args.executable + "/batch_ccd_spacing.sh --single yes " \
+    command_args = batch_bits + "bash " + args.executable + "batch_ccd_spacing.sh --single yes " \
                   + " --pickle " + args.pickle + " -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
