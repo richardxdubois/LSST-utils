@@ -30,12 +30,12 @@ out_files = " --output " + args.output
 for combos in cS.file_paths:
     out_csv = " --out_params " + args.out_params + combos + ".csv"
     log_file = args.logs + combos + ".log"
-    batch_bits = "-W 20 -R rhel7 -o " + log_file
+    batch_bits = "-W 4 -R centos7 -o " + log_file
 
     command_args = batch_bits + " bash batch_ccd_spacing.sh --single yes " \
                   + " --pickle " + args.pickle + " -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
-    #subprocess.run(["bsub", command_args])
+    subprocess.run(["bsub", command_args])
     if args.single == "yes":
         break
