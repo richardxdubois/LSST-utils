@@ -36,6 +36,7 @@ for combos in cS.file_paths:
                   + " --pickle " + args.pickle + " -c " + combos
     command_args += distort_file + spot_files + out_csv + out_files
     print(command_args)
-    subprocess.run(["bsub", command_args])
+    #subprocess.run(["bsub", command_args])
+    subprocess.run(["bsub", "-W 1 ls -l"])
     if args.single == "yes":
         break
