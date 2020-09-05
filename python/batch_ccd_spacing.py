@@ -31,7 +31,7 @@ out_files = " --output " + args.output
 for combos in cS.file_paths:
     out_csv = " --out_params " + args.out_params + combos + ".csv"
     log_file = args.logs + combos + ".log"
-    batch_bits = "-W 2 -R centos7 -o " + log_file
+    batch_bits = "-W 10 -R centos7 -o " + log_file
 
     command_args = batch_bits + " " + args.executable + "batch_ccd_spacing.sh --single yes " \
                   + " --pickle " + args.pickle + " -c " + combos
