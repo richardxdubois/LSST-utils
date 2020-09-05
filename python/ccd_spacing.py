@@ -2,6 +2,7 @@ import glob
 import sys
 import os
 import math
+import pickle
 import numpy as np
 from scipy import optimize
 from sklearn import linear_model
@@ -60,7 +61,7 @@ class sensor():
 
 class ccd_spacing():
 
-    def __init__(self, dir_index=None, combo_name=None, distort_file=None):
+    def __init__(self, dir_index=None, combo_name=None, distort_file=None, pickles_dir=None):
 
         self.file_paths = {}
         self.raft_ccd_combo = combo_name
@@ -72,6 +73,9 @@ class ccd_spacing():
         self.names_ccd = []
         self.ccd_relative_orientation = "vertical"
         self.extrap_dir = 1.
+
+        self.use_pickles = False
+        self.pickles_dir = pickles_dir
 
         self.lines = {}
         self.linfits = {}
@@ -191,6 +195,10 @@ class ccd_spacing():
         self.button_rotate = Button(label="Rotate", button_type="danger", width=100)
         self.button_rotate.on_click(self.do_rotate)
 
+        # button to enable using pickle files for input
+        self.button_pickle = Button(label="Use Pickles", button_type="danger", width=100)
+        self.button_pickle.on_click(self.do_pickle)
+
         # button toggle line fitting
         self.button_line_fitting = Button(label="Enable Lines", button_type="success", width=100)
         self.button_line_fitting.on_click(self.do_line_fitting)
@@ -286,7 +294,7 @@ class ccd_spacing():
 
         self.min_layout = column(row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
-                              self.button_line_fitting),
+                              self.button_line_fitting, self.button_pickle),
                                  row(self.text_box_half, self.text_box_full))
         self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
                                      self.button_submit)
@@ -305,6 +313,14 @@ class ccd_spacing():
 
     # handlers
 
+    def get_pickle_file(self):
+        s_p = self.pickles_dir + self.raft_ccd_combo + ".p"
+        pickle_file = open(s_p, "rb")
+        pickle_obj = pickle.load(pickle_file)
+        pickle_file.close()
+
+        return pickle_obj
+
     def update_dropdown_data(self, event):
         self.dir_index = event.item.split(",")[0].strip()
         self.raft_ccd_combo = event.item.split(",")[1].strip()
@@ -321,6 +337,13 @@ class ccd_spacing():
     def update_box_full(self, sattr, old, new):
         self.cln_box_full = float(self.text_box_full.value)
         return
+
+    def do_pickle(self):
+        self.use_pickles = not self.use_pickles
+        if self.use_pickles:
+            self.button_pickle.button_type = "success"
+        else:
+            self.button_pickle.button_type = "danger"
 
     def do_exit(self):
         print("Shutting down app")
@@ -362,7 +385,6 @@ class ccd_spacing():
         else:
             self.button_sims_enable_distortions.button_type = "danger"
             self.button_sims_enable_distortions.label = "Distortions Off"
-
         return
 
     def update_sims_rotate(self, sattr, old, new):
@@ -483,13 +505,16 @@ class ccd_spacing():
 
     def do_get_data(self):
 
-        try:
-            rc = self.get_data()
-        except ValueError:
-            self.drop_data.button_type = "danger"
-            m_new = column(self.max_layout)
-            self.layout.children = m_new.children
-            return
+        if self.use_pickles:
+            self.sensor = self.get_pickle_file()
+        else:
+            try:
+                rc = self.get_data()
+            except ValueError:
+                self.drop_data.button_type = "danger"
+                m_new = column(self.max_layout)
+                self.layout.children = m_new.children
+                return
 
         self.use_offsets = False
         self.use_fit = False
