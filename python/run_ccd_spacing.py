@@ -76,10 +76,6 @@ for combos in cS.file_paths:
         continue
     successes += 1
 
-    if args.pickle is not None:
-        p_fn = args.pickle + "/" + combos + ".p"
-        pickle.dump(cS.sensor, open(p_fn, "wb"))
-
     if args.dofit == "yes":
         cS.use_fit = True
         rc = cS.match()
@@ -101,6 +97,7 @@ for combos in cS.file_paths:
 
     rc = cS.make_plots()
     line_layout = cS.make_line_plots()
+    fit_layout = cS.make_fit_plots()
 
     names.append(combos)
     orient.append(cS.ccd_relative_orientation)
@@ -127,8 +124,13 @@ for combos in cS.file_paths:
     urls.append(url_link)
 
     output_file(args.output + o_name)
-    save(line_layout, title=combos + " grid plots")
+    combo_layout = layout(line_layout, fit_layout)
+    save(combo_layout, title=combos + " grid plots")
     reset_output()
+
+    if args.pickle is not None:
+        p_fn = args.pickle + "/" + combos + ".p"
+        pickle.dump(cS.sensor, open(p_fn, "wb"))
 
 print("Found ", successes, " good filesets and", problems, " problem filesets")
 

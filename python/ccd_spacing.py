@@ -251,6 +251,10 @@ class ccd_spacing():
         self.button_linfit_plots = Button(label="Linfit plots", button_type="success", width=100)
         self.button_linfit_plots.on_click(self.do_linfit_plots)
 
+        # button to make plots from grid fits
+        self.button_gridfit_plots = Button(label="gridfit plots", button_type="success", width=100)
+        self.button_gridfit_plots.on_click(self.do_gridfit_plots)
+
         # simulation buttons
 
         self.button_enable_sims = Button(label="Enable sims", button_type="danger", width=100)
@@ -299,7 +303,7 @@ class ccd_spacing():
         self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
                                      self.button_submit)
         self.max_layout = column(self.min_layout, sims_layout, self.sliders_layout,
-                                 self.button_fit)
+                                 row(self.button_fit, self.button_gridfit_plots))
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
 
@@ -319,6 +323,31 @@ class ccd_spacing():
         pickle_obj = pickle.load(pickle_file)
         pickle_file.close()
 
+        # re-establish global state
+
+        self.ccd_relative_orientation = self.sensor[0].orientation
+        self.extrap_dir = 1.
+        if self.ccd_relative_orientation == "vertical":
+            self.extrap_dir = -1.
+        name_bits = self.raft_ccd_combo.split("_")
+        self.name_ccd1 = name_bits[0] + "_" + name_bits[1]
+        self.name_ccd2 = name_bits[2] + "_" + name_bits[3]
+        self.names_ccd = [self.name_ccd1, self.name_ccd2]
+
+        # kludge
+        pickle_obj[0].name = self.name_ccd1
+        pickle_obj[1].name = self.name_ccd2
+
+        self.x0_in = pickle_obj[0].grid_fit_results.params["x0"].value
+        self.y0_in = pickle_obj[0].grid_fit_results.params["y0"].value
+        self.x1_in = pickle_obj[1].grid_fit_results.params["x0"].value
+        self.y1_in = pickle_obj[1].grid_fit_results.params["y0"].value
+
+        self.grid_x0 = self.x0_in
+        self.grid_x1 = self.x1_in
+        self.grid_y0 = self.y0_in
+        self.grid_y1 = self.y1_in
+
         return pickle_obj
 
     def update_dropdown_data(self, event):
@@ -326,6 +355,7 @@ class ccd_spacing():
         self.raft_ccd_combo = event.item.split(",")[1].strip()
         self.drop_data.button_type = "warning"
 
+        self.use_offsets = True
         rc = self.do_get_data()
 
         return
@@ -437,6 +467,12 @@ class ccd_spacing():
         m_new = column(self.max_layout, p_grid)
         self.layout.children = m_new.children
 
+    def do_gridfit_plots(self):
+        p_grid = self.make_fit_plots()
+
+        m_new = column(self.max_layout, p_grid)
+        self.layout.children = m_new.children
+
     def iterate_fit(self):
         # hack in case fit and lines are off by a spot - inflate long edge guess by 5% and re-fit
         inflate = 1.0075
@@ -507,6 +543,7 @@ class ccd_spacing():
 
         if self.use_pickles:
             self.sensor = self.get_pickle_file()
+            self.drop_data.label = self.raft_ccd_combo
         else:
             try:
                 rc = self.get_data()
@@ -1247,6 +1284,7 @@ class ccd_spacing():
                                              flux=self.sensor[0].src[kw_flux])
             self.sensor[0].orientation = self.ccd_relative_orientation
             self.sensor[0].sensor_type = self.raft_types[r1]
+            self.sensor[0].name = self.name_ccd1
 
             self.sensor[1].src = fits.getdata(self.infile2)
             self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y],
@@ -1254,6 +1292,7 @@ class ccd_spacing():
                                              flux=self.sensor[1].src[kw_flux])
             self.sensor[1].orientation = self.ccd_relative_orientation
             self.sensor[1].sensor_type = self.raft_types[r2]
+            self.sensor[1].name = self.name_ccd2
 
         num_spots_0 = len(self.sensor[0].spot_input["x"])
         num_spots_1 = len(self.sensor[1].spot_input["x"])
@@ -1580,6 +1619,7 @@ class ccd_spacing():
 
         # look at fit results
 
+        rc = self.match_line_spots_to_grid(id_sensor=0)
         rc = self.match_line_spots_to_grid(id_sensor=1)
 
         return
@@ -1603,28 +1643,64 @@ class ccd_spacing():
         num_lines = len(self.sensor[id_sensor].lines)
 
         for lines in range(num_lines):
-            gi = self.sensor[id_sensor].grid_index.setdefault(lines, [])
+            num_spots = len(self.sensor[id_sensor].lines[lines])
+            gi = self.sensor[id_sensor].grid_index.setdefault(lines, [0]*num_spots)
 
             # get distances between spots
             distances = distance.cdist(self.sensor[id_sensor].lines[lines],
                                        self.sensor[id_sensor].lines[lines],
                                        metric="euclidean")
-            num_spots = len(self.sensor[id_sensor].lines[lines])
             if self.ccd_relative_orientation == "horizontal":
-                grid_index = lines*self.num_spots
+                grid_index = 0
+                dist_2_next = 0
+                spot_index = 0
+                # loop over spots on the line and jump grid index values if there are gaps
+                sp_order = list(range(num_spots))
+                if self.ccd_standard == id_sensor:
+                    sp_order = sp_order[::-1]
+
+                for sp in sp_order:
+                    sgn = 1.
+                    end = 0
+                    if self.ccd_standard == id_sensor:
+                        sgn = -1
+                        end = 1
+                        spot_index += round(dist_2_next/self.pitch) * sgn
+                        grid_index = num_lines * (num_lines + spot_index -1) + lines
+                    else:
+                        sgn = 1.
+                        spot_index += round(dist_2_next / self.pitch) * sgn
+                        grid_index = num_lines * spot_index + lines
+                    gi[sp] = int(grid_index)
+                    try:
+                        if self.ccd_standard == id_sensor:
+                            dist_2_next = distances[sp-1, sp]  # distance to previous spot
+                        else:
+                            dist_2_next = distances[sp, sp + 1]  # distance to previous spot
+                    except:  # bail on the last point
+                        pass
+            else:  # vertical sensor pairing - lines run vertically - grid indexing is orthogonal to horiz mode
+
+                grid_index = 0
+                spot_index = 0
                 dist_2_next = 0
                 # loop over spots on the line and jump grid index values if there are gaps
                 sp_order = list(range(num_spots))
                 if self.ccd_standard == id_sensor:
                     sp_order = sp_order[::-1]
-                    grid_index = (lines + 1) * self.num_spots -1
 
                 for sp in sp_order:
                     sgn = 1.
                     if self.ccd_standard == id_sensor:
                         sgn = -1
-                    grid_index += round(dist_2_next/self.pitch) * sgn
-                    gi.append(int(grid_index))
+                        spot_index += round(dist_2_next/self.pitch) * sgn
+                        grid_index = num_lines * (lines + 1) + spot_index - 1
+                    else:
+                        sgn = 1
+                        spot_index += round(dist_2_next / self.pitch) * sgn
+                        grid_index = num_lines * lines + spot_index
+
+                    gi[sp] = int(grid_index)
                     try:
                         if self.ccd_standard == id_sensor:
                             dist_2_next = distances[sp-1, sp]  # distance to previous spot
@@ -1634,6 +1710,88 @@ class ccd_spacing():
                         pass
 
         return
+
+    def make_fit_plots(self):
+
+        print("entered make_fit_plots")
+
+        # residuals from the fit
+
+        color = ["blue", "red"]
+        fr0_hist = figure(title="Fit residuals:  " + self.sensor[0].name, x_axis_label='residual (px)',
+                           y_axis_label='count', tools=self.TOOLS)
+        fr1_hist = figure(title="Fit residuals:  " + self.sensor[1].name, x_axis_label='residual (px)',
+                           y_axis_label='count', tools=self.TOOLS)
+
+        fit_res0 = self.sensor[0].grid_fit_results.residual
+        mean_res0 = np.mean(fit_res0)
+        h0, b0 = np.histogram(fit_res0, bins=50)
+
+        w = b0[1] - b0[0]
+        fr0_hist.step(y=h0, x=b0[:-1] + w / 2., color=color[0], legend_label=self.sensor[0].name)
+
+        fit_res1 = self.sensor[1].grid_fit_results.residual
+        mean_res1 = np.mean(fit_res1)
+        h1, b1 = np.histogram(fit_res1, bins=50)
+
+        w = b1[1] - b1[0]
+        fr1_hist.step(y=h1, x=b1[:-1] + w / 2., color=color[1], legend_label=self.sensor[1].name)
+
+        # compare fitted grid to spots
+
+        c_color_mapper_res = LinearColorMapper(palette=palette, high=2.)
+        c_color_bar_res = ColorBar(color_mapper=c_color_mapper_res, label_standoff=8, width=500, height=20,
+                                   border_line_color=None, location=(0, 0), orientation='horizontal')
+
+        sxp_s = {}
+        syp_s = {}
+        sdist_s = {}
+        dist_heat = {}
+        dist_spot = {}
+
+        for s in range(2):
+
+            distorted_grid = DistortedGrid(xstep=self.sensor[s].grid_fit_results.params["xstep"].value,
+                                           ystep=self.sensor[s].grid_fit_results.params["ystep"].value,
+                                           theta=self.sensor[s].grid_fit_results.params["theta"].value,
+                                           x0=self.sensor[s].grid_fit_results.params["x0"].value,
+                                           y0=self.sensor[s].grid_fit_results.params["y0"].value,
+                                           ncols=self.num_spots, nrows=self.num_spots)
+
+            yg, xg = distorted_grid.get_source_centroids()
+
+            sxp = sxp_s.setdefault(s, [])
+            syp = syp_s.setdefault(s, [])
+            sdist = sdist_s.setdefault(s, [])
+
+            for line in self.sensor[s].lines:
+                for isp, sp in enumerate(self.sensor[s].lines[line]):
+                    grid_index = self.sensor[s].grid_index[line][isp]
+                    x_sp = sp[0]
+                    y_sp = sp[1]
+                    x_grid = xg[grid_index]
+                    y_grid = yg[grid_index]
+
+                    sg_dist = math.hypot(x_sp - x_grid, y_sp - y_grid)
+
+                    sxp.append(x_sp)
+                    syp.append(y_sp)
+                    sdist.append(sg_dist)
+
+            dist_spot[s] = ColumnDataSource(dict(x=sxp_s[s], y=syp_s[s], res=sdist_s[s]))
+
+            dist_heat[s] = figure(title="Spots Grid: residuals  " + self.sensor[s].name, x_axis_label='x',
+                                  y_axis_label='y', tools=self.TOOLS,
+                                  tooltips=[
+                                      ("x", "@x"), ("y", "@y"), ("distance", "@res")]
+                                  )
+            dist_heat[s].circle(x="x", y="y", source=dist_spot[s], color="gray", size=10,
+                             fill_color={'field': 'res', 'transform': c_color_mapper_res})
+            dist_heat[s].add_layout(c_color_bar_res, 'below')
+
+        fh = column(row(fr0_hist, fr1_hist), row(dist_heat[0], dist_heat[1]))
+
+        return fh
 
     def simulate_response(self, distort=False):
 
