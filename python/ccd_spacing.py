@@ -21,7 +21,8 @@ from bokeh.plotting import figure, curdoc
 from bokeh.palettes import Viridis256 as palette #@UnresolvedImport
 from bokeh.layouts import row, column, layout, gridplot
 from bokeh.models.widgets import TextInput, Dropdown, Button, Slider, FileInput
-from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, ColorBar, LogColorMapper
+from bokeh.models import CustomJS, ColumnDataSource, Legend, LinearColorMapper, ColorBar, LogColorMapper, Arrow, \
+    NormalHead
 
 
 class sensor():
@@ -57,6 +58,10 @@ class sensor():
         # grid fit results
 
         self.grid_fit_results = None
+        self.grid_x = None
+        self.grid_y = None
+        self.grid_distances = None
+        self.grid_whiskers = None
 
 
 class ccd_spacing():
@@ -322,6 +327,7 @@ class ccd_spacing():
         pickle_file = open(s_p, "rb")
         pickle_obj = pickle.load(pickle_file)
         pickle_file.close()
+        self.sensor = pickle_obj
 
         # re-establish global state
 
@@ -334,10 +340,6 @@ class ccd_spacing():
         self.name_ccd2 = name_bits[2] + "_" + name_bits[3]
         self.names_ccd = [self.name_ccd1, self.name_ccd2]
 
-        # kludge
-        pickle_obj[0].name = self.name_ccd1
-        pickle_obj[1].name = self.name_ccd2
-
         self.x0_in = pickle_obj[0].grid_fit_results.params["x0"].value
         self.y0_in = pickle_obj[0].grid_fit_results.params["y0"].value
         self.x1_in = pickle_obj[1].grid_fit_results.params["x0"].value
@@ -348,7 +350,7 @@ class ccd_spacing():
         self.grid_y0 = self.y0_in
         self.grid_y1 = self.y1_in
 
-        return pickle_obj
+        return
 
     def update_dropdown_data(self, event):
         self.dir_index = event.item.split(",")[0].strip()
@@ -542,7 +544,7 @@ class ccd_spacing():
     def do_get_data(self):
 
         if self.use_pickles:
-            self.sensor = self.get_pickle_file()
+            rc = self.get_pickle_file()
             self.drop_data.label = self.raft_ccd_combo
         else:
             try:
@@ -1635,10 +1637,20 @@ class ccd_spacing():
 
         # loop over lines starting from the outer edges of the grid
         # assumes spots on lines are all good (cleaning has been done) and that every first spot per line is there
-        # Todo - take care of 2nd sensor and horizontal vs vertical pairings  <==
+
+        distorted_grid = DistortedGrid(xstep=self.sensor[id_sensor].grid_fit_results.params["xstep"].value,
+                                       ystep=self.sensor[id_sensor].grid_fit_results.params["ystep"].value,
+                                       theta=self.sensor[id_sensor].grid_fit_results.params["theta"].value,
+                                       x0=self.sensor[id_sensor].grid_fit_results.params["x0"].value,
+                                       y0=self.sensor[id_sensor].grid_fit_results.params["y0"].value,
+                                       ncols=self.num_spots, nrows=self.num_spots)
+
+        self.sensor[id_sensor].grid_y, self.sensor[id_sensor].grid_x = distorted_grid.get_source_centroids()
 
         spots_grid_index = []
         self.sensor[id_sensor].grid_index = {}
+        self.sensor[id_sensor].grid_distances = [0.]*len(self.sensor[id_sensor].grid_x)
+        self.sensor[id_sensor].grid_whiskers = [0.]*len(self.sensor[id_sensor].grid_x)
 
         num_lines = len(self.sensor[id_sensor].lines)
 
@@ -1666,12 +1678,15 @@ class ccd_spacing():
                         sgn = -1
                         end = 1
                         spot_index += round(dist_2_next/self.pitch) * sgn
-                        grid_index = num_lines * (num_lines + spot_index -1) + lines
+                        grid_index = int(num_lines * (num_lines + spot_index -1) + lines)
                     else:
                         sgn = 1.
                         spot_index += round(dist_2_next / self.pitch) * sgn
-                        grid_index = num_lines * spot_index + lines
+                        grid_index = int(num_lines * spot_index + lines)
                     gi[sp] = int(grid_index)
+                    dist, whisker = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp, grid_index=grid_index)
+                    self.sensor[id_sensor].grid_distances[grid_index] = dist
+                    self.sensor[id_sensor].grid_whiskers[grid_index] = whisker
                     try:
                         if self.ccd_standard == id_sensor:
                             dist_2_next = distances[sp-1, sp]  # distance to previous spot
@@ -1694,13 +1709,16 @@ class ccd_spacing():
                     if self.ccd_standard == id_sensor:
                         sgn = -1
                         spot_index += round(dist_2_next/self.pitch) * sgn
-                        grid_index = num_lines * (lines + 1) + spot_index - 1
+                        grid_index = int(num_lines * (lines + 1) + spot_index - 1)
                     else:
                         sgn = 1
                         spot_index += round(dist_2_next / self.pitch) * sgn
-                        grid_index = num_lines * lines + spot_index
+                        grid_index = int(num_lines * lines + spot_index)
 
                     gi[sp] = int(grid_index)
+                    dist, whisker = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp, grid_index=grid_index)
+                    self.sensor[id_sensor].grid_distances[grid_index] = dist
+                    self.sensor[id_sensor].grid_whiskers[grid_index] = whisker
                     try:
                         if self.ccd_standard == id_sensor:
                             dist_2_next = distances[sp-1, sp]  # distance to previous spot
@@ -1710,6 +1728,19 @@ class ccd_spacing():
                         pass
 
         return
+
+    def grid_whiskers(self, sensor=None, line=None, spot=None, grid_index=None):
+
+        x_spot = self.sensor[sensor].lines[line][spot][0]
+        y_spot = self.sensor[sensor].lines[line][spot][1]
+
+        x_grid = self.sensor[sensor].grid_x[grid_index]
+        y_grid = self.sensor[sensor].grid_y[grid_index]
+
+        dist = math.hypot(x_spot - x_grid, y_spot - y_grid)
+        whisker = [x_spot - x_grid, y_spot - y_grid]
+
+        return dist, whisker
 
     def make_fit_plots(self):
 
@@ -1746,42 +1777,34 @@ class ccd_spacing():
         sxp_s = {}
         syp_s = {}
         sdist_s = {}
+        whiskers = {}
         dist_heat = {}
         dist_spot = {}
+        whisker_plot = {}
 
         for s in range(2):
-
-            distorted_grid = DistortedGrid(xstep=self.sensor[s].grid_fit_results.params["xstep"].value,
-                                           ystep=self.sensor[s].grid_fit_results.params["ystep"].value,
-                                           theta=self.sensor[s].grid_fit_results.params["theta"].value,
-                                           x0=self.sensor[s].grid_fit_results.params["x0"].value,
-                                           y0=self.sensor[s].grid_fit_results.params["y0"].value,
-                                           ncols=self.num_spots, nrows=self.num_spots)
-
-            yg, xg = distorted_grid.get_source_centroids()
 
             sxp = sxp_s.setdefault(s, [])
             syp = syp_s.setdefault(s, [])
             sdist = sdist_s.setdefault(s, [])
+            swhiskers = whiskers.setdefault(s, [])
 
-            for line in self.sensor[s].lines:
-                for isp, sp in enumerate(self.sensor[s].lines[line]):
-                    grid_index = self.sensor[s].grid_index[line][isp]
-                    x_sp = sp[0]
-                    y_sp = sp[1]
-                    x_grid = xg[grid_index]
-                    y_grid = yg[grid_index]
+            for sp in range(self.num_spots*self.num_spots):
+                sg_dist = self.sensor[s].grid_distances[sp]
+                if sg_dist == 0.:  # missing spot on grid
+                    continue
 
-                    sg_dist = math.hypot(x_sp - x_grid, y_sp - y_grid)
-
-                    sxp.append(x_sp)
-                    syp.append(y_sp)
-                    sdist.append(sg_dist)
+                x_sp = self.sensor[s].grid_x[sp] + self.sensor[s].grid_whiskers[sp][0]
+                y_sp = self.sensor[s].grid_y[sp] + self.sensor[s].grid_whiskers[sp][1]
+                sxp.append(x_sp)
+                syp.append(y_sp)
+                sdist.append(sg_dist)
+                swhiskers.append(self.sensor[s].grid_whiskers[sp])
 
             dist_spot[s] = ColumnDataSource(dict(x=sxp_s[s], y=syp_s[s], res=sdist_s[s]))
 
             dist_heat[s] = figure(title="Spots Grid: residuals  " + self.sensor[s].name, x_axis_label='x',
-                                  y_axis_label='y', tools=self.TOOLS,
+                                  y_axis_label='y', tools=self.TOOLS, height=1000, width=1000,
                                   tooltips=[
                                       ("x", "@x"), ("y", "@y"), ("distance", "@res")]
                                   )
@@ -1789,7 +1812,27 @@ class ccd_spacing():
                              fill_color={'field': 'res', 'transform': c_color_mapper_res})
             dist_heat[s].add_layout(c_color_bar_res, 'below')
 
-        fh = column(row(fr0_hist, fr1_hist), row(dist_heat[0], dist_heat[1]))
+            whisker_plot[s] = figure(title="Spots Grid: whiskers 10x  " + self.sensor[s].name, x_axis_label='x',
+                                  y_axis_label='y', tools=self.TOOLS, height=1000, width=1000)
+
+            for iw, w in enumerate(whiskers[s]):
+                x1 = sxp_s[s][iw]
+                x2 = sxp_s[s][iw] - w[0]
+
+                y1 = syp_s[s][iw]
+                y2 = syp_s[s][iw] - w[1]
+
+                unitSlopeX = (x2 - x1) / sdist_s[s][iw]
+                unitSlopeY = (y2 - y1) / sdist_s[s][iw]
+
+                x3 = x1 + unitSlopeX * sdist_s[s][iw] * 10.
+                y3 = y1 + unitSlopeY * sdist_s[s][iw] * 10.
+
+                whisker_plot[s].line([x1, x3], [y1, y3],
+                                     line_width=4)
+
+        fh = column(row(fr0_hist, fr1_hist), row(dist_heat[0], dist_heat[1]),
+                    row(whisker_plot[0], whisker_plot[1]))
 
         return fh
 
