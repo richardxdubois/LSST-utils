@@ -167,6 +167,7 @@ class ccd_spacing():
         self.grid_y0 = None
         self.grid_x1 = None
         self.grid_y1 = None
+        self.grid_use_distortions = False
 
         self.sim_x = None
         self.sim_y = None
@@ -1095,7 +1096,8 @@ class ccd_spacing():
         if self.ccd_standard == 0:
             x0 = self.grid_x0
             y0 = self.grid_y0
-            x1, y1 = self.rotate_xy(self.grid_x1-2048., self.grid_y1-2048., -self.mean_slope_diff)
+            # rotate by -(standard - non-standard) - here it's sensor 1 - sensor 0
+            x1, y1 = self.rotate_xy(self.grid_x1-2048., self.grid_y1-2048., self.mean_slope_diff)
             x1 += 2048.
             y1 += 2048.
         else:
@@ -1107,7 +1109,10 @@ class ccd_spacing():
 
         c1 = [centers[0] - x1, centers[1] - y1]
         c0 = [centers[0] - x0, centers[1] - y0]
-        self.center_to_center = np.array(c0) - np.array(c1)
+
+        # always standard - non-standard for (x,y) and theta
+        self.center_to_center = (np.array(c0) - np.array(c1))*(1.-2.*self.ccd_standard)
+        self.mean_slope_diff *= -(1.-2.*self.ccd_standard)
 
         print("line fit final coords: , x0, y0, x1, y1 ", x0, y0, x1, y1)
         print("x0_in, y0_in, x1_in, y1_in = ", self.x0_in, self.y0_in, self.x1_in, self.y1_in)
@@ -1551,7 +1556,7 @@ class ccd_spacing():
         self.gX2 = self.grid.x
         self.gY2 = self.grid.y
 
-        if self.sim_distort:
+        if self.grid_use_distortions:
             self.gX1 += self.grid.norm_dx
             self.gY1 += self.grid.norm_dy
             self.gX2 += self.grid.norm_dx
@@ -1560,12 +1565,12 @@ class ccd_spacing():
     def match(self):
 
         print("start fitting with guesses ", self.grid_x0, self.grid_y0, self.grid_x1, self.grid_y1)
-        print("add distortions ", self.sim_distort)
+        print("add distortions ", self.grid_use_distortions)
         distortions = None
 
         rc = self.setup_grid()
 
-        if self.sim_distort:
+        if self.grid_use_distortions:
             distortions = (self.grid.norm_dy, self.grid.norm_dx)
         else:
             print("distortions disabled ", distortions)
@@ -1595,10 +1600,14 @@ class ccd_spacing():
         print('Grid 2:', model_grid2.params['x0'].value, model_grid2.params['y0'].value,
               model_grid2.params['theta'].value)
 
-        self.dtheta0 = model_grid2.params['theta'].value - model_grid1.params['theta'].value
 
         # rotate the non standard sensor center by -dtheta0 to get back into the standard sensor frame
         non_standard = (1 - self.ccd_standard)
+
+        # dtheta = theta(standard) - theta(non-standard)
+        self.dtheta0 = self.sensor[self.ccd_standard].grid_fit_results.params['theta'].value - \
+                       self.sensor[non_standard].grid_fit_results.params['theta'].value
+
         x0n = self.sensor[non_standard].grid_fit_results.params["x0"] - 2048.
         y0n = self.sensor[non_standard].grid_fit_results.params["y0"] - 2048.
         xn, yn = self.rotate_xy(x=x0n, y=y0n, theta=-self.dtheta0)
@@ -1608,8 +1617,10 @@ class ccd_spacing():
         print("fit rotating sensor ", non_standard, " : ", xn, yn)
 
         sgn = (1 - 2*self.ccd_standard)
-        self.dx0 = (xn - self.sensor[self.ccd_standard].grid_fit_results.params["x0"]) * sgn
-        self.dy0 = (yn - self.sensor[self.ccd_standard].grid_fit_results.params["y0"]) * sgn
+
+        # non-standard = standard + dx0, dy0
+        self.dx0 = (xn - self.sensor[self.ccd_standard].grid_fit_results.params["x0"])
+        self.dy0 = (yn - self.sensor[self.ccd_standard].grid_fit_results.params["y0"])
         print("Fit: dx, dy, dtheta ", self.dx0, self.dy0, self.dtheta0)
 
         # reset grid guesses
@@ -1770,7 +1781,7 @@ class ccd_spacing():
 
         # compare fitted grid to spots
 
-        c_color_mapper_res = LinearColorMapper(palette=palette, high=2.)
+        c_color_mapper_res = LinearColorMapper(palette=palette, low=0., high=2.)
         c_color_bar_res = ColorBar(color_mapper=c_color_mapper_res, label_standoff=8, width=500, height=20,
                                    border_line_color=None, location=(0, 0), orientation='horizontal')
 
@@ -1815,9 +1826,11 @@ class ccd_spacing():
             whisker_plot[s] = figure(title="Spots Grid: whiskers 10x  " + self.sensor[s].name, x_axis_label='x',
                                   y_axis_label='y', tools=self.TOOLS, height=1000, width=1000)
 
+            # recall: whisker = spot - grid
+
             for iw, w in enumerate(whiskers[s]):
-                x1 = sxp_s[s][iw]
-                x2 = sxp_s[s][iw] - w[0]
+                x1 = sxp_s[s][iw]          # = spot location
+                x2 = sxp_s[s][iw] - w[0]   # = grid location
 
                 y1 = syp_s[s][iw]
                 y2 = syp_s[s][iw] - w[1]
@@ -1825,7 +1838,7 @@ class ccd_spacing():
                 unitSlopeX = (x2 - x1) / sdist_s[s][iw]
                 unitSlopeY = (y2 - y1) / sdist_s[s][iw]
 
-                x3 = x1 + unitSlopeX * sdist_s[s][iw] * 10.
+                x3 = x1 + unitSlopeX * sdist_s[s][iw] * 10.  # 10x magnification
                 y3 = y1 + unitSlopeY * sdist_s[s][iw] * 10.
 
                 whisker_plot[s].line([x1, x3], [y1, y3],
