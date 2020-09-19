@@ -22,6 +22,7 @@ parser.add_argument('-f', '--dofit', default='yes', help="do full fit yes/no")
 parser.add_argument('-o', '--output', default=None,
                     help="output directory path")
 parser.add_argument('--pickle', default=None, help="output directory for pickle of cS.sensor")
+parser.add_argument('--read_pickle', default="no", help="read from pickle files")
 parser.add_argument('--out_params', default='CCD_grids_params.csv',
                     help="output params file spec")
 parser.add_argument('-u', '--url_base', default='http://slac.stanford.edu/~richard/LSST/CCD_grids/',
@@ -33,7 +34,7 @@ parser.add_argument('--single', default="no", help="run single combo")
 
 args = parser.parse_args()
 print(args.dir)
-cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid)
+cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid, pickles_dir=args.pickle)
 
 cS.line_fitting = True
 cS.use_offsets = True
@@ -69,7 +70,11 @@ for combos in cS.file_paths:
     if combos == "R30_S00_R30_S10":    # problems with data
         continue
     try:
-        rc = cS.get_data(combo_name=combos)
+        if args.read_pickle != "no":
+            cS.raft_ccd_combo = combos
+            rc = cS.get_pickle_file()
+        else:
+            rc = cS.get_data(combo_name=combos)
     except ValueError:
         print("run_ccd_spacing - problem with ", combos)
         problems += 1
@@ -77,9 +82,10 @@ for combos in cS.file_paths:
     successes += 1
 
     if args.dofit == "yes":
-        cS.use_fit = True
-        rc = cS.match()
-        rc = cS.iterate_fit()
+        if args.read_pickle == "no":
+            cS.use_fit = True
+            rc = cS.match()
+            rc = cS.iterate_fit()
         fx.append(cS.dx0)
         fy.append(cS.dy0)
         ftheta.append(cS.dtheta0)
@@ -128,7 +134,7 @@ for combos in cS.file_paths:
     save(combo_layout, title=combos + " grid plots")
     reset_output()
 
-    if args.pickle is not None:
+    if args.pickle is not None and args.read_pickle == "no":
         p_fn = args.pickle + "/" + combos + ".p"
         pickle.dump(cS.sensor, open(p_fn, "wb"))
 
@@ -149,7 +155,7 @@ results_columns = [
     TableColumn(field="st_name", title="Ref CCD", width=30),
     TableColumn(field="x", title="x offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
     TableColumn(field="y", title="y offset (px)", width=50, formatter=NumberFormatter(format='0.00')),
-    TableColumn(field="sdiff", title="slopes diff (rad)", width=50, formatter=NumberFormatter(format='0.0000'))
+    TableColumn(field="sdiff", title="slopes diff (rad)", width=50, formatter=NumberFormatter(format='0.00000'))
 ]
 if args.dofit:
     results_columns.append(TableColumn(field="fx", title="fit x offset (px)", width=50,
@@ -162,15 +168,15 @@ if args.dofit:
                                        formatter=NumberFormatter(format='0.003')))
     results_columns.append(TableColumn(field="ftheta", title="fit theta diff (rad)", width=50,
                                        formatter=NumberFormatter(format='0.00000')))
-    results_columns.append(TableColumn(field="dftheta", title="fit theta error (rad)", width=50,
-                                       formatter=NumberFormatter(format='0.0000')))
+    results_columns.append(TableColumn(field="dftheta", title="fit theta error (rad)", width=60,
+                                       formatter=NumberFormatter(format='0.00000')))
 
 results_columns.append(TableColumn(field="url", title="Links to plots",
                 formatter=HTMLTemplateFormatter(template="<a href='<%= url %>' target='_blank'>plots</a>"),
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=1300, height=1200)
+results_table = DataTable(source=results_source, columns=results_columns, width=1400, height=1200)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]

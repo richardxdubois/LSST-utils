@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-from scipy import stats
+from astropy import stats
 from ccd_spacing import ccd_spacing
 
 from bokeh.plotting import figure, curdoc, output_file, save
@@ -80,7 +80,8 @@ for s in range(2):
         else:
             dist_sums = np.vstack([dist_sums, distances[co][s]])
 
-    dist_mean[s] = np.mean(stats.sigmaclip(dist_sums, low=10., high=10.), axis=0) # in case a row is very wrong
+    clipped = stats.sigma_clip(dist_sums, sigma=3., axis=0)
+    dist_mean[s] = np.mean(clipped, axis=0) # in case a row is very wrong
     dist_std[s] = np.std(dist_sums, axis=0)
 
 c_color_mapper_res = LinearColorMapper(palette=palette, low=-0.5, high=0.5)
@@ -90,18 +91,26 @@ c_color_bar_res = ColorBar(color_mapper=c_color_mapper_res, label_standoff=8, wi
 TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
 
 r_plots = {}
+d_plots = {}
+dist_plots = {}
 x_s = {}
 y_s = {}
 res_s = {}
+dist_s = {}
 r_cds = {}
 
 plot_layout = []
 
 for co in where_x:
     rp = r_plots.setdefault(co, {})
+    dp = d_plots.setdefault(co, {})
+    dip = dist_plots.setdefault(co, {})
+
     xp = x_s.setdefault(co, {})
     yp = y_s.setdefault(co, {})
-    rp = res_s.setdefault(co, {})
+    rsp = res_s.setdefault(co, {})
+    ds = dist_s.setdefault(co, {})
+
     rc = r_cds.setdefault(co, {})
 
     name = co.split("_")
@@ -110,7 +119,11 @@ for co in where_x:
         rps = rp.setdefault(s, [])
         xps = xp.setdefault(s, [])
         yps = yp.setdefault(s, [])
-        rps = rp.setdefault(s, [])
+        rsps = rsp.setdefault(s, [])
+        dps = dp.setdefault(s, [])
+        dsp = ds.setdefault(s, [])
+        dips = dip.setdefault(s, [])
+
         for ig, x in enumerate(where_x[co][s]):
             if distances[co][s][ig] == 0.:
                 continue
@@ -118,7 +131,8 @@ for co in where_x:
             resid = distances[co][s][ig] - dist_mean[s][ig]
             xps.append(x)
             yps.append(y)
-            rps.append(resid)
+            rsps.append(resid)
+            dsp.append(distances[co][s][ig])
             sensor_name = name[2*s] + "_" + name[2*s+1]
 
         r_cds[co][s] = ColumnDataSource(dict(x=x_s[co][s], y=y_s[co][s], res=res_s[co][s]))
@@ -132,7 +146,23 @@ for co in where_x:
                             fill_color={'field': 'res', 'transform': c_color_mapper_res})
         r_plots[co][s].add_layout(c_color_bar_res, 'below')
 
-    plot_layout.append(row(r_plots[co][0], r_plots[co][1]))
+        d_plots[co][s] = figure(title="subtracted distances  " + sensor_name, x_axis_label='distances (px)',
+                           y_axis_label='count', tools=TOOLS, height=450)
+
+        h0, b0 = np.histogram(res_s[co][s], bins=50)
+        w = b0[1] - b0[0]
+        d_plots[co][s].step(y=h0, x=b0[:-1] + w / 2.)
+
+        dist_plots[co][s] = figure(title="original distances  " + sensor_name, x_axis_label='distances (px)',
+                           y_axis_label='count', tools=TOOLS, height=450)
+
+        h1, b1 = np.histogram(dist_s[co][s], bins=50)
+        w = b1[1] - b1[0]
+        dist_plots[co][s].step(y=h1, x=b1[:-1] + w / 2.)
+
+
+    plot_layout.append(row(r_plots[co][0], column(dist_plots[co][0], d_plots[co][0]),
+                           r_plots[co][1], column(dist_plots[co][1], d_plots[co][1])))
 
 out_lay = layout(plot_layout)
 

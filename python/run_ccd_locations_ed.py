@@ -155,13 +155,18 @@ focal_plane.circle(x=0., y=0., color="green", size=8)
 #           "R20_S11", "R20_S21", "R30_S01", "R30_S11", "R30_S21", "R30_S20"]
 
 #sensors = ["R30_S11", "R30_S01", "R20_S21", "R20_S20", "R30_S00", "R30_S10", "R30_S20", "R30_S21"]
-#sensors = ["R30_S11",  "R30_S10", "R30_S20", "R30_S21"]
 
+#sensors = ["R30_S01",  "R30_S02", "R30_S12", "R30_S11"]
 #sensors = ["R30_S10", "R30_S11", "R30_S21", "R30_S20"]
-#sensors = ["R20_S11", "R20_S01", "R20_S02", "R20_S12"]
+#sensors = ["R30_S11", "R30_S12", "R30_S22", "R30_S21"]
 
-sensors = ["R30_S21", "R30_S11", "R30_S01", "R20_S21", "R20_S11", "R20_S01", "R20_S02",
-           "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22"]
+sensors = ["R20_S01", "R20_S02", "R20_S12", "R20_S11"]
+#sensors = ["R20_S10", "R20_S11", "R20_S21", "R20_S20"]
+#sensors = ["R20_S00", "R20_S01", "R20_S11", "R20_S10"]
+#sensors = ["R20_S11", "R20_S12", "R20_S22", "R20_S21"]
+
+#sensors = ["R30_S21", "R30_S11", "R30_S01", "R20_S21", "R20_S11", "R20_S01", "R20_S02",
+#          "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22"]
 
 if args.invert == "yes":
     sensors.reverse()
@@ -184,6 +189,21 @@ cx_0 = -2.5 * d_raft + (float(r0[2]) + 0.5) * d_raft + (float(s0[2]) - 1.) * d_s
 
 orientation = ""
 
+start_x = 0.
+start_y = 0.
+
+running_x = start_x
+running_y = start_y
+
+print(sensors[-1], 0., 0.)
+rot_angle = 0
+cur_sensor = sensors[-1]  # assumes this is a loop with the starting point == ending point
+r0 = cur_sensor[0:3]
+s0 = cur_sensor[4:7]
+
+cy_0 = -2.5 * d_raft + (float(r0[1]) + 0.5) * d_raft + (float(s0[1]) - 1.) * d_sensor
+cx_0 = -2.5 * d_raft + (float(r0[2]) + 0.5) * d_raft + (float(s0[2]) - 1.) * d_sensor
+
 # find the proper connecting measurement given the current sensor and standard
 for ids, tgt_sensor in enumerate(sensors):
     print('tgt_sensor:  ' + tgt_sensor)
@@ -194,8 +214,9 @@ for ids, tgt_sensor in enumerate(sensors):
             if cur_sensor in c:
                 idl = ic
                 break
+    # subtract distances, but remember that the x coordinate is flipped wrt DM
     xic = x[idl]
-    yic = y[idl]
+    yic = -y[idl]
 
     if tgt_sensor == st_name[idl]:
         print('Reverse step: ' + tgt_sensor + ' ' + cur_sensor + ' ' + c)
@@ -207,7 +228,7 @@ for ids, tgt_sensor in enumerate(sensors):
     else:
         print('Forward step: ' + tgt_sensor + ' ' + cur_sensor + ' ' + c)
         # Keep the offset and rotation as they are
-        theta_r = theta[idl]
+        theta_r = +theta[idl]
         dx0 = xic
         dy0 = yic
         print(dx0, dy0, theta)

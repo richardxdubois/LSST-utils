@@ -63,6 +63,8 @@ class sensor():
         self.grid_distances = None
         self.grid_whiskers = None
 
+        self.num_x_pixels = None
+        self.num_y_pixels = None
 
 class ccd_spacing():
 
@@ -72,6 +74,11 @@ class ccd_spacing():
         self.raft_ccd_combo = combo_name
 
         self.sensor = None
+
+        self.num_x_pixels_ITL = 4072.
+        self.num_y_pixels_ITL = 4000.
+        self.num_x_pixels_e2v = 4096.
+        self.num_y_pixels_e2v = 4004.
 
         self.name_ccd1 = None
         self.name_ccd2 = None
@@ -1090,22 +1097,26 @@ class ccd_spacing():
 
         # rotate the non-standard sensor into the standard sensor's frame to get the offsets estimate
 
-        #        centers = [2048., 2048.]
-        centers = [2100., 2100.]
+        c_offset = 2100.
+        centers = [c_offset, c_offset]
 
         if self.ccd_standard == 0:
             x0 = self.grid_x0
             y0 = self.grid_y0
             # rotate by -(standard - non-standard) - here it's sensor 1 - sensor 0
-            x1, y1 = self.rotate_xy(self.grid_x1-2048., self.grid_y1-2048., self.mean_slope_diff)
-            x1 += 2048.
-            y1 += 2048.
+            x1, y1 = self.rotate_xy(self.grid_x1 - self.sensor[1].num_x_pixels/2.,
+                                    self.grid_y1 - self.sensor[1].num_y_pixels/2.,
+                                    -self.mean_slope_diff)
+            x1 += self.sensor[1].num_x_pixels/2.
+            y1 += self.sensor[1].num_y_pixels/2.
         else:
             x1 = self.grid_x1
             y1 = self.grid_y1
-            x0, y0 = self.rotate_xy(self.grid_x0-2048., self.grid_y0-2048., -self.mean_slope_diff)
-            x0 += 2048.
-            y0 += 2048.
+            x0, y0 = self.rotate_xy(self.grid_x0 - self.sensor[0].num_x_pixels/2.,
+                                    self.grid_y0 - self.sensor[0].num_y_pixels/2.,
+                                    +self.mean_slope_diff)
+            x0 += self.sensor[0].num_x_pixels/2.
+            y0 += self.sensor[0].num_y_pixels/2.
 
         c1 = [centers[0] - x1, centers[1] - y1]
         c0 = [centers[0] - x0, centers[1] - y0]
@@ -1291,6 +1302,12 @@ class ccd_spacing():
                                              flux=self.sensor[0].src[kw_flux])
             self.sensor[0].orientation = self.ccd_relative_orientation
             self.sensor[0].sensor_type = self.raft_types[r1]
+            if self.sensor[0].sensor_type == "ITL":
+                self.sensor[0].num_x_pixels = self.num_x_pixels_ITL
+                self.sensor[0].num_y_pixels = self.num_y_pixels_ITL
+            else:
+                self.sensor[0].num_x_pixels = self.num_x_pixels_e2v
+                self.sensor[0].num_y_pixels = self.num_y_pixels_e2v
             self.sensor[0].name = self.name_ccd1
 
             self.sensor[1].src = fits.getdata(self.infile2)
@@ -1299,6 +1316,12 @@ class ccd_spacing():
                                              flux=self.sensor[1].src[kw_flux])
             self.sensor[1].orientation = self.ccd_relative_orientation
             self.sensor[1].sensor_type = self.raft_types[r2]
+            if self.sensor[1].sensor_type == "ITL":
+                self.sensor[1].num_x_pixels = self.num_x_pixels_ITL
+                self.sensor[1].num_y_pixels = self.num_y_pixels_ITL
+            else:
+                self.sensor[1].num_x_pixels = self.num_x_pixels_e2v
+                self.sensor[1].num_y_pixels = self.num_y_pixels_e2v
             self.sensor[1].name = self.name_ccd2
 
         num_spots_0 = len(self.sensor[0].spot_input["x"])
@@ -1608,15 +1631,15 @@ class ccd_spacing():
         self.dtheta0 = self.sensor[self.ccd_standard].grid_fit_results.params['theta'].value - \
                        self.sensor[non_standard].grid_fit_results.params['theta'].value
 
-        x0n = self.sensor[non_standard].grid_fit_results.params["x0"] - 2048.
-        y0n = self.sensor[non_standard].grid_fit_results.params["y0"] - 2048.
-        xn, yn = self.rotate_xy(x=x0n, y=y0n, theta=-self.dtheta0)
-        # restore coordinate system back to (0,0) in corner
-        xn += 2048.
-        yn += 2048.
-        print("fit rotating sensor ", non_standard, " : ", xn, yn)
+        r_offset = 2098.
 
-        sgn = (1 - 2*self.ccd_standard)
+        x0n = self.sensor[non_standard].grid_fit_results.params["x0"] - self.sensor[non_standard].num_x_pixels/2.
+        y0n = self.sensor[non_standard].grid_fit_results.params["y0"] - self.sensor[non_standard].num_y_pixels/2.
+        xn, yn = self.rotate_xy(x=x0n, y=y0n, theta=self.dtheta0)
+        # restore coordinate system back to (0,0) in corner
+        xn += self.sensor[non_standard].num_x_pixels/2.
+        yn += self.sensor[non_standard].num_y_pixels/2.
+        print("fit rotating sensor ", non_standard, " : ", xn, yn)
 
         # non-standard = standard + dx0, dy0
         self.dx0 = (xn - self.sensor[self.ccd_standard].grid_fit_results.params["x0"])
