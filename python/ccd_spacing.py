@@ -484,19 +484,35 @@ class ccd_spacing():
         self.layout.children = m_new.children
 
     def iterate_fit(self):
-        # hack in case fit and lines are off by a spot - inflate long edge guess by 5% and re-fit
-        inflate = 1.0075
-        pitch_frac = 0.3
 
-        if self.line_fitting:
-            if self.ccd_relative_orientation == "horizontal":
-                if abs(abs(self.center_to_center[0]) - abs(self.dx0)) > pitch_frac*self.pitch:
-                    if self.ccd_standard == 0:
-                        self.grid_x1 *= inflate
-                    else:
-                        self.grid_x0 *= inflate
-                    print("refit")
-                    rc = self.match()
+        # in case the fit maxed out on iterations. Give one more try with the last values
+        redo_max_iterations = False
+
+        if redo_max_iterations and (self.sensor[0].grid_fit_results.nfev > 250 or \
+                self.sensor[1].grid_fit_results.nfev > 250):
+
+            print("redo fit after max iterations")
+            self.grid_x0 = self.sensor[0].grid_fit_results.params["x0"].value
+            self.grid_y0 = self.sensor[0].grid_fit_results.params["y0"].value
+            self.grid_x1 = self.sensor[1].grid_fit_results.params["x0"].value
+            self.grid_y1 = self.sensor[1].grid_fit_results.params["y0"].value
+
+            rc = self.match()
+
+        else:
+            # hack in case fit and lines are off by a spot - inflate long edge guess by 5% and re-fit
+            inflate = 1.0075
+            pitch_frac = 0.3
+
+            if self.line_fitting:
+                if self.ccd_relative_orientation == "horizontal":
+                    if abs(abs(self.center_to_center[0]) - abs(self.dx0)) > pitch_frac*self.pitch:
+                        if self.ccd_standard == 0:
+                            self.grid_x1 *= inflate
+                        else:
+                            self.grid_x0 *= inflate
+                        print("refit")
+                        rc = self.match()
 
             else:
                 if abs(abs(self.center_to_center[1]) - abs(self.dy0)) > pitch_frac*self.pitch:
