@@ -62,6 +62,9 @@ dftheta = []
 st_name = []
 t1 = []
 t2 = []
+seq = []
+redchi_0 = []
+redchi_1 = []
 
 for combos in cS.file_paths:
     if args.single == "yes" and combos != args.combo:
@@ -111,6 +114,9 @@ for combos in cS.file_paths:
     c2c = cS.center_to_center
     t1.append(cS.sensor[0].sensor_type)
     t2.append(cS.sensor[1].sensor_type)
+    seq.append(cS.sensor[0].sequence)
+    redchi_0.append(cS.sensor[0].grid_fit_results.redchi)
+    redchi_1.append(cS.sensor[1].grid_fit_results.redchi)
 
     x.append(str(c2c[0]))
     y.append(str(c2c[1]))
@@ -141,14 +147,17 @@ for combos in cS.file_paths:
 print("Found ", successes, " good filesets and", problems, " problem filesets")
 
 if args.dofit:
-    results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, fx=fx, fy=fy, ftheta=ftheta,
+    results_source = ColumnDataSource(dict(names=names, seq=seq, x=x, y=y, o=orient, fx=fx, fy=fy,
+                                           ftheta=ftheta,
                                            sdiff=sdiff, st_name=st_name, t1=t1, t2=t2, url=urls,
-                                           dfx=dfx, dfy=dfy, dftheta=dftheta))
+                                           dfx=dfx, dfy=dfy, dftheta=dftheta, chi0=redchi_0, chi1=redchi_1))
 else:
-    results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, st_name=st_name, url=urls))
+    results_source = ColumnDataSource(dict(names=names, x=x, y=y, o=orient, sdiff=sdiff, st_name=st_name,
+                                           url=urls))
 
 results_columns = [
     TableColumn(field="names", title="Raft-sensors", width=75),
+    TableColumn(field="seq", title="Sequence", width=50),
     TableColumn(field="o", title="Sensor Orientation", width=50),
     TableColumn(field="t1", title="S1 type", width=30),
     TableColumn(field="t2", title="S2 type", width=30),
@@ -170,13 +179,17 @@ if args.dofit:
                                        formatter=NumberFormatter(format='0.00000')))
     results_columns.append(TableColumn(field="dftheta", title="fit theta error (rad)", width=60,
                                        formatter=NumberFormatter(format='0.00000')))
+    results_columns.append(TableColumn(field="chi0", title="red chi s0", width=60,
+                                       formatter=NumberFormatter(format='0.00')))
+    results_columns.append(TableColumn(field="chi1", title="red chi s1", width=60,
+                                       formatter=NumberFormatter(format='0.00')))
 
 results_columns.append(TableColumn(field="url", title="Links to plots",
                 formatter=HTMLTemplateFormatter(template="<a href='<%= url %>' target='_blank'>plots</a>"),
                 width=50))
 
 
-results_table = DataTable(source=results_source, columns=results_columns, width=1400, height=1200)
+results_table = DataTable(source=results_source, columns=results_columns, width=1600, height=1200)
 
 x_off, bins = np.histogram(np.array(x_o), bins=10)
 w = bins[1] - bins[0]
