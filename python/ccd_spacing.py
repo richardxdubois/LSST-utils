@@ -7,6 +7,7 @@ import numpy as np
 from scipy import optimize
 from sklearn import linear_model
 from scipy.spatial import distance
+from lmfit import Minimizer, Parameters
 #from exploreFocalPlane import exploreFocalPlane
 #from exploreRaft import exploreRaft
 import lmfit
@@ -166,8 +167,7 @@ class ccd_spacing():
         self.dy0 = None
         self.dtheta0 = None
 
-        # simulation stuff
-
+        self.mixcoatl = False
         self.grid_data_file = distort_file
         self.grid = None
         self.grid_x0 = None
@@ -175,6 +175,8 @@ class ccd_spacing():
         self.grid_x1 = None
         self.grid_y1 = None
         self.grid_use_distortions = False
+
+        # simulation stuff
 
         self.sim_x = None
         self.sim_y = None
@@ -256,6 +258,10 @@ class ccd_spacing():
         self.button_overlay_ccd = Button(label="Overlay CCDs", button_type="danger", width=100)
         self.button_overlay_ccd.on_click(self.do_overlay_ccd)
 
+        # button to toggle fit method
+        self.button_pick_fit = Button(label="mixcoatl", button_type="warning", width=100)
+        self.button_pick_fit.on_click(self.do_pick_fit)
+
         # button to toggle grid overlay from fit
         self.button_overlay_grid = Button(label="Overlay grid", button_type="danger", width=100)
         self.button_overlay_grid.on_click(self.do_overlay_grid)
@@ -316,7 +322,7 @@ class ccd_spacing():
         self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
                                      self.button_submit)
         self.max_layout = column(self.min_layout, sims_layout, self.sliders_layout,
-                                 row(self.button_fit, self.button_gridfit_plots))
+                                 row(self.button_fit, self.button_pick_fit, self.button_gridfit_plots))
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
 
@@ -465,6 +471,13 @@ class ccd_spacing():
             self.button_overlay_grid.button_type = "success"
         else:
             self.button_overlay_grid.button_type = "danger"
+
+    def do_pick_fit(self):
+        self.mixcoatl = not self.mixcoatl
+        if self.mixcoatl:
+            self.button_pick_fit.button_type = "warning"
+        else:
+            self.button_pick_fit.button_type = "success"
 
         rc = self.setup_grid()
         pl = self.make_plots()
@@ -1454,11 +1467,14 @@ class ccd_spacing():
 
         return out_dict
 
-    def data_2_model(self, srcX, srcY, ncols, nrows, x0_guess, y0_guess, distortions=None):
+    def data_2_model(self, srcX, srcY, ncols, nrows, x0_guess, y0_guess, distortions=None, sensor_id=None):
 
-        result = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
-                          y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
-                          brute_search=False, vary_theta=True)
+        if self.mixcoatl:
+            result = grid_fit(srcX=srcX, srcY=srcY, ncols=ncols, nrows=nrows,
+                              y0_guess=y0_guess, x0_guess=x0_guess, normalized_shifts=distortions,
+                              brute_search=False, vary_theta=True)
+        else:
+            result = self.fit_grid(sensor_id=sensor_id)
 
         return result
 
@@ -1619,14 +1635,14 @@ class ccd_spacing():
         model_grid1 = self.data_2_model(srcX=self.sensor[0].spot_cln["x"], srcY=self.sensor[0].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x0, y0_guess=self.grid_y0,
-                                        distortions=distortions)
+                                        distortions=distortions, sensor_id=0)
         s = model_grid1.params["x0"].stderr
         print(self.name_ccd1, lmfit.fit_report(model_grid1))
 
         model_grid2 = self.data_2_model(srcX=self.sensor[1].spot_cln["x"], srcY=self.sensor[1].spot_cln["y"],
                                         ncols=49, nrows=49,
                                         x0_guess=self.grid_x1, y0_guess=self.grid_y1,
-                                        distortions=distortions)
+                                        distortions=distortions, sensor_id=1)
 
         s = model_grid2.params["x0"].stderr
         print(self.name_ccd2, lmfit.fit_report(model_grid2))
@@ -1683,17 +1699,39 @@ class ccd_spacing():
 
         return xn, yn
 
-    def match_line_spots_to_grid(self, id_sensor):
+    def match_line_spots_to_grid(self, id_sensor, lines_guess=False, distortions=False, theta_fitter=None):
 
         # loop over lines starting from the outer edges of the grid
         # assumes spots on lines are all good (cleaning has been done) and that every first spot per line is there
 
-        distorted_grid = DistortedGrid(xstep=self.sensor[id_sensor].grid_fit_results.params["xstep"].value,
-                                       ystep=self.sensor[id_sensor].grid_fit_results.params["ystep"].value,
-                                       theta=self.sensor[id_sensor].grid_fit_results.params["theta"].value,
-                                       x0=self.sensor[id_sensor].grid_fit_results.params["x0"].value,
-                                       y0=self.sensor[id_sensor].grid_fit_results.params["y0"].value,
-                                       ncols=self.num_spots, nrows=self.num_spots)
+        if lines_guess:
+            xstep = self.pitch
+            ystep = self.pitch
+            theta = theta_fitter
+            if id_sensor == self.ccd_standard:
+                x0 = self.grid_x0
+                y0 = self.grid_y0
+            else:
+                x0 = self.grid_x1
+                y0 = self.grid_y1
+        else:
+            xstep = self.sensor[id_sensor].grid_fit_results.params["xstep"].value
+            ystep = self.sensor[id_sensor].grid_fit_results.params["ystep"].value
+            theta = self.sensor[id_sensor].grid_fit_results.params["theta"].value
+            x0 = self.sensor[id_sensor].grid_fit_results.params["x0"].value
+            y0 = self.sensor[id_sensor].grid_fit_results.params["y0"].value
+
+        normalized_shifts = None
+        if distortions:
+            normalized_shifts = (self.grid.norm_dy, self.grid.norm_dx)
+
+        distorted_grid = DistortedGrid(xstep=xstep,
+                                       ystep=ystep,
+                                       theta=theta,
+                                       x0=x0,
+                                       y0=y0,
+                                       ncols=self.num_spots, nrows=self.num_spots,
+                                       normalized_shifts=normalized_shifts)
 
         self.sensor[id_sensor].grid_y, self.sensor[id_sensor].grid_x = distorted_grid.get_source_centroids()
 
@@ -1734,7 +1772,8 @@ class ccd_spacing():
                         spot_index += round(dist_2_next / self.pitch) * sgn
                         grid_index = int(num_lines * spot_index + lines)
                     gi[sp] = int(grid_index)
-                    dist, whisker = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp, grid_index=grid_index)
+                    dist, whisker = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp,
+                                                       grid_index=grid_index)
                     self.sensor[id_sensor].grid_distances[grid_index] = dist
                     self.sensor[id_sensor].grid_whiskers[grid_index] = whisker
                     try:
@@ -1970,3 +2009,57 @@ class ccd_spacing():
             self.button_line_fitting.button_type = "danger"
 
         self.layout = layout(self.max_layout)
+
+    def fit_grid(self, sensor_id=None):
+
+        if sensor_id == self.ccd_standard:
+            x0 = self.grid_x0
+            y0 = self.grid_y0
+        else:
+            x0 = self.grid_x1
+            y0 = self.grid_y1
+
+        theta_r = -self.rotate
+
+        ## Define fit parameters
+        params = Parameters()
+        params.add('ystep', value=self.pitch, vary=False)
+        params.add('xstep', value=self.pitch, vary=False)
+        params.add('theta', value=theta_r, vary=True)
+        params.add('y0', value=y0)
+        params.add('x0', value=x0)
+
+        ## Optionally perform initial brute search
+        #params.add('y0', value=y0, min=y0 - self.pitch / 3., max=y0 + self.pitch / 3.,
+        #          vary=True, brute_step=self.pitch / 6.)
+        #params.add('x0', value=x0, min=x0 - self.pitch / 3., max=x0 + self.pitch / 3.,
+        #           vary=True, brute_step=self.pitch / 6.)
+        #params['theta'].set(vary=True, min=-self.rotate - 5 * np.pi / 180., max=-self.rotate + 5 * np.pi
+        #                                                                        / 180.)
+
+        ## LM Fit
+
+        method = 'least_squares'
+        minner = Minimizer(self.fit_grid_distances, params, fcn_kws={"s":sensor_id},
+                           nan_policy='omit')
+        result = minner.minimize(params=params, method=method)
+
+        return result
+
+    def fit_grid_distances(self, params, s):
+
+        if s == self.ccd_standard:
+            self.grid_x0 = params["x0"].value
+            self.grid_y0 = params["y0"].value
+        else:
+            self.grid_x1 = params["x0"].value
+            self.grid_y1 = params["y0"].value
+
+        rc = self.match_line_spots_to_grid(id_sensor=s, lines_guess=True, distortions=False,
+                                           theta_fitter=params["theta"].value)
+        distances = np.array(self.sensor[s].grid_distances)
+        mask = [distances > 0.]
+        masked_distances = distances[mask]
+        rms_dist = np.sqrt(np.mean(masked_distances**2))
+
+        return masked_distances
