@@ -34,6 +34,7 @@ class sensor():
 
         self.src = None
         self.spot_input = None
+        self.sequence = None
 
         # orientation to work in - is sensor boundary perpendicular to x or y in original coordinates.
         self.orientation = None
@@ -478,11 +479,6 @@ class ccd_spacing():
             self.button_pick_fit.button_type = "warning"
         else:
             self.button_pick_fit.button_type = "success"
-
-        rc = self.setup_grid()
-        pl = self.make_plots()
-        m_new = column(self.max_layout, pl)
-        self.layout.children = m_new.children
 
     def do_linfit_plots(self):
         p_grid = self.make_line_plots()
@@ -1274,6 +1270,7 @@ class ccd_spacing():
 
         infile1 = None
         infile2 = None
+        seq = "NA"
 
         if self.sim_doit:
             X1 = self.sim_x[0]
@@ -1292,9 +1289,16 @@ class ccd_spacing():
             print(self.infile1)
             print(self.infile2)
 
-            self.name_ccd1 = os.path.basename(self.infile1).split("_source")[0]
-            self.name_ccd2 = os.path.basename(self.infile2).split("_source")[0]
+            file_name1 = os.path.basename(self.infile1)
+            file_name2 = os.path.basename(self.infile2)
+
+            self.name_ccd1 = file_name1[0].split("_source")[0]
+            self.name_ccd2 = file_name2[0].split("_source")[0]
             self.names_ccd = [self.name_ccd1, self.name_ccd2]
+
+            run_bit = dir_index.split("/")[-3].split("_")[0]
+            seq_bit = dir_index.split("/")[-2].split("_")[-1]
+            seq = run_bit + "_" + seq_bit
 
             r1 = self.name_ccd1.split("_")[0]
             r2 = self.name_ccd2.split(("_"))[0]
@@ -1352,6 +1356,9 @@ class ccd_spacing():
                 self.sensor[1].num_x_pixels = self.num_x_pixels_e2v
                 self.sensor[1].num_y_pixels = self.num_y_pixels_e2v
             self.sensor[1].name = self.name_ccd2
+
+        self.sensor[0].sequence = seq
+        self.sensor[0].sequence = seq
 
         num_spots_0 = len(self.sensor[0].spot_input["x"])
         num_spots_1 = len(self.sensor[1].spot_input["x"])
