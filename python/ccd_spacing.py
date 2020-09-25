@@ -1292,8 +1292,8 @@ class ccd_spacing():
             file_name1 = os.path.basename(self.infile1)
             file_name2 = os.path.basename(self.infile2)
 
-            self.name_ccd1 = file_name1[0].split("_source")[0]
-            self.name_ccd2 = file_name2[0].split("_source")[0]
+            self.name_ccd1 = file_name1.split("_source")[0]
+            self.name_ccd2 = file_name2.split("_source")[0]
             self.names_ccd = [self.name_ccd1, self.name_ccd2]
 
             run_bit = dir_index.split("/")[-3].split("_")[0]
