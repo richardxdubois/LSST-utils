@@ -1150,7 +1150,7 @@ class ccd_spacing():
             # rotate by -(standard - non-standard) - here it's sensor 1 - sensor 0
             x1, y1 = self.rotate_xy(self.grid_x1 - self.sensor[1].num_x_pixels/2.,
                                     self.grid_y1 - self.sensor[1].num_y_pixels/2.,
-                                    -self.mean_slope_diff)
+                                    self.mean_slope_diff)
             x1 += self.sensor[1].num_x_pixels/2.
             y1 += self.sensor[1].num_y_pixels/2.
         else:
@@ -1158,7 +1158,7 @@ class ccd_spacing():
             y1 = self.grid_y1
             x0, y0 = self.rotate_xy(self.grid_x0 - self.sensor[0].num_x_pixels/2.,
                                     self.grid_y0 - self.sensor[0].num_y_pixels/2.,
-                                    +self.mean_slope_diff)
+                                    -self.mean_slope_diff)
             x0 += self.sensor[0].num_x_pixels/2.
             y0 += self.sensor[0].num_y_pixels/2.
 
