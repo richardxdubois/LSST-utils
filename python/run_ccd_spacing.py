@@ -31,16 +31,18 @@ parser.add_argument('-g', '--grid', default=
                     '/Volumes/External_SSD_Deb/LSST/misc/CCD_grids/optics_distorted_grid_norm.fits',
                     help="grid distortions file")
 parser.add_argument('--single', default="no", help="run single combo")
+parser.add_argument('-w', '--whiskers', default="./", help="whisker files directory")
 
 args = parser.parse_args()
 print(args.dir)
-cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid, pickles_dir=args.pickle)
+cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid,
+                 pickles_dir=args.pickle, whiskers=args.whiskers)
 
 cS.line_fitting = True
 cS.use_offsets = True
 cS.overlay_ccd = True
 cS.sim_distort = False
-
+cS.grid_use_distortions = True
 # loop over file sets
 
 problems = 0

@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import pickle
 from astropy import stats
 from ccd_spacing import ccd_spacing
 
@@ -29,10 +30,12 @@ parser.add_argument('--pickle', default=None, help="output directory for pickle 
 parser.add_argument('--logs', default=None, help="output directory for batch logs")
 parser.add_argument('-g', '--grid', default=None, help="grid distortions file")
 parser.add_argument('-s', '--single', default="no", help="run first combo")
+parser.add_argument('-w', '--whiskers', default="./", help="whisker files directory")
 
 args = parser.parse_args()
 print(args.dir)
-cS = ccd_spacing(dir_index=args.dir, distort_file=args.grid, pickles_dir=args.pickle)
+cS = ccd_spacing(dir_index=args.dir, distort_file=args.grid,
+                 pickles_dir=args.pickle, whiskers=args.whiskers)
 
 distort_file = " -g " + args.grid
 spot_files = " -d " + args.dir
@@ -41,6 +44,7 @@ out_files = " --output " + args.output
 distances = {}
 where_x = {}
 where_y = {}
+g = {}
 
 for combos in cS.file_paths:
     if combos == "R30_S00_R30_S10" or combos == "R30_S00_R30_S01":
@@ -56,6 +60,8 @@ for combos in cS.file_paths:
         c = distances.setdefault(combos, {})
         sd = c.setdefault(s, [])
         c[s] = cS.sensor[s].grid_distances
+        gw = g.setdefault(combos, {})
+        g[combos][s] = cS.sensor[s].grid_whiskers
 
         wx = where_x.setdefault(combos, {})
         wxd = wx.setdefault(s, [])
@@ -67,22 +73,50 @@ for combos in cS.file_paths:
     if args.single == "yes":
         break
 
-dist_mean = [None]*2
-dist_std = [None]*2
+dist_mean = [None]
+dist_std = [None]
+whx_mean = [None]
+why_mean = [None]
 
-for s in range(2):
-    dist_sums = []
-    f = True
-    for co in distances:
-        if f:
-            dist_sums = np.array(distances[co][s])
-            f = False
-        else:
-            dist_sums = np.vstack([dist_sums, distances[co][s]])
+dist_sums = [0.]*2401
+wh_x = [0.]*2401
+wh_y = [0.]*2401
 
-    clipped = stats.sigma_clip(dist_sums, sigma=3., axis=0)
-    dist_mean[s] = np.mean(clipped, axis=0) # in case a row is very wrong
-    dist_std[s] = np.std(dist_sums, axis=0)
+f = True
+for co in distances:
+    wh_xt = [0.] * 2401
+    wh_yt = [0.] * 2401
+    for s in range(2):
+        dist_sums = np.array(distances[co][s])
+        whisks = g[co][s]
+        for iw in range(len(whisks)):
+            try:
+                wh_xt[iw] = g[co][s][iw][0]
+                wh_yt[iw] = g[co][s][iw][1]
+            except TypeError:  # float, not a list of 2. Should be zero.
+                pass
+
+    if f:
+        wh_x = wh_xt
+        wh_y = wh_yt
+        f = False
+    else:
+        dist_sums = np.vstack([dist_sums, distances[co][s]])
+        wh_x = np.vstack([wh_x, wh_xt])
+        wh_y = np.vstack([wh_y, wh_yt])
+
+clipped = stats.sigma_clip(dist_sums, sigma=3., axis=0)
+dist_mean = np.mean(clipped, axis=0) # in case a row is very wrong
+dist_std = np.std(dist_sums, axis=0)
+whx_clipped = stats.sigma_clip(wh_x, sigma=3., axis=0)
+whx_mean = np.mean(whx_clipped, axis=0) # in case a row is very wrong
+why_clipped = stats.sigma_clip(wh_y, sigma=3., axis=0)
+why_mean = np.mean(why_clipped, axis=0) # in case a row is very wrong
+
+# write out pickle file of whiskers
+
+pickle.dump([whx_mean, why_mean], open("whiskers_" + args.mode + ".p", "wb"))
+exit()
 
 c_color_mapper_res = LinearColorMapper(palette=palette, low=-0.5, high=0.5)
 c_color_bar_res = ColorBar(color_mapper=c_color_mapper_res, label_standoff=8, width=500, height=20,

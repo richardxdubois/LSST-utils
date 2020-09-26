@@ -70,7 +70,8 @@ class sensor():
 
 class ccd_spacing():
 
-    def __init__(self, dir_index=None, combo_name=None, distort_file=None, pickles_dir=None):
+    def __init__(self, dir_index=None, combo_name=None, distort_file=None, pickles_dir=None,
+                 whiskers=None):
 
         self.file_paths = {}
         self.raft_ccd_combo = combo_name
@@ -112,7 +113,6 @@ class ccd_spacing():
                            'R20': 'ITL', 'R21': 'e2v', 'R22': 'e2v', 'R23': 'e2v', 'R24': 'e2v', 'R30': 'e2v',
                            'R31': 'e2v', 'R32': 'e2v', 'R33': 'e2v', 'R34': 'e2v', 'R41': 'ITL', 'R42': 'ITL',
                            'R43': 'ITL'}
-
 
         self.ccd1_scatter = None
 
@@ -175,7 +175,7 @@ class ccd_spacing():
         self.grid_y0 = None
         self.grid_x1 = None
         self.grid_y1 = None
-        self.grid_use_distortions = False
+        self.grid_use_distortions = True
 
         # simulation stuff
 
@@ -263,6 +263,10 @@ class ccd_spacing():
         self.button_pick_fit = Button(label="mixcoatl", button_type="warning", width=100)
         self.button_pick_fit.on_click(self.do_pick_fit)
 
+        # button to toggle fit distortions
+        self.button_fit_distort = Button(label="Fit distort", button_type="success", width=100)
+        self.button_fit_distort.on_click(self.do_fit_distort)
+
         # button to toggle grid overlay from fit
         self.button_overlay_grid = Button(label="Overlay grid", button_type="danger", width=100)
         self.button_overlay_grid.on_click(self.do_overlay_grid)
@@ -318,7 +322,7 @@ class ccd_spacing():
 
         self.min_layout = column(row(self.button_exit, self.drop_data, self.button_get_data, self.button_overlay_ccd,
                               self.button_overlay_grid, self.button_linfit_plots, self.button_rotate,
-                              self.button_line_fitting, self.button_pickle),
+                              self.button_line_fitting, self.button_pickle, self.button_fit_distort),
                                  row(self.text_box_half, self.text_box_full))
         self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
                                      self.button_submit)
@@ -334,6 +338,14 @@ class ccd_spacing():
         self.distorted_grid = DistortedGrid(xstep=self.pitch, ystep=self.pitch, theta=-self.rotate, x0=0, y0=0,
                                             ncols=self.num_spots, nrows=self.num_spots,
                                             normalized_shifts=normalized_shifts)
+        self.whisker_files = whiskers
+        self.whiskers = {}
+        with open(self.whisker_files + "whiskers_vertical.p", "rb") as f:
+            self.whiskers["vertical"] = pickle.load(f)
+        f.close();
+        with open(self.whisker_files + "whiskers_horizontal.p", "rb") as f:
+            self.whiskers["horizontal"] = pickle.load(f)
+        f.close()
 
     # handlers
 
@@ -479,6 +491,13 @@ class ccd_spacing():
             self.button_pick_fit.button_type = "warning"
         else:
             self.button_pick_fit.button_type = "success"
+
+    def do_fit_distort(self):
+        self.grid_use_distortions = not self.grid_use_distortions
+        if self.grid_use_distortions:
+            self.button_fit_distort.button_type = "success"
+        else:
+            self.button_fit_distort.button_type = "danger"
 
     def do_linfit_plots(self):
         p_grid = self.make_line_plots()
@@ -1674,7 +1693,7 @@ class ccd_spacing():
 
         x0n = self.sensor[non_standard].grid_fit_results.params["x0"] - self.sensor[non_standard].num_x_pixels/2.
         y0n = self.sensor[non_standard].grid_fit_results.params["y0"] - self.sensor[non_standard].num_y_pixels/2.
-        xn, yn = self.rotate_xy(x=x0n, y=y0n, theta=self.dtheta0)
+        xn, yn = self.rotate_xy(x=x0n, y=y0n, theta=-self.dtheta0)
         # restore coordinate system back to (0,0) in corner
         xn += self.sensor[non_standard].num_x_pixels/2.
         yn += self.sensor[non_standard].num_y_pixels/2.
@@ -1694,8 +1713,8 @@ class ccd_spacing():
 
         # look at fit results
 
-        rc = self.match_line_spots_to_grid(id_sensor=0)
-        rc = self.match_line_spots_to_grid(id_sensor=1)
+        rc = self.match_line_spots_to_grid(id_sensor=0, distortions=self.grid_use_distortions)
+        rc = self.match_line_spots_to_grid(id_sensor=1, distortions=self.grid_use_distortions)
 
         return
 
@@ -1729,8 +1748,12 @@ class ccd_spacing():
             y0 = self.sensor[id_sensor].grid_fit_results.params["y0"].value
 
         normalized_shifts = None
+        wx = None
+        wy = None
         if distortions:
             normalized_shifts = (self.grid.norm_dy, self.grid.norm_dx)
+            wx = self.whiskers[self.ccd_relative_orientation][0]
+            wy = self.whiskers[self.ccd_relative_orientation][1]
 
         distorted_grid = DistortedGrid(xstep=xstep,
                                        ystep=ystep,
@@ -1738,9 +1761,12 @@ class ccd_spacing():
                                        x0=x0,
                                        y0=y0,
                                        ncols=self.num_spots, nrows=self.num_spots,
-                                       normalized_shifts=normalized_shifts)
+                                       normalized_shifts=None)
 
         self.sensor[id_sensor].grid_y, self.sensor[id_sensor].grid_x = distorted_grid.get_source_centroids()
+        if wx is not None:
+            self.sensor[id_sensor].grid_y += wy
+            self.sensor[id_sensor].grid_x += wx
 
         spots_grid_index = []
         self.sensor[id_sensor].grid_index = {}
@@ -2062,7 +2088,7 @@ class ccd_spacing():
             self.grid_x1 = params["x0"].value
             self.grid_y1 = params["y0"].value
 
-        rc = self.match_line_spots_to_grid(id_sensor=s, lines_guess=True, distortions=False,
+        rc = self.match_line_spots_to_grid(id_sensor=s, lines_guess=True, distortions=self.grid_use_distortions,
                                            theta_fitter=params["theta"].value)
         distances = np.array(self.sensor[s].grid_distances)
         mask = [distances > 0.]

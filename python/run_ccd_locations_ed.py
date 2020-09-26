@@ -160,13 +160,13 @@ focal_plane.circle(x=0., y=0., color="green", size=8)
 #sensors = ["R30_S10", "R30_S11", "R30_S21", "R30_S20"]
 #sensors = ["R30_S11", "R30_S12", "R30_S22", "R30_S21"]
 
-sensors = ["R20_S01", "R20_S02", "R20_S12", "R20_S11"]
-#sensors = ["R20_S10", "R20_S11", "R20_S21", "R20_S20"]
+#sensors = ["R20_S01", "R20_S02", "R20_S12", "R20_S11"]
+#sensors = ["R20_S10", "R20_S11", "R20_S21", "R20_S20"]#
 #sensors = ["R20_S00", "R20_S01", "R20_S11", "R20_S10"]
 #sensors = ["R20_S11", "R20_S12", "R20_S22", "R20_S21"]
 
-#sensors = ["R30_S21", "R30_S11", "R30_S01", "R20_S21", "R20_S11", "R20_S01", "R20_S02",
-#          "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22"]
+sensors = ["R30_S21", "R30_S11", "R30_S01", "R20_S21", "R20_S11", "R20_S01", "R20_S02",
+          "R20_S12", "R20_S22", "R30_S02", "R30_S12", "R30_S22"]
 
 if args.invert == "yes":
     sensors.reverse()

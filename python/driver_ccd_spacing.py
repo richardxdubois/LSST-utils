@@ -16,13 +16,15 @@ parser.add_argument('-d', '--dir',
                     help="default directory to use")
 parser.add_argument('-c', '--combo', default='R20_S12_R21_S10', help="raft, sensor combo name")
 parser.add_argument('-p', '--pickles', default=None, help="pickle files directory")
+parser.add_argument('-w', '--whiskers', default="./", help="whisker files directory")
 parser.add_argument('-g', '--grid', default=
                     '/Users/richard/LSST/Code/misc/CCD_grids/optical_distortion_grid.fits',
                     help="grid distortions file")
 
 args = parser.parse_args()
 print(args.dir)
-cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid, pickles_dir=args.pickles)
+cS = ccd_spacing(dir_index=args.dir, combo_name=args.combo, distort_file=args.grid,
+                 pickles_dir=args.pickles, whiskers=args.whiskers)
 
 cS.line_fitting = True
 rc = cS.loop()
