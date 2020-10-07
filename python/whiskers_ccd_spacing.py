@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import pickle
+import math
 from astropy import stats
 from ccd_spacing import ccd_spacing
 
@@ -31,6 +32,7 @@ parser.add_argument('--logs', default=None, help="output directory for batch log
 parser.add_argument('-g', '--grid', default=None, help="grid distortions file")
 parser.add_argument('-s', '--single', default="no", help="run first combo")
 parser.add_argument('-w', '--whiskers', default="./", help="whisker files directory")
+parser.add_argument('-n', '--nodistort', default="no", help="suppress mean subtraction")
 
 args = parser.parse_args()
 print(args.dir)
@@ -41,10 +43,15 @@ distort_file = " -g " + args.grid
 spot_files = " -d " + args.dir
 out_files = " --output " + args.output
 
+suppress_distortions = 1.
+if args.nodistort != "no":
+    suppress_distortions = 0.
+
 distances = {}
 where_x = {}
 where_y = {}
 g = {}
+any_co = None
 
 for combos in cS.file_paths:
     if combos == "R30_S00_R30_S10" or combos == "R30_S00_R30_S01":
@@ -55,6 +62,9 @@ for combos in cS.file_paths:
 
     if cS.ccd_relative_orientation != args.mode:
         continue
+
+    if any_co is None:  # kludge grabbing one valid name of this orientation
+        any_co = combos
 
     for s in range(2):
         c = distances.setdefault(combos, {})
@@ -86,22 +96,24 @@ f = True
 for co in distances:
     wh_xt = [0.] * 2401
     wh_yt = [0.] * 2401
+    dist_sums_t = [0.]* 2401
     for s in range(2):
-        dist_sums = np.array(distances[co][s])
         whisks = g[co][s]
         for iw in range(len(whisks)):
             try:
                 wh_xt[iw] = g[co][s][iw][0]
                 wh_yt[iw] = g[co][s][iw][1]
+                dist_sums_t[iw] = distances[co][s][iw]
             except TypeError:  # float, not a list of 2. Should be zero.
                 pass
 
     if f:
         wh_x = wh_xt
         wh_y = wh_yt
+        dist_sums = dist_sums_t
         f = False
     else:
-        dist_sums = np.vstack([dist_sums, distances[co][s]])
+        dist_sums = np.vstack([dist_sums, dist_sums_t])
         wh_x = np.vstack([wh_x, wh_xt])
         wh_y = np.vstack([wh_y, wh_yt])
 
@@ -116,9 +128,18 @@ why_mean = np.mean(why_clipped, axis=0) # in case a row is very wrong
 # write out pickle file of whiskers
 
 pickle.dump([whx_mean, why_mean], open("whiskers_" + args.mode + ".p", "wb"))
-exit()
 
-c_color_mapper_res = LinearColorMapper(palette=palette, low=-0.5, high=0.5)
+c_color_mapper_dists = LinearColorMapper(palette=palette, low=0., high=6.)
+c_color_bar_dists = ColorBar(color_mapper=c_color_mapper_dists, label_standoff=8, width=500, height=20,
+                           border_line_color=None, location=(0, 0), orientation='horizontal',
+                           )
+r_low = -0.5
+r_high = 0.5
+if args.nodistort != "no":
+    r_low = 0.
+    r_high = 6.
+
+c_color_mapper_res = LinearColorMapper(palette=palette, low=r_low, high=r_high)
 c_color_bar_res = ColorBar(color_mapper=c_color_mapper_res, label_standoff=8, width=500, height=20,
                            border_line_color=None, location=(0, 0), orientation='horizontal',
                            )
@@ -133,7 +154,33 @@ res_s = {}
 dist_s = {}
 r_cds = {}
 
-plot_layout = []
+dist_map_cds = ColumnDataSource(dict(x=where_x[any_co][0], y=where_y[any_co][0], res=dist_mean))
+
+dist_map = figure(title="Spots Grid: mean distortions", x_axis_label='x',
+                  y_axis_label='y', tools=TOOLS, height=1000, width=1000,
+                  tooltips=[
+                      ("x", "@x"), ("y", "@y"), ("distance", "@res")]
+                  )
+dist_map.circle(x="x", y="y", source=dist_map_cds, color="gray", size=10,
+                fill_color={'field': 'res', 'transform': c_color_mapper_dists})
+dist_map.add_layout(c_color_bar_dists, 'below')
+
+adam_map = []
+for ia in range(len(cS.grid.norm_dx)):
+    adam_map.append(math.hypot(cS.grid.norm_dx[ia], cS.grid.norm_dy[ia]) * cS.pitch)
+
+adam_map_cds = ColumnDataSource(dict(x=where_x[any_co][0], y=where_y[any_co][0], res=adam_map))
+
+adam_dist_map = figure(title="Spots Grid: Adam's distortions", x_axis_label='x',
+                  y_axis_label='y', tools=TOOLS, height=1000, width=1000,
+                  tooltips=[
+                      ("x", "@x"), ("y", "@y"), ("distance", "@res")]
+                  )
+adam_dist_map.circle(x="x", y="y", source=adam_map_cds, color="gray", size=10,
+                fill_color={'field': 'res', 'transform': c_color_mapper_dists})
+adam_dist_map.add_layout(c_color_bar_dists, 'below')
+
+plot_layout = [row(dist_map, adam_dist_map)]
 
 for co in where_x:
     rp = r_plots.setdefault(co, {})
@@ -162,7 +209,7 @@ for co in where_x:
             if distances[co][s][ig] == 0.:
                 continue
             y = where_y[co][s][ig]
-            resid = distances[co][s][ig] - dist_mean[s][ig]
+            resid = distances[co][s][ig] - dist_mean[ig] * suppress_distortions
             xps.append(x)
             yps.append(y)
             rsps.append(resid)

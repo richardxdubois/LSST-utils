@@ -68,6 +68,14 @@ class sensor():
         self.num_x_pixels = None
         self.num_y_pixels = None
 
+        self.fit_rms_dist_list = []
+        self.fit_max_dist_list = []
+        self.fit_min_dist_list = []
+        self.fit_x0_list = []
+        self.fit_y0_list = []
+        self.fit_theta_list = []
+
+
 class ccd_spacing():
 
     def __init__(self, dir_index=None, combo_name=None, distort_file=None, pickles_dir=None,
@@ -125,6 +133,24 @@ class ccd_spacing():
         self.center_to_center = [0., 0.]
         self.d_extrap = []
 
+        self.ranges = {}
+        self.ranges["vertical"] = {}
+        self.ranges["vertical"][0] = {}
+        self.ranges["vertical"][0]["x"] = [0., 4000.]
+        self.ranges["vertical"][0]["y"] = [1000., 5000.]
+        self.ranges["vertical"][1] = {}
+        self.ranges["vertical"][1]["x"] = [0., 4000.]
+        self.ranges["vertical"][1]["y"] = [-1500., 2500.]
+
+        self.ranges["horizontal"] = {}
+        self.ranges["horizontal"][0] = {}
+        self.ranges["horizontal"][0]["x"] = [-1500., 2500.]
+        self.ranges["horizontal"][0]["y"] = [0., 4000.]
+        self.ranges["horizontal"][1] = {}
+        self.ranges["horizontal"][1]["x"] = [1500., 5500.]
+        self.ranges["horizontal"][1]["y"] = [0., 4000.]
+
+
         self.line_fitting = False
 
         self.infile1 = None
@@ -175,7 +201,7 @@ class ccd_spacing():
         self.grid_y0 = None
         self.grid_x1 = None
         self.grid_y1 = None
-        self.grid_use_distortions = True
+        self.grid_use_distortions = False
 
         # simulation stuff
 
@@ -242,9 +268,9 @@ class ccd_spacing():
         self.button_submit.on_click(self.do_submit)
 
         # text box for box sizes in cleanup step
-        self.text_box_half = TextInput(value=str(self.cln_box_half), title="Half size cln (px)")
+        self.text_box_half = TextInput(value=str(self.cln_box_half), title="Half size cln (# spot pitch)")
         self.text_box_half.on_change('value', self.update_box_half)
-        self.text_box_full = TextInput(value=str(self.cln_box_full), title="Full size cln (px)")
+        self.text_box_full = TextInput(value=str(self.cln_box_full), title="Full size cln (# spot pitch)")
         self.text_box_full.on_change('value', self.update_box_full)
 
         # button to change data source
@@ -264,8 +290,10 @@ class ccd_spacing():
         self.button_pick_fit.on_click(self.do_pick_fit)
 
         # button to toggle fit distortions
-        self.button_fit_distort = Button(label="Fit distort", button_type="success", width=100)
+        self.button_fit_distort = Button(label="Fit distort", button_type="danger", width=100)
         self.button_fit_distort.on_click(self.do_fit_distort)
+        if self.grid_use_distortions:
+            self.button_fit_distort.button_type = "success"
 
         # button to toggle grid overlay from fit
         self.button_overlay_grid = Button(label="Overlay grid", button_type="danger", width=100)
@@ -342,9 +370,13 @@ class ccd_spacing():
         self.whiskers = {}
         with open(self.whisker_files + "whiskers_vertical.p", "rb") as f:
             self.whiskers["vertical"] = pickle.load(f)
-        f.close();
+        f.close()
         with open(self.whisker_files + "whiskers_horizontal.p", "rb") as f:
             self.whiskers["horizontal"] = pickle.load(f)
+        f.close()
+        self.grid_replacement = None
+        with open(self.whisker_files + "grid.p", "rb") as f:
+            self.grid_replacement = pickle.load(f)
         f.close()
 
     # handlers
@@ -909,7 +941,7 @@ class ccd_spacing():
             w = bins[1] - bins[0]
             gr_hist.step(y=g_resid, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
 
-            pitches, bins = np.histogram(np.array(spl), bins=200, range=(64., 67.))
+            pitches, bins = np.histogram(np.array(spl), bins=200, range=(64.5, 66.2))
             w = bins[1] - bins[0]
 
             pitch_hist.step(y=pitches, x=bins[:-1]+w/2., color=color[l], legend_label=self.names_ccd[l])
@@ -944,8 +976,9 @@ class ccd_spacing():
         cds_spot = ColumnDataSource(dict(x=x_spot, y=y_spot, res=res_spot, pitch=pitch_spot))
 
         spot_heat = figure(title="Spots Grid: spot pitch " + self.raft_ccd_combo, x_axis_label='x',
-                           y_axis_label='y', tools=self.TOOLS)
-        c_color_mapper_sp = LinearColorMapper(palette=palette, low=64., high=66.5)
+                           y_axis_label='y', tools=self.TOOLS, tooltips=[
+                      ("x", "@x"), ("y", "@y"), ("pitch", "@pitch")])
+        c_color_mapper_sp = LinearColorMapper(palette=palette, low=64.5, high=66.2)
         c_color_bar_sp = ColorBar(color_mapper=c_color_mapper_sp, label_standoff=8, width=500, height=20,
                                border_line_color=None, location=(0, 0), orientation='horizontal')
         spot_heat.circle(x="x", y="y", source=cds_spot, color="gray", size=10,
@@ -1335,6 +1368,8 @@ class ccd_spacing():
         self.sensor[0] = sensor()
         self.sensor[1] = sensor()
 
+        #kw_x = 'base_NaiveCentroid_x'
+        #kw_y = 'base_NaiveCentroid_y'
         kw_x = 'base_SdssShape_x'
         kw_y = 'base_SdssShape_y'
         kw_xx = 'base_SdssShape_xx'
@@ -1508,8 +1543,8 @@ class ccd_spacing():
 
         print("Entered make_plots")
         if self.use_fit:
-            o1 = -self.dx0
-            o2 = -self.dy0
+            o1 = -self.dx0 * (1.- 2.*self.ccd_standard)
+            o2 = -self.dy0 * (1.- 2.*self.ccd_standard)
             o3 = 0.
             o4 = 0.
         else:
@@ -1595,6 +1630,13 @@ class ccd_spacing():
         yErr_hist = figure(title="Spots Grid: y errors  " + self.raft_ccd_combo, x_axis_label='dy (px)',
                            y_axis_label='y', y_axis_type="log", x_axis_type="log", tools=self.TOOLS)
 
+        flux_map = [None]*2
+        c_color_mapper_flux = LogColorMapper(palette=palette)
+        c_color_bar_flux = ColorBar(color_mapper=c_color_mapper_flux, label_standoff=8, width=500, height=20,
+                                     border_line_color=None, location=(0, 0), orientation='horizontal',
+                                     )
+
+
         for s, sensor in enumerate(self.sensor):
             fl = self.sensor[sensor].spot_input["flux"]
             order = self.sensor[sensor].spot_cln["order"]
@@ -1624,7 +1666,21 @@ class ccd_spacing():
             w = binh[1] - binh[0]
             yErr_hist.step(y=dyh, x=binh[:-1]+w/2., color=color[s], legend_label=self.names_ccd[s])
 
-        final_layout = layout(plots_layout, row(xx_hist, yy_hist), row(xErr_hist, yErr_hist), flux_hist)
+            flux_map[s] = figure(title="Flux for " + self.names_ccd[s], x_axis_label='x',
+                                 x_range=self.ranges[self.ccd_relative_orientation][s]["x"],
+                                 y_range=self.ranges[self.ccd_relative_orientation][s]["y"],
+                  y_axis_label='y', tools=self.TOOLS, height=1000, width=1000,
+                  tooltips=[
+                      ("x", "@x"), ("y", "@y"), ("flux", "@flux")]
+                  )
+            f_cds = ColumnDataSource(dict(x=self.sensor[sensor].spot_cln["x"],
+                                           y=self.sensor[sensor].spot_cln["y"],
+                                           flux=flux))
+            flux_map[s].circle(x="x", y="y", source=f_cds, color="gray", size=10,
+                                 fill_color={'field': 'flux', 'transform': c_color_mapper_flux})
+            flux_map[s].add_layout(c_color_bar_flux, 'below')
+
+        final_layout = layout(plots_layout, row(flux_map), row(xx_hist, yy_hist), row(xErr_hist, yErr_hist), flux_hist)
 
         return final_layout
 
@@ -1734,7 +1790,7 @@ class ccd_spacing():
             xstep = self.pitch
             ystep = self.pitch
             theta = theta_fitter
-            if id_sensor == self.ccd_standard:
+            if id_sensor == 0:  # was comparing to ccd_standard
                 x0 = self.grid_x0
                 y0 = self.grid_y0
             else:
@@ -1762,6 +1818,11 @@ class ccd_spacing():
                                        y0=y0,
                                        ncols=self.num_spots, nrows=self.num_spots,
                                        normalized_shifts=None)
+
+        # put in grid found from single sensor run
+
+        distorted_grid._x = self.grid_replacement[0]
+        distorted_grid._y = self.grid_replacement[1]
 
         self.sensor[id_sensor].grid_y, self.sensor[id_sensor].grid_x = distorted_grid.get_source_centroids()
         if wx is not None:
@@ -1903,6 +1964,7 @@ class ccd_spacing():
         dist_heat = {}
         dist_spot = {}
         whisker_plot = {}
+        grid_index = {}
 
         for s in range(2):
 
@@ -1910,6 +1972,7 @@ class ccd_spacing():
             syp = syp_s.setdefault(s, [])
             sdist = sdist_s.setdefault(s, [])
             swhiskers = whiskers.setdefault(s, [])
+            sgi = grid_index.setdefault(s, [])
 
             for sp in range(self.num_spots*self.num_spots):
                 sg_dist = self.sensor[s].grid_distances[sp]
@@ -1922,13 +1985,15 @@ class ccd_spacing():
                 syp.append(y_sp)
                 sdist.append(sg_dist)
                 swhiskers.append(self.sensor[s].grid_whiskers[sp])
+                sgi.append(sp)
 
-            dist_spot[s] = ColumnDataSource(dict(x=sxp_s[s], y=syp_s[s], res=sdist_s[s]))
+            dist_spot[s] = ColumnDataSource(dict(x=sxp_s[s], y=syp_s[s], res=sdist_s[s],
+                                                 idx=grid_index[s]))
 
             dist_heat[s] = figure(title="Spots Grid: residuals  " + self.sensor[s].name, x_axis_label='x',
                                   y_axis_label='y', tools=self.TOOLS, height=1000, width=1000,
                                   tooltips=[
-                                      ("x", "@x"), ("y", "@y"), ("distance", "@res")]
+                                      ("x", "@x"), ("y", "@y"), ("distance", "@res"), ("idx", "@idx")]
                                   )
             dist_heat[s].circle(x="x", y="y", source=dist_spot[s], color="gray", size=10,
                              fill_color={'field': 'res', 'transform': c_color_mapper_res})
@@ -2045,7 +2110,7 @@ class ccd_spacing():
 
     def fit_grid(self, sensor_id=None):
 
-        if sensor_id == self.ccd_standard:
+        if sensor_id == 0: # was comparing to ccd_standard
             x0 = self.grid_x0
             y0 = self.grid_y0
         else:
@@ -2072,6 +2137,13 @@ class ccd_spacing():
 
         ## LM Fit
 
+        self.sensor[sensor_id].fit_rms_dist_list = []
+        self.sensor[sensor_id].fit_max_dist_list = []
+        self.sensor[sensor_id].fit_min_dist_list = []
+        self.sensor[sensor_id].fit_x0_list = []
+        self.sensor[sensor_id].fit_y0_list = []
+        self.sensor[sensor_id].fit_theta_list = []
+
         method = 'least_squares'
         minner = Minimizer(self.fit_grid_distances, params, fcn_kws={"s":sensor_id},
                            nan_policy='omit')
@@ -2081,7 +2153,7 @@ class ccd_spacing():
 
     def fit_grid_distances(self, params, s):
 
-        if s == self.ccd_standard:
+        if s == 0: # was comparing to ccd_standard
             self.grid_x0 = params["x0"].value
             self.grid_y0 = params["y0"].value
         else:
@@ -2093,6 +2165,12 @@ class ccd_spacing():
         distances = np.array(self.sensor[s].grid_distances)
         mask = [distances > 0.]
         masked_distances = distances[mask]
-        rms_dist = np.sqrt(np.mean(masked_distances**2))
+
+        self.sensor[s].fit_rms_dist_list.append(np.sqrt(np.mean(masked_distances**2)))
+        self.sensor[s].fit_max_dist_list.append(np.max(masked_distances))
+        self.sensor[s].fit_min_dist_list.append(np.min(masked_distances))
+        self.sensor[s].fit_x0_list.append(params["x0"].value)
+        self.sensor[s].fit_y0_list.append(params["y0"].value)
+        self.sensor[s].fit_theta_list.append(params["theta"].value)
 
         return masked_distances

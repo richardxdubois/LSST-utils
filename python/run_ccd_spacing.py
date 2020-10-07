@@ -42,7 +42,11 @@ cS.line_fitting = True
 cS.use_offsets = True
 cS.overlay_ccd = True
 cS.sim_distort = False
-cS.grid_use_distortions = True
+cS.grid_use_distortions = False
+
+#cS.cln_box_half = 50
+#cS.cln_box_full = 50
+
 # loop over file sets
 
 problems = 0
