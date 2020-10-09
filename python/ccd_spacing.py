@@ -34,6 +34,8 @@ class sensor():
 
         self.src = None
         self.spot_input = None
+        self.spot_x_error = None
+        self.spot_y_error = None
         self.sequence = None
 
         # orientation to work in - is sensor boundary perpendicular to x or y in original coordinates.
@@ -64,6 +66,7 @@ class sensor():
         self.grid_y = None
         self.grid_distances = None
         self.grid_whiskers = None
+        self.grid_errors = None
 
         self.num_x_pixels = None
         self.num_y_pixels = None
@@ -150,7 +153,6 @@ class ccd_spacing():
         self.ranges["horizontal"][1]["x"] = [1500., 5500.]
         self.ranges["horizontal"][1]["y"] = [0., 4000.]
 
-
         self.line_fitting = False
 
         self.infile1 = None
@@ -202,6 +204,7 @@ class ccd_spacing():
         self.grid_x1 = None
         self.grid_y1 = None
         self.grid_use_distortions = False
+        self.apply_grid_errors = True
 
         # simulation stuff
 
@@ -295,6 +298,12 @@ class ccd_spacing():
         if self.grid_use_distortions:
             self.button_fit_distort.button_type = "success"
 
+        # button to toggle fit errors
+        self.button_fit_errors = Button(label="Fit errors", button_type="danger", width=100)
+        self.button_fit_errors.on_click(self.do_fit_errors)
+        if self.apply_grid_errors:
+            self.button_fit_errors.button_type = "success"
+
         # button to toggle grid overlay from fit
         self.button_overlay_grid = Button(label="Overlay grid", button_type="danger", width=100)
         self.button_overlay_grid.on_click(self.do_overlay_grid)
@@ -355,7 +364,8 @@ class ccd_spacing():
         self.sliders_layout = column(row(self.slider_x0, self.slider_y0), row(self.slider_x1, self.slider_y1),
                                      self.button_submit)
         self.max_layout = column(self.min_layout, sims_layout, self.sliders_layout,
-                                 row(self.button_fit, self.button_pick_fit, self.button_gridfit_plots))
+                                 row(self.button_fit, self.button_fit_errors, self.button_pick_fit,
+                                     self.button_gridfit_plots))
 
         self.TOOLS = "pan, wheel_zoom, box_zoom, reset, save, box_select, lasso_select, tap"
 
@@ -531,6 +541,13 @@ class ccd_spacing():
         else:
             self.button_fit_distort.button_type = "danger"
 
+    def do_fit_errors(self):
+        self.apply_grid_errors = not self.apply_grid_errors
+        if self.apply_grid_errors:
+            self.button_fit_errors.button_type = "success"
+        else:
+            self.button_fit_errors.button_type = "danger"
+
     def do_linfit_plots(self):
         p_grid = self.make_line_plots()
 
@@ -671,7 +688,9 @@ class ccd_spacing():
 
         return
 
-    def find_lines(self, x_in, y_in):
+    def find_lines(self, x_in, y_in, dx, dy):
+
+        # flip the x, y coordinates to find lines in the appropriate coordinate
 
         if self.ccd_relative_orientation == "horizontal":
             x_use = x_in
@@ -713,10 +732,13 @@ class ccd_spacing():
             if line_bin > 48:  # spurious high point
                 continue
             fl = ccd.setdefault(line_bin, [])
+
+            # flip the coordinates back, so x is x always.
+
             if self.ccd_relative_orientation == "horizontal":
-                ccd[line_bin].append([x[idy], y[idy]])
+                ccd[line_bin].append([x[idy], y[idy], dx[idy], dy[idy]])
             else:
-                ccd[line_bin].append([y[idy], x[idy]])
+                ccd[line_bin].append([y[idy], x[idy], dx[idy], dy[idy]])
 
         if len(ccd) != self.num_spots:
             print(self.raft_ccd_combo + ": Problem finding full grid: found ", len(ccd),
@@ -865,8 +887,9 @@ class ccd_spacing():
                             width=600)
 
         off_ccd = [[0., 0.], [0., 0.]]
+        sgn = 1.- 2.*self.ccd_standard
         if self.use_fit:
-            off_ccd[0] = [-self.dx0, -self.dy0]
+            off_ccd[0] = [-self.dx0 * sgn, -self.dy0 * sgn]
             print("make_line_plots: use for fitted offsets ", off_ccd)
         elif self.use_offsets:
             off_ccd = [[self.x0_in, self.y0_in], [self.x1_in, self.y1_in]]
@@ -1324,6 +1347,9 @@ class ccd_spacing():
         infile2 = None
         seq = "NA"
 
+        infile = []
+        r = []
+
         if self.sim_doit:
             X1 = self.sim_x[0]
             Y1 = self.sim_y[0]
@@ -1354,9 +1380,12 @@ class ccd_spacing():
 
             r1 = self.name_ccd1.split("_")[0]
             r2 = self.name_ccd2.split(("_"))[0]
+            r = [r1, r2]
             s1 = self.name_ccd1.split("_")[1]
             s2 = self.name_ccd2.split(("_"))[1]
             self.extrap_dir = 1.
+
+            infile = [self.infile1, self.infile2]
 
             if int(s1[1]) == int(s2[1]):
                 self.ccd_relative_orientation = "horizontal"
@@ -1365,54 +1394,44 @@ class ccd_spacing():
                 self.extrap_dir = -1.
 
         self.sensor = {}
-        self.sensor[0] = sensor()
-        self.sensor[1] = sensor()
 
-        #kw_x = 'base_NaiveCentroid_x'
-        #kw_y = 'base_NaiveCentroid_y'
         kw_x = 'base_SdssShape_x'
         kw_y = 'base_SdssShape_y'
         kw_xx = 'base_SdssShape_xx'
         kw_yy = 'base_SdssShape_yy'
         kw_flux = 'base_SdssShape_instFlux'
 
-        # use simulation data
-        if self.sim_doit:
-            self.sensor[0].spot_input = dict(x=self.sim_x[0], y=self.sim_y[0], xx=self.sim_moments[0],
-                                             yy=self.sim_moments[0], flux=self.sim_flux[0])
-            self.sensor[1].spot_input = dict(x=self.sim_x[1], y=self.sim_y[1], xx=self.sim_moments[1],
-                                             yy=self.sim_moments[1], flux=self.sim_flux[1])
-        else:   # use projector data
-            self.sensor[0].src = fits.getdata(self.infile1)
-            self.sensor[0].spot_input = dict(x=self.sensor[0].src[kw_x], y=self.sensor[0].src[kw_y],
-                                             xx=self.sensor[0].src[kw_xx], yy=self.sensor[0].src[kw_yy],
-                                             flux=self.sensor[0].src[kw_flux])
-            self.sensor[0].orientation = self.ccd_relative_orientation
-            self.sensor[0].sensor_type = self.raft_types[r1]
-            if self.sensor[0].sensor_type == "ITL":
-                self.sensor[0].num_x_pixels = self.num_x_pixels_ITL
-                self.sensor[0].num_y_pixels = self.num_y_pixels_ITL
-            else:
-                self.sensor[0].num_x_pixels = self.num_x_pixels_e2v
-                self.sensor[0].num_y_pixels = self.num_y_pixels_e2v
-            self.sensor[0].name = self.name_ccd1
+        for s in range(2):
+            self.sensor[s] = sensor()
 
-            self.sensor[1].src = fits.getdata(self.infile2)
-            self.sensor[1].spot_input = dict(x=self.sensor[1].src[kw_x], y=self.sensor[1].src[kw_y],
-                                             xx=self.sensor[1].src[kw_xx], yy=self.sensor[1].src[kw_yy],
-                                             flux=self.sensor[1].src[kw_flux])
-            self.sensor[1].orientation = self.ccd_relative_orientation
-            self.sensor[1].sensor_type = self.raft_types[r2]
-            if self.sensor[1].sensor_type == "ITL":
-                self.sensor[1].num_x_pixels = self.num_x_pixels_ITL
-                self.sensor[1].num_y_pixels = self.num_y_pixels_ITL
-            else:
-                self.sensor[1].num_x_pixels = self.num_x_pixels_e2v
-                self.sensor[1].num_y_pixels = self.num_y_pixels_e2v
-            self.sensor[1].name = self.name_ccd2
+            # use simulation data
+            if self.sim_doit:
+                self.sensor[s].spot_input = dict(x=self.sim_x[s], y=self.sim_y[s], xx=self.sim_moments[s],
+                                                 yy=self.sim_moments[s], flux=self.sim_flux[s])
+            else:   # use projector data
+                self.sensor[s].src = fits.getdata(infile[s])
+                self.sensor[s].spot_input = dict(x=self.sensor[s].src[kw_x], y=self.sensor[s].src[kw_y],
+                                                 xx=self.sensor[s].src[kw_xx], yy=self.sensor[s].src[kw_yy],
+                                                 flux=self.sensor[s].src[kw_flux])
+                self.sensor[s].orientation = self.ccd_relative_orientation
+                self.sensor[s].sensor_type = self.raft_types[r[s]]
+                if self.sensor[s].sensor_type == "ITL":
+                    self.sensor[s].num_x_pixels = self.num_x_pixels_ITL
+                    self.sensor[s].num_y_pixels = self.num_y_pixels_ITL
+                else:
+                    self.sensor[s].num_x_pixels = self.num_x_pixels_e2v
+                    self.sensor[s].num_y_pixels = self.num_y_pixels_e2v
+                self.sensor[s].name = self.names_ccd[s]
 
-        self.sensor[0].sequence = seq
-        self.sensor[0].sequence = seq
+            self.sensor[s].sequence = seq
+
+            fl = self.sensor[s].spot_input["flux"]
+            flux = np.nan_to_num(fl, nan=100.)
+            xx = self.sensor[s].spot_input["xx"]
+            yy = self.sensor[s].spot_input["yy"]
+
+            self.sensor[s].spot_x_error = np.sqrt(xx/flux)
+            self.sensor[s].spot_y_error = np.sqrt(yy/flux)
 
         num_spots_0 = len(self.sensor[0].spot_input["x"])
         num_spots_1 = len(self.sensor[1].spot_input["x"])
@@ -1437,7 +1456,12 @@ class ccd_spacing():
 
             if self.line_fitting:
                 self.sensor[s].lines = self.find_lines(x_in=self.sensor[s].spot_cln["x"],
-                                                       y_in=self.sensor[s].spot_cln["y"])
+                                                       y_in=self.sensor[s].spot_cln["y"],
+                                                       dx=self.sensor[s].spot_x_error
+                                                       [self.sensor[s].spot_cln["order"]],
+                                                       dy=self.sensor[s].spot_y_error
+                                                        [self.sensor[s].spot_cln["order"]]
+                )
                 # decide which CCD is the standard - the other is then measured relative to it. Pick the one that
                 # is fatter on top.
 
@@ -1636,7 +1660,6 @@ class ccd_spacing():
                                      border_line_color=None, location=(0, 0), orientation='horizontal',
                                      )
 
-
         for s, sensor in enumerate(self.sensor):
             fl = self.sensor[sensor].spot_input["flux"]
             order = self.sensor[sensor].spot_cln["order"]
@@ -1833,6 +1856,7 @@ class ccd_spacing():
         self.sensor[id_sensor].grid_index = {}
         self.sensor[id_sensor].grid_distances = [0.]*len(self.sensor[id_sensor].grid_x)
         self.sensor[id_sensor].grid_whiskers = [0.]*len(self.sensor[id_sensor].grid_x)
+        self.sensor[id_sensor].grid_errors = [0.]*len(self.sensor[id_sensor].grid_x)
 
         num_lines = len(self.sensor[id_sensor].lines)
 
@@ -1866,10 +1890,11 @@ class ccd_spacing():
                         spot_index += round(dist_2_next / self.pitch) * sgn
                         grid_index = int(num_lines * spot_index + lines)
                     gi[sp] = int(grid_index)
-                    dist, whisker = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp,
+                    dist, whisker, err = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp,
                                                        grid_index=grid_index)
                     self.sensor[id_sensor].grid_distances[grid_index] = dist
                     self.sensor[id_sensor].grid_whiskers[grid_index] = whisker
+                    self.sensor[id_sensor].grid_errors[grid_index] = err
                     try:
                         if self.ccd_standard == id_sensor:
                             dist_2_next = distances[sp-1, sp]  # distance to previous spot
@@ -1899,9 +1924,10 @@ class ccd_spacing():
                         grid_index = int(num_lines * lines + spot_index)
 
                     gi[sp] = int(grid_index)
-                    dist, whisker = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp, grid_index=grid_index)
+                    dist, whisker, err = self.grid_whiskers(sensor=id_sensor, line=lines, spot=sp, grid_index=grid_index)
                     self.sensor[id_sensor].grid_distances[grid_index] = dist
                     self.sensor[id_sensor].grid_whiskers[grid_index] = whisker
+                    self.sensor[id_sensor].grid_errors[grid_index] = err
                     try:
                         if self.ccd_standard == id_sensor:
                             dist_2_next = distances[sp-1, sp]  # distance to previous spot
@@ -1916,6 +1942,8 @@ class ccd_spacing():
 
         x_spot = self.sensor[sensor].lines[line][spot][0]
         y_spot = self.sensor[sensor].lines[line][spot][1]
+        dx_spot = self.sensor[sensor].lines[line][spot][2]
+        dy_spot = self.sensor[sensor].lines[line][spot][3]
 
         x_grid = self.sensor[sensor].grid_x[grid_index]
         y_grid = self.sensor[sensor].grid_y[grid_index]
@@ -1923,7 +1951,13 @@ class ccd_spacing():
         dist = math.hypot(x_spot - x_grid, y_spot - y_grid)
         whisker = [x_spot - x_grid, y_spot - y_grid]
 
-        return dist, whisker
+        # error on distance
+        error_x = dx_spot * (x_spot - x_grid)/dist
+        error_y = dy_spot * (y_spot - y_grid) / dist
+
+        error = math.sqrt(error_x**2 + error_y**2)
+
+        return dist, whisker, error
 
     def make_fit_plots(self):
 
@@ -2163,8 +2197,13 @@ class ccd_spacing():
         rc = self.match_line_spots_to_grid(id_sensor=s, lines_guess=True, distortions=self.grid_use_distortions,
                                            theta_fitter=params["theta"].value)
         distances = np.array(self.sensor[s].grid_distances)
+        errors = np.array(self.sensor[s].grid_errors)
+
         mask = [distances > 0.]
-        masked_distances = distances[mask]
+        if self.apply_grid_errors:
+            masked_distances = distances[mask]/errors[mask]
+        else:
+            masked_distances = distances[mask]
 
         self.sensor[s].fit_rms_dist_list.append(np.sqrt(np.mean(masked_distances**2)))
         self.sensor[s].fit_max_dist_list.append(np.max(masked_distances))
