@@ -2000,7 +2000,16 @@ class ccd_spacing():
         whisker_plot = {}
         grid_index = {}
 
+        grid_dists = [None]*2
         for s in range(2):
+
+            grid_dists[s] = figure(title="Fit residuals:  " + self.sensor[s].name, x_axis_label='distance ('
+                                                                                                'px)',
+                              y_axis_label='count', tools=self.TOOLS)
+
+            h1, b1 = np.histogram(self.sensor[s].grid_distances, bins=50)
+            w = b1[1] - b1[0]
+            grid_dists[s].step(y=h1, x=b1[:-1] + w / 2., color=color[s])
 
             sxp = sxp_s.setdefault(s, [])
             syp = syp_s.setdefault(s, [])
@@ -2054,7 +2063,8 @@ class ccd_spacing():
                 whisker_plot[s].line([x1, x3], [y1, y3],
                                      line_width=4)
 
-        fh = column(row(fr0_hist, fr1_hist), row(dist_heat[0], dist_heat[1]),
+        fh = column(row(fr0_hist, fr1_hist), row(grid_dists[0], grid_dists[1]),
+                    row(dist_heat[0], dist_heat[1]),
                     row(whisker_plot[0], whisker_plot[1]))
 
         return fh
