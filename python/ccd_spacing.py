@@ -205,6 +205,7 @@ class ccd_spacing():
         self.grid_y1 = None
         self.grid_use_distortions = False
         self.apply_grid_errors = True
+        self.fit_dist_threshold = 50.
 
         # simulation stuff
 
@@ -2007,7 +2008,10 @@ class ccd_spacing():
                                                                                                 'px)',
                               y_axis_label='count', tools=self.TOOLS)
 
-            h1, b1 = np.histogram(self.sensor[s].grid_distances, bins=50)
+            hdists = np.array(self.sensor[s].grid_distances)
+            mask = [hdists > 0.]
+
+            h1, b1 = np.histogram(hdists[tuple(mask)], bins=50)
             w = b1[1] - b1[0]
             grid_dists[s].step(y=h1, x=b1[:-1] + w / 2., color=color[s])
 
@@ -2209,7 +2213,7 @@ class ccd_spacing():
         distances = np.array(self.sensor[s].grid_distances)
         errors = np.array(self.sensor[s].grid_errors)
 
-        mask = [distances > 0.]
+        mask = np.logical_and(distances > 0., distances < self.fit_dist_threshold)
         if self.apply_grid_errors:
             masked_distances = distances[mask]/errors[mask]
         else:
