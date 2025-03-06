@@ -2,7 +2,8 @@ import numpy as np
 import itertools
 import pickle
 from copy import deepcopy
-import math
+import yaml
+import argparse
 
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import DatetimeTickFormatter
@@ -11,8 +12,21 @@ from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
 
-data_dir = "/Volumes/Data/Rubin/camera/"
-in_file = data_dir + "E2233_amps_data.npy"
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--app_config',
+                    default="process_exposure_config.yaml",
+                    help="overall app config file")
+args = parser.parse_args()
+
+with open(args.app_config, "r") as f:
+    data = yaml.safe_load(f)
+
+#data_dir = "/Volumes/Data/Rubin/camera/"
+#in_file = data_dir + "E2233_amps_data.npy"
+
+data_dir = data["data_dir"]
+in_file = data_dir + data["in_file_name"]
 
 p = None
 
@@ -85,6 +99,35 @@ def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
 
     return source, g
 
+
+def get_new_test(test_name):
+    test_data = p[test_name]
+
+    new_test = np.empty(0)
+
+    for rg in raft_groups:
+        for r in rg:
+            if "R00" in r:
+                continue
+            if "R40" in r:
+               continue
+            if "R04" in r:
+                continue
+            if "R44" in r:
+                continue
+           # print(r, raft_offset_x, raft_offset_y)
+            for cd in ccd_groups:
+                for c in cd:
+                    raft_ccd = r + "_" + c
+                    results = np.array(list(test_data[raft_ccd].values()))[::-1]
+                    signal = np.zeros((2, 8))
+                    signal[1, :] = results[8:16][::-1]
+                    signal[0, :] = results[0:8]
+                    z_flat = signal.flatten()
+
+                    new_test = np.append(new_test, z_flat)
+
+    return new_test
 
 # Add a color bar
 color_mapper = LinearColorMapper(palette="Viridis256", low=min_z, high=max_z)
@@ -166,7 +209,7 @@ fp.add_glyph(source, g)
 
 # Step 5: Add tooltips
 hover = fp.select(dict(type=HoverTool))
-hover.tooltips = [(test_name, "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
+hover.tooltips = [("test", "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
                   ("amp", "@amp")]
 
 fp.title.text = "Full focal plane: " + test_name
@@ -199,6 +242,22 @@ def update(attr, old, new):
     # Get the new range from the slider
     lower, upper = slider.value
     selected_name = dropdown.value
+    global source_static
+    global test_name
+
+    if selected_name != test_name:
+        new_test_data = get_new_test(selected_name)
+        source_static["z"] = list(new_test_data)
+        test_name = selected_name
+        slider.remove_on_change('value', update)
+        slider.start = min(new_test_data)
+        slider.end = max(new_test_data)
+        slider.value = (slider.start, slider.end)
+        slider.on_change('value', update)
+        lower = slider.start
+        upper = slider.end
+        color_mapper.low = lower
+        color_mapper.high = upper
 
     x_u = np.array(source_static["x"])
     y_u = np.array(source_static["y"])
