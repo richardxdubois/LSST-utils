@@ -293,9 +293,9 @@ def update(attr, old, new):
     print(run_text_box, name_dropdown)
 
     # who triggered this?
-    w = widget_called == run_text_box
-    d = widget_called == name_dropdown
-    s = widget_called == slider
+    w = curdoc().get_model_by_id(run_text_box.id) == run_text_box
+    d = curdoc().get_model_by_id(name_dropdown.id) == name_dropdown
+    s = curdoc().get_model_by_id(slider.id) == slider
 
     new_run = False
     if DM_stack and selected_run != test_run and w:
