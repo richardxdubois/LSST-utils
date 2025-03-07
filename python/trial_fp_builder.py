@@ -36,6 +36,18 @@ with open(args.app_config, "r") as f:
 data_dir = data["data_dir"]
 in_file = data_dir + data["in_file_name"]
 
+message_log = []
+
+
+def generate_log_message(log_div, message):
+    message_log.append(message)
+
+    if len(message_log) > 10:
+        message_log.pop(0)
+
+    log_div.text = "Log: <br>" + "<br>".join(message_log)
+
+
 p = None
 
 with open(in_file, 'rb') as f:
@@ -140,7 +152,7 @@ def get_new_test(test_name):
     return new_test
 
 def get_new_run(run_name):
-    print("Entered get_new_run", run_name)
+    generate_log_message(log_div, "Entered get_new_run " + run_name)
     repo = "/repo/main"
     butler = daf_butler.Butler(repo)
 
@@ -151,7 +163,7 @@ def get_new_run(run_name):
     collections = butler.registry.queryCollections(pattern)
 
     amp_data = eo_pipe.get_amp_data(repo, collections)
-    print("new amp data acquired")
+    generate_log_message(log_div, "new amp data acquired")
 
     return amp_data
 
@@ -272,12 +284,15 @@ exit_button = Button(label="Exit", button_type="danger")
 
 # Define a function to stop the server
 def stop_server():
+    generate_log_message(log_div, ("Server is shutting down..."))
     print("Server is shutting down...")
     IOLoop.current().stop()
 
 # Attach the stop function to the button click event
+
 exit_button.on_click(stop_server)
 
+log_div = Div(text="Log:<br>", width=400, height=150)
 
 # Define callback to update the data
 def update(attr, old, new):
@@ -297,13 +312,13 @@ def update(attr, old, new):
 
     new_run = False
     if DM_stack and selected_run != test_run and w:
-        print("run_text_box selected")
+        generate_log_message(log_div, "run_text_box selected")
         p = get_new_run(selected_run)
         test_run = selected_run
         new_run = True
 
     if (d and selected_name != test_name) or new_run:
-        print("getting new test data", selected_name)
+        generate_log_message(log_div,"getting new test data " + selected_name)
         new_test_data = get_new_test(selected_name)
         source_static["z"] = list(new_test_data)
 
@@ -344,7 +359,7 @@ def update(attr, old, new):
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
     p1.title.text = test_name
     fp.title.text = "Full focal plane: " + test_name
-
+    generate_log_message(log_div, "Ready")
 
 # Attach the callback to the slider and dropdown
 slider.on_change('value', update)
@@ -352,7 +367,7 @@ name_dropdown.on_change('value', update)
 run_text_box.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
-l = layout(exit_button, row( run_text_box, name_dropdown, slider), row(fp, p1))
+l = layout(exit_button, row( run_text_box, name_dropdown, slider, log_div), row(fp, p1))
 #save(l, title="trial focal plane")
 
 # Add the layout to the current document
