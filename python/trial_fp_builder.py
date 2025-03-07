@@ -140,7 +140,7 @@ def get_new_test(test_name):
     return new_test
 
 def get_new_run(run_name):
-    print("Entered get_new_run")
+    print("Entered get_new_run", run_name)
     repo = "/repo/main"
     butler = daf_butler.Butler(repo)
 
