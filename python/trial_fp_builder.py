@@ -43,6 +43,8 @@ with open(in_file, 'rb') as f:
 
 tests = list(p.keys())
 test_name = tests[11]
+test_run = None
+
 print(tests)
 
 test_data = p[test_name]
@@ -283,15 +285,17 @@ def update(attr, old, new):
     selected_run = run_text_box.value
     global source_static
     global test_name
+    global test_run
     global p
 
     widget_called = curdoc().get_model_by_id(attr[0])
     print("call back called")
 
     new_run = False
-    if DM_stack and run_text_box == new and attr == "value":
+    if DM_stack and selected_run != test_run:
         print("run_text_box selected")
         p = get_new_run(selected_run)
+        test_run = selected_run
         new_run = True
 
     if selected_name != test_name or new_run:
