@@ -260,7 +260,7 @@ slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, ti
 name_list = tests  # Unique names sorted
 name_dropdown = Select(title="Pick test", value=name_list[0], options=name_list)
 
-run_text_box = TextInput(title="Pick run", value="E2233")
+run_text_box = TextInput(title="Pick run", value="None")
 
 # Create a Button to exit the server
 exit_button = Button(label="Exit", button_type="danger")
