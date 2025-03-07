@@ -249,12 +249,13 @@ fp.ygrid.grid_line_color = None  # Remove y-grid lines
 mask = ~np.isnan(source_dict["z"])
 z_u = np.array(source_dict["z"])
 res_h, res_edges = np.histogram(z_u[mask], bins=100)
-hist_source = ColumnDataSource(data=dict(top=res_h, x=res_edges[:-1]))
+vbar_width = np.ones_like(res_h) * (res_edges[1] - res_edges[0])
+
+hist_source = ColumnDataSource(data=dict(top=res_h, x=res_edges[:-1], vbar_width=vbar_width))
 source_static = deepcopy(source_dict)
 
-width = res_edges[1] - res_edges[0]
 p1 = figure(width=640, height=640, title=test_name)
-p1.vbar(top="top", x="x", width=width, alpha=0.3, fill_color="red", source=hist_source,)
+p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
 
 step = (max_z - min_z) / 20.
 slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
@@ -287,10 +288,6 @@ def update(attr, old, new):
     global test_name
     global test_run
     global p
-
-    #widget_called = curdoc().get_model_by_id()
-    print("call back called")
-    print(run_text_box, name_dropdown)
 
     # who triggered this?
     w = new == run_text_box.value
@@ -341,7 +338,11 @@ def update(attr, old, new):
     #print("about to remake histogram", len(new_zu))
 
     hist, edges = np.histogram(new_zu, bins=100)
-    hist_source.data = dict(top=hist, x=edges[:-1])
+    width = edges[1] - edges[0]
+    vbar_width = np.ones_like(hist) * width
+    hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
+    p1.title.text = test_name
+    fp.title.text = "Full focal plane: " + test_name
 
 
 # Attach the callback to the slider and dropdown
