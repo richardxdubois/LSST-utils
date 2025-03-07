@@ -289,7 +289,7 @@ def update(attr, old, new):
     print("call back called")
 
     new_run = False
-    if DM_stack and run_text_box == new:
+    if DM_stack and run_text_box == new and attr == "value":
         print("run_text_box selected")
         p = get_new_run(selected_run)
         new_run = True
