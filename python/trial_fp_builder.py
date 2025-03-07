@@ -288,14 +288,14 @@ def update(attr, old, new):
     global test_run
     global p
 
-    widget_called = curdoc().get_model_by_id(run_text_box.id)
+    #widget_called = curdoc().get_model_by_id()
     print("call back called")
     print(run_text_box, name_dropdown)
 
     # who triggered this?
-    w = curdoc().get_model_by_id(run_text_box.id) == run_text_box
-    d = curdoc().get_model_by_id(name_dropdown.id) == name_dropdown
-    s = curdoc().get_model_by_id(slider.id) == slider
+    w = new == run_text_box.value
+    d = new == name_dropdown.value
+    s = new == slider.value
 
     new_run = False
     if DM_stack and selected_run != test_run and w:
