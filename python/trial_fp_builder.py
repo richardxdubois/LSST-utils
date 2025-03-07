@@ -260,7 +260,7 @@ step = (max_z - min_z) / 20.
 slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
 
 name_list = tests  # Unique names sorted
-name_dropdown = Select(title="Pick test", value=name_list[0], options=name_list)
+name_dropdown = Select(title="Pick test", value=test_name, options=name_list)
 
 run_text_box = TextInput(title="Pick run", value="None")
 
@@ -288,17 +288,23 @@ def update(attr, old, new):
     global test_run
     global p
 
-    widget_called = curdoc().get_model_by_id(attr[0])
+    widget_called = curdoc().get_model_by_id(run_text_box.id)
     print("call back called")
+    print(run_text_box, name_dropdown)
+
+    # who triggered this?
+    w = widget_called == run_text_box
+    d = widget_called == name_dropdown
+    s = widget_called == slider
 
     new_run = False
-    if DM_stack and selected_run != test_run:
+    if DM_stack and selected_run != test_run and w:
         print("run_text_box selected")
         p = get_new_run(selected_run)
         test_run = selected_run
         new_run = True
 
-    if selected_name != test_name or new_run:
+    if (d and selected_name != test_name) or new_run:
         print("getting new test data", selected_name)
         new_test_data = get_new_test(selected_name)
         source_static["z"] = list(new_test_data)
