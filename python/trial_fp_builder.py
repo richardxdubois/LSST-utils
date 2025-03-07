@@ -299,6 +299,7 @@ def update(attr, old, new):
         new_run = True
 
     if selected_name != test_name or new_run:
+        print("getting new test data", selected_name)
         new_test_data = get_new_test(selected_name)
         source_static["z"] = list(new_test_data)
 
