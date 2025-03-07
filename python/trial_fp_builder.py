@@ -5,10 +5,17 @@ from copy import deepcopy
 import yaml
 import argparse
 from tornado.ioloop import IOLoop
+try:
+    import lsst.daf.butler as daf_butler
+    import lsst.eo.pipe as eo_pipe
+    DM_stack = True
+except ImportError:
+    DM_stack = False
 
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import DatetimeTickFormatter
-from bokeh.models import RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button
+from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
+                          TextInput)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -130,6 +137,19 @@ def get_new_test(test_name):
 
     return new_test
 
+def get_new_run(run_name):
+    repo = "/repo/main"
+    butler = daf_butler.Butler(repo)
+
+    acq_run = run_name
+    weekly = "d_2025_01_27"
+    pattern = f"u/lsstccs/eo_*_{acq_run}_{weekly}"
+    collections = butler.registry.queryCollections(pattern)
+
+    amp_data = eo_pipe.get_amp_data(repo, collections)
+
+    return amp_data
+
 # Add a color bar
 color_mapper = LinearColorMapper(palette="Viridis256", low=min_z, high=max_z)
 
@@ -236,7 +256,9 @@ step = (max_z - min_z) / 20.
 slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
 
 name_list = tests  # Unique names sorted
-dropdown = Select(title="Pick test", value=name_list[0], options=name_list)
+name_dropdown = Select(title="Pick test", value=name_list[0], options=name_list)
+
+run_text_box = TextInput(title="Pick run", value=name_list[0], options=name_list)
 
 # Create a Button to exit the server
 exit_button = Button(label="Exit", button_type="danger")
@@ -255,14 +277,24 @@ exit_button.on_click(stop_server)
 def update(attr, old, new):
     # Get the new range from the slider
     lower, upper = slider.value
-    selected_name = dropdown.value
+    selected_name = name_dropdown.value
+    selected_run = run_text_box.value
     global source_static
     global test_name
+    global p
 
-    if selected_name != test_name:
+    new_run = False
+    if DM_stack and run_text_box == curdoc().get_model_by_id(attr[0]):
+        p = get_new_run(selected_run)
+        new_run = True
+
+    if selected_name != test_name or new_run:
         new_test_data = get_new_test(selected_name)
         source_static["z"] = list(new_test_data)
-        test_name = selected_name
+
+        if not new_run:
+            test_name = selected_name
+
         slider.remove_on_change('value', update)
         slider.start = min(new_test_data)
         slider.end = max(new_test_data)
@@ -297,10 +329,10 @@ def update(attr, old, new):
 
 # Attach the callback to the slider and dropdown
 slider.on_change('value', update)
-dropdown.on_change('value', update)
+name_dropdown.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
-l = layout(exit_button, row(dropdown, slider), row(fp, p1))
+l = layout(exit_button, row( run_text_box, name_dropdown, slider), row(fp, p1))
 #save(l, title="trial focal plane")
 
 # Add the layout to the current document
