@@ -144,9 +144,10 @@ def get_new_run(run_name):
     repo = "/repo/main"
     butler = daf_butler.Butler(repo)
 
-    acq_run = run_name
-    weekly = "d_2025_01_27"
-    pattern = f"u/lsstccs/eo_*_{acq_run}_{weekly}"
+    acq_run = run_name  # form is run-id_<weekly>, eg E2233_d_2025_01_27
+    #weekly = "d_2025_01_27"
+    #pattern = f"u/lsstccs/eo_*_{acq_run}_{weekly}"
+    pattern = f"u/lsstccs/eo_*_{acq_run}"
     collections = butler.registry.queryCollections(pattern)
 
     amp_data = eo_pipe.get_amp_data(repo, collections)
