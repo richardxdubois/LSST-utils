@@ -138,6 +138,7 @@ def get_new_test(test_name):
     return new_test
 
 def get_new_run(run_name):
+    print("Entered get_new_run")
     repo = "/repo/main"
     butler = daf_butler.Butler(repo)
 
@@ -147,6 +148,7 @@ def get_new_run(run_name):
     collections = butler.registry.queryCollections(pattern)
 
     amp_data = eo_pipe.get_amp_data(repo, collections)
+    print("new amp data acquired")
 
     return amp_data
 
@@ -285,6 +287,7 @@ def update(attr, old, new):
 
     new_run = False
     if DM_stack and run_text_box == curdoc().get_model_by_id(attr[0]):
+        print("run_text_box selected")
         p = get_new_run(selected_run)
         new_run = True
 
@@ -330,6 +333,7 @@ def update(attr, old, new):
 # Attach the callback to the slider and dropdown
 slider.on_change('value', update)
 name_dropdown.on_change('value', update)
+run_text_box.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
 l = layout(exit_button, row( run_text_box, name_dropdown, slider), row(fp, p1))
