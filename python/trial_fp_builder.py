@@ -4,10 +4,11 @@ import pickle
 from copy import deepcopy
 import yaml
 import argparse
+from tornado.ioloop import IOLoop
 
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import DatetimeTickFormatter
-from bokeh.models import RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select
+from bokeh.models import RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -233,8 +234,21 @@ p1.vbar(top="top", x="x", width=width, alpha=0.3, fill_color="red", source=hist_
 
 step = (max_z - min_z) / 20.
 slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
+
 name_list = tests  # Unique names sorted
 dropdown = Select(title="Pick test", value=name_list[0], options=name_list)
+
+# Create a Button to exit the server
+exit_button = Button(label="Exit", button_type="danger")
+
+
+# Define a function to stop the server
+def stop_server():
+    print("Server is shutting down...")
+    IOLoop.current().stop()
+
+# Attach the stop function to the button click event
+exit_button.on_click(stop_server)
 
 
 # Define callback to update the data
@@ -286,7 +300,7 @@ slider.on_change('value', update)
 dropdown.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
-l = layout(row(dropdown, slider), row(fp, p1))
+l = layout(exit_button, row(dropdown, slider), row(fp, p1))
 #save(l, title="trial focal plane")
 
 # Add the layout to the current document
