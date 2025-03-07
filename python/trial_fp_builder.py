@@ -286,10 +286,10 @@ def update(attr, old, new):
     global p
 
     widget_called = curdoc().get_model_by_id(attr[0])
-    print("call back for", widget_called)
+    print("call back called")
 
     new_run = False
-    if DM_stack and run_text_box == widget_called:
+    if DM_stack and run_text_box == new:
         print("run_text_box selected")
         p = get_new_run(selected_run)
         new_run = True
