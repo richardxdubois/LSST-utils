@@ -360,7 +360,7 @@ def update(attr, old, new):
         lower = slider.start
         upper = slider.end
         color_mapper.low = lower
-        color_mapper.high = upper
+        color_mapper.high = upper * 1.2
 
     x_u = np.array(source_static["x"])
     y_u = np.array(source_static["y"])
@@ -382,7 +382,7 @@ def update(attr, old, new):
 
     # Update the histogram
     #new_zu = np.array(new_data["z"])
-    #print("about to remake histogram", len(new_zu))
+    generate_log_message(log_div, "about to remake histogram")
 
     new_zu = np.array(source.data["z"])
     #hist, edges = np.histogram(new_zu, bins=100)
