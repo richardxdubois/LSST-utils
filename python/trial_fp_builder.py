@@ -78,6 +78,9 @@ amp_length = 1.
 segments = 8
 amps = 2
 
+raft_border = 0.2
+ccd_border = 0.05
+
 fp = figure(height=1000, width=1000, title="Focal plane", tools="pan,wheel_zoom,box_zoom,lasso_select,reset,save,hover")
 
 x = np.arange(segments) * amp_width
@@ -100,6 +103,27 @@ ccd_groups = [["S00", "S01", "S02"],
              ["S10", "S11", "S12"],
              ["S20", "S21", "S22"]]
 
+start_raft = {}
+x_0 = raft_border
+y_0 = raft_border
+
+for rg in raft_groups:
+    for r in rg:
+        start_raft[r] = [x_0, y_0]
+        x_0 += 3 * amp_length + raft_border
+    y_0 += 3 * amp_length + raft_border
+    x_0 = raft_border
+
+start_ccd = {}
+x_0 = ccd_border
+y_0 = ccd_border
+
+for cg in ccd_groups:
+    for c in cg:
+        start_ccd[c] = [x_0, y_0]
+        x_0 += amp_length + ccd_border
+    y_0 += amp_length + ccd_border
+    x_0 = ccd_border
 
 def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
 
@@ -213,8 +237,11 @@ for rg in raft_groups:
                 raft = np.full(len(z_flat), r)
                 ccd = np.full(len(z_flat), c)
 
-                x_offset = ccd_offset_x + raft_offset_x
-                y_offset = ccd_offset_y + raft_offset_y
+                #x_offset = ccd_offset_x + raft_offset_x
+                #y_offset = ccd_offset_y + raft_offset_y
+
+                x_offset = start_raft[r][0] + start_ccd[c][0]
+                y_offset = start_raft[r][1] + start_ccd[c][1]
                 #source, g = make_ccd(x_offset=x_offset, y_offset=y_offset, raft_id=r, ccd_id=c,
                 #                     test_results=results)
                 #g.fill_color = {'field': 'z', 'transform': color_mapper}
