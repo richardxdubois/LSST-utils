@@ -370,17 +370,23 @@ def update(attr, old, new):
     amp_u = np.array(source_static["amp"])
 
     # Filter the data source based on the range and selected name
-    mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
-    new_data = dict(x=x_u[mask], y=y_u[mask],
-                    z=z_u[mask], raft=r_u[mask],
-                    ccd=c_u[mask], amp=amp_u[mask])
-    source.data = new_data
+    #mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
+    mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
+    #new_data = dict(x=x_u[mask], y=y_u[mask],
+    #                z=z_u[mask], raft=r_u[mask],
+    #                ccd=c_u[mask], amp=amp_u[mask])
+    z_u[mask] = upper * 10.
+    source.data["z"] = z_u
+    #source.data = new_data
+
 
     # Update the histogram
-    new_zu = np.array(new_data["z"])
+    #new_zu = np.array(new_data["z"])
     #print("about to remake histogram", len(new_zu))
 
-    hist, edges = np.histogram(new_zu, bins=100)
+    new_zu = np.array(source.data["z"])
+    #hist, edges = np.histogram(new_zu, bins=100)
+    hist, edges = np.histogram(new_zu, bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
