@@ -15,7 +15,7 @@ except ImportError:
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import DatetimeTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
-                          TextInput)
+                          TextInput, TapTool)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -77,6 +77,8 @@ amp_width = 0.125
 amp_length = 1.
 segments = 8
 amps = 2
+
+current_raft = None
 
 raft_border = 0.2
 ccd_border = 0.05
@@ -146,13 +148,16 @@ def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
     return source, g
 
 
-def get_new_test(test_name):
+def get_new_test(test_name, single_raft=None):
     test_data = p[test_name]
 
     new_test = np.empty(0)
 
     for rg in raft_groups:
         for r in rg:
+            if single_raft is not None and r != single_raft:
+                continue
+
             if "R00" in r:
                 continue
             if "R40" in r:
@@ -203,7 +208,7 @@ raft_offset_y = 0
 y_scale = 3
 x_scale = 3
 
-source_dict = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[]}
+source_dict_fp = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[]}
 
 for rg in raft_groups:
     for r in rg:
@@ -250,12 +255,12 @@ for rg in raft_groups:
                 x_new = x_flat + x_offset
                 y_new = y_flat + y_offset
 
-                source_dict["x"].extend(x_new)
-                source_dict["y"].extend(y_new)
-                source_dict["z"].extend(z_flat)
-                source_dict["ccd"].extend(ccd)
-                source_dict["raft"].extend(raft)
-                source_dict["amp"].extend(amp_names_flat)
+                source_dict_fp["x"].extend(x_new)
+                source_dict_fp["y"].extend(y_new)
+                source_dict_fp["z"].extend(z_flat)
+                source_dict_fp["ccd"].extend(ccd)
+                source_dict_fp["raft"].extend(raft)
+                source_dict_fp["amp"].extend(amp_names_flat)
 
                 ccd_offset_x += amp_length
             ccd_offset_y += amp_length
@@ -266,6 +271,34 @@ for rg in raft_groups:
     raft_offset_x = 0
     raft_offset_y += y_scale * amp_length
 
+source_dict_raft = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[]}
+
+r = "R01"
+for cd in ccd_groups:
+    for c in cd:
+        raft_ccd = r + "_" + c
+        results = np.array(list(test_data[raft_ccd].values()))[::-1]
+        signal = np.zeros((2, 8))
+        signal[1, :] = results[8:16][::-1]
+        signal[0, :] = results[0:8]
+        z_flat = signal.flatten()
+        raft = np.full(len(z_flat), r)
+        ccd = np.full(len(z_flat), c)
+
+        x_offset = start_raft[r][0] + start_ccd[c][0]
+        y_offset = start_raft[r][1] + start_ccd[c][1]
+
+        x_new = x_flat + x_offset
+        y_new = y_flat + y_offset
+
+        source_dict_raft["x"].extend(x_new)
+        source_dict_raft["y"].extend(y_new)
+        source_dict_raft["z"].extend(z_flat)
+        source_dict_raft["ccd"].extend(ccd)
+        source_dict_raft["raft"].extend(raft)
+        source_dict_raft["amp"].extend(amp_names_flat)
+
+source_dict = deepcopy(source_dict_fp)
 source = ColumnDataSource(source_dict)
 
 g = Rect(x='x', y='y', width=amp_width, height=amp_length / 2., line_color="black")
@@ -321,6 +354,68 @@ exit_button.on_click(stop_server)
 
 log_div = Div(text="Log:<br>", width=400, height=150)
 
+# Add TapTool
+taptool = TapTool()
+fp.add_tools(taptool)
+
+
+# Define a callback function for TapTool
+def tap_callback(event):
+    global source
+    selected = source.selected
+    selected_index = source.selected.indices[0]
+    selected_data = source.data
+    raft_value = selected_data['raft'][selected_index]
+    ccd_value = selected_data['ccd'][selected_index]
+    amp_value = selected_data['amp'][selected_index]
+    # Unselect at the end of the callback
+    source.selected.indices = []
+    generate_log_message(log_div, f"Selected raft: {raft_value}, ccd: {ccd_value}, amp: {amp_value}")
+
+    global current_raft
+    if current_raft is None:
+        current_raft = raft_value
+        source.data["x"] = source_dict_raft["x"]
+        source.data["y"] = source_dict_raft["y"]
+        source.data["ccd"] = source_dict_raft["ccd"]
+        source.data["raft"] = source_dict_raft["raft"]
+        source.data["amp"] = source_dict_raft["amp"]
+
+        global source_static
+        source_static = deepcopy(source_dict_raft)
+        new_test_data = get_new_test(test_name, single_raft=current_raft)
+        source.data["z"] = list(new_test_data)
+        source_static["z"] = list(new_test_data)
+        fp.title.text = "Raft " + current_raft + ": " + test_name
+        generate_log_message(log_div, "Switched to single raft mode: " + current_raft)
+    else:
+        current_raft = None
+        source.data["x"] = source_dict_fp["x"]
+        source.data["y"] = source_dict_fp["y"]
+        source.data["ccd"] = source_dict_fp["ccd"]
+        source.data["raft"] = source_dict_fp["raft"]
+        source.data["amp"] = source_dict_fp["amp"]
+        source_static = deepcopy(source_dict_fp)
+
+        new_test_data = get_new_test(test_name)
+        source.data["z"] = list(new_test_data)
+        source_static["z"] = list(new_test_data)
+        fp.title.text = "Full focal plane: " + test_name
+
+        generate_log_message(log_div, "Switched to full fp mode")
+
+    lower, upper = slider.value
+    hist, edges = np.histogram(new_test_data, bins=100, range=(lower, upper))
+    width = edges[1] - edges[0]
+    vbar_width = np.ones_like(hist) * width
+    hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
+    p1.title.text = test_name
+    generate_log_message(log_div, "Ready")
+
+# Attach the callback to the TapTool's event
+fp.on_event('tap', tap_callback)
+
+
 # Define callback to update the data
 def update(attr, old, new):
     # Get the new range from the slider
@@ -339,13 +434,13 @@ def update(attr, old, new):
 
     new_run = False
     if DM_stack and selected_run != test_run and w:
-        generate_log_message(log_div, "run_text_box selected")
+        generate_log_message(log_div, "run_text_box selected: " + selected_run)
         p = get_new_run(selected_run)
         test_run = selected_run
         new_run = True
 
     if (d and selected_name != test_name) or new_run:
-        generate_log_message(log_div,"getting new test data " + selected_name)
+        generate_log_message(log_div,"getting new test data: " + selected_name)
         new_test_data = get_new_test(selected_name)
         source_static["z"] = list(new_test_data)
 
