@@ -197,7 +197,8 @@ def get_new_run(run_name):
     return amp_data
 
 # Add a color bar
-color_mapper = LinearColorMapper(palette="Viridis256", low=min_z, high=max_z)
+#color_mapper = LinearColorMapper(palette="Viridis256", low=min_z, high=max_z)
+color_mapper = LinearColorMapper(palette="Inferno256", low=min_z, high=max_z)
 
 color_bar = ColorBar(color_mapper=color_mapper, location=(0, 0))
 fp.add_layout(color_bar, 'right')
