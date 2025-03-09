@@ -149,7 +149,13 @@ def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
 
 
 def get_new_test(test_name, single_raft=None):
-    test_data = p[test_name]
+    t_name = test_name
+
+    if "HIGH" in test_name or "LOW" in test_name:
+        t_name_split = test_name.split("_")
+        t_name = (t_name_split[0], t_name_split[1])
+
+    test_data = p[t_name]
 
     new_test = np.empty(0)
 
@@ -334,7 +340,15 @@ p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", sourc
 step = (max_z - min_z) / 20.
 slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
 
-name_list = tests  # Unique names sorted
+# Create a new list with tuple elements replaced by joined strings - some test names are tuples
+name_list = []
+
+for elem in tests:
+    if isinstance(elem, tuple) and len(elem) == 2:
+        name_list.append(f"{elem[0]}_{elem[1]}")
+    else:
+        name_list.append(elem)
+
 name_dropdown = Select(title="Pick test", value=test_name, options=name_list)
 
 run_text_box = TextInput(title="Pick run", value="None")
