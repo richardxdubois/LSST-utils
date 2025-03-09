@@ -42,7 +42,7 @@ message_log = []
 def generate_log_message(log_div, message):
     message_log.append(message)
 
-    if len(message_log) > 10:
+    if len(message_log) > 5:
         message_log.pop(0)
 
     log_div.text = "Log: <br>" + "<br>".join(message_log)
@@ -375,11 +375,8 @@ def tap_callback(event):
     global current_raft
     if current_raft is None:
         current_raft = raft_value
-        source.data["x"] = source_dict_raft["x"]
-        source.data["y"] = source_dict_raft["y"]
-        source.data["ccd"] = source_dict_raft["ccd"]
-        source.data["raft"] = source_dict_raft["raft"]
-        source.data["amp"] = source_dict_raft["amp"]
+        source.data = dict(x=source_dict_raft["x"], y=source_dict_raft["y"], z=source_dict_raft["z"],
+                           ccd=source_dict_raft["ccd"], raft=source_dict_raft["raft"], amp=source_dict_raft["amp"])
 
         global source_static
         source_static = deepcopy(source_dict_raft)
@@ -390,12 +387,8 @@ def tap_callback(event):
         generate_log_message(log_div, "Switched to single raft mode: " + current_raft)
     else:
         current_raft = None
-        source.data["x"] = source_dict_fp["x"]
-        source.data["y"] = source_dict_fp["y"]
-        source.data["ccd"] = source_dict_fp["ccd"]
-        source.data["raft"] = source_dict_fp["raft"]
-        source.data["amp"] = source_dict_fp["amp"]
-        source_static = deepcopy(source_dict_fp)
+        source.data = dict(x=source_dict_fp["x"], y=source_dict_fp["y"], z=source_dict_fp["z"],
+                           ccd=source_dict_fp["ccd"], raft=source_dict_fp["raft"], amp=source_dict_fp["amp"])
 
         new_test_data = get_new_test(test_name)
         source.data["z"] = list(new_test_data)
