@@ -15,7 +15,7 @@ except ImportError:
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import DatetimeTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
-                          TextInput, TapTool)
+                          TextInput, TapTool, RadioButtonGroup, Range1d)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -55,6 +55,10 @@ with open(in_file, 'rb') as f:
 
 tests = list(p.keys())
 test_name = tests[11]
+second_test_name = test_name
+
+clip_threshold = 5.
+
 test_run = None
 
 print(tests)
@@ -84,6 +88,13 @@ raft_border = 0.2
 ccd_border = 0.05
 
 fp = figure(height=1000, width=1000, title="Focal plane", tools="pan,wheel_zoom,box_zoom,lasso_select,reset,save,hover")
+
+# placeholder figures
+fp2 = figure(height=320, width=640, title="2nd test", tools="pan,wheel_zoom,box_zoom,reset,save,hover")
+fp2.visible = False
+
+fp2s = figure(height=320, width=640, title="2nd test scatter", tools="pan,wheel_zoom,box_zoom,reset,save,hover")
+fp2s.visible = False
 
 x = np.arange(segments) * amp_width
 y = np.arange(amps) * amp_length/2.
@@ -215,7 +226,7 @@ raft_offset_y = 0
 y_scale = 3
 x_scale = 3
 
-source_dict_fp = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[]}
+source_dict_fp = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[]}
 
 for rg in raft_groups:
     for r in rg:
@@ -278,7 +289,9 @@ for rg in raft_groups:
     raft_offset_x = 0
     raft_offset_y += y_scale * amp_length
 
-source_dict_raft = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[]}
+source_dict_fp["test2"] = source_dict_fp["z"]
+
+source_dict_raft = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[]}
 
 r = "R01"
 for cd in ccd_groups:
@@ -304,6 +317,8 @@ for cd in ccd_groups:
         source_dict_raft["ccd"].extend(ccd)
         source_dict_raft["raft"].extend(raft)
         source_dict_raft["amp"].extend(amp_names_flat)
+
+source_dict_raft["test2"] = source_dict_raft["z"]
 
 source_dict = deepcopy(source_dict_fp)
 source = ColumnDataSource(source_dict)
@@ -337,6 +352,17 @@ source_static = deepcopy(source_dict)
 p1 = figure(width=640, height=640, title=test_name)
 p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
 
+# set up the second test histogram
+
+test2_u = np.array(source_dict["test2"])
+t2_res_h, t2_res_edges = np.histogram(test2_u[mask], bins=100)
+t2_vbar_width = np.ones_like(t2_res_h) * (t2_res_edges[1] - t2_res_edges[0])
+
+t2_hist_source = ColumnDataSource(data=dict(top=t2_res_h, x=t2_res_edges[:-1], t2_vbar_width=vbar_width))
+fp2.vbar(top="top", x="x", width="t2_vbar_width", alpha=0.3, fill_color="red", source=t2_hist_source)
+
+fp2s.scatter(x="z", y="test2", source=source)
+
 step = (max_z - min_z) / 20.
 slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
 
@@ -350,11 +376,17 @@ for elem in tests:
         name_list.append(elem)
 
 name_dropdown = Select(title="Pick test", value=test_name, options=name_list)
+second_dropdown = Select(title="Pick second test", value=second_test_name, options=name_list)
+second_dropdown.visible = False
 
 run_text_box = TextInput(title="Pick run", value="None")
 
 # Create a Button to exit the server
 exit_button = Button(label="Exit", button_type="danger")
+
+# Create RadioGroup to handle second histogram mode
+second_toggle = RadioButtonGroup(labels=["On", "Off"], active=1)
+st_div = Div(text="Second histos")
 
 
 # Define a function to stop the server
@@ -364,6 +396,7 @@ def stop_server():
     IOLoop.current().stop()
 
 # Attach the stop function to the button click event
+
 
 exit_button.on_click(stop_server)
 
@@ -398,6 +431,9 @@ def tap_callback(event):
         new_test_data = get_new_test(test_name, single_raft=current_raft)
         source.data["z"] = list(new_test_data)
         source_static["z"] = list(new_test_data)
+        t2_new_test_data = get_new_test(second_test_name, single_raft=current_raft)
+        source.data["test2"] = list(t2_new_test_data)
+        source_static["test2"] = list(t2_new_test_data)
         fp.title.text = "Raft " + current_raft + ": " + test_name
         generate_log_message(log_div, "Switched to single raft mode: " + current_raft)
     else:
@@ -408,20 +444,50 @@ def tap_callback(event):
         new_test_data = get_new_test(test_name)
         source.data["z"] = list(new_test_data)
         source_static["z"] = list(new_test_data)
+        t2_new_test_data = get_new_test(second_test_name)
+        source.data["test2"] = list(t2_new_test_data)
+        source_static["test2"] = list(t2_new_test_data)
         fp.title.text = "Full focal plane: " + test_name
 
         generate_log_message(log_div, "Switched to full fp mode")
 
     lower, upper = slider.value
-    hist, edges = np.histogram(new_test_data, bins=100, range=(lower, upper))
+    mask = ~np.isnan(new_test_data)
+    hist, edges = np.histogram(new_test_data[mask], bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
     p1.title.text = test_name
+
+    # re histogram 2nd test
+    t2_mask = ~np.isnan(t2_new_test_data)
+    t2_hist, t2_edges = np.histogram(t2_new_test_data[t2_mask], bins=100)
+    width = t2_edges[1] - t2_edges[0]
+    t2_vbar_width = np.ones_like(t2_hist) * width
+    t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
+
     generate_log_message(log_div, "Ready")
+
 
 # Attach the callback to the TapTool's event
 fp.on_event('tap', tap_callback)
+
+
+# Define a callback to toggle the visibility of the plot
+def second_callback(attr, old, new):
+    if second_toggle.active == 0:  # "On"
+        fp2.visible = True
+        fp2s.visible = True
+        second_dropdown.visible = True
+        p1.height = 320
+    else:  # "Off"
+        fp2.visible = False
+        fp2s.visible = False
+        second_dropdown.visible = False
+        p1.height = 640
+
+
+second_toggle.on_change("active", second_callback)
 
 
 # Define callback to update the data
@@ -429,16 +495,18 @@ def update(attr, old, new):
     # Get the new range from the slider
     lower, upper = slider.value
     selected_name = name_dropdown.value
+    second_name = second_dropdown.value
     selected_run = run_text_box.value
     global source_static
     global test_name
+    global second_test_name
     global test_run
     global p
 
     # who triggered this?
     w = new == run_text_box.value
     d = new == name_dropdown.value
-    s = new == slider.value
+    s = new == second_dropdown.value
 
     new_run = False
     if DM_stack and selected_run != test_run and w:
@@ -449,7 +517,7 @@ def update(attr, old, new):
 
     if (d and selected_name != test_name) or new_run:
         generate_log_message(log_div,"getting new test data: " + selected_name)
-        new_test_data = get_new_test(selected_name)
+        new_test_data = get_new_test(selected_name, current_raft)
         source_static["z"] = list(new_test_data)
 
         if not new_run:
@@ -465,21 +533,31 @@ def update(attr, old, new):
         color_mapper.low = lower
         color_mapper.high = upper * 1.2
 
+    if (s and second_test_name != second_name) or new_run:
+        generate_log_message(log_div, "getting new second test data: " + second_name)
+        t2_new_test_data = get_new_test(second_name, current_raft)
+        source_static["test2"] = list(t2_new_test_data)
+
+        if not new_run:
+            second_test_name = second_name
+
     x_u = np.array(source_static["x"])
     y_u = np.array(source_static["y"])
     z_u = np.array(source_static["z"])
     r_u = np.array(source_static["raft"])
     c_u = np.array(source_static["ccd"])
     amp_u = np.array(source_static["amp"])
+    test2 = np.array(source_static["test2"])
 
     # Filter the data source based on the range and selected name
-    #mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
+    pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
     mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
     #new_data = dict(x=x_u[mask], y=y_u[mask],
     #                z=z_u[mask], raft=r_u[mask],
     #                ccd=c_u[mask], amp=amp_u[mask])
     z_u[mask] = upper * 10.
     source.data["z"] = z_u
+    source.data["test2"] = source_static["test2"]
     #source.data = new_data
 
 
@@ -494,16 +572,47 @@ def update(attr, old, new):
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
     p1.title.text = test_name
+
+    # re histogram 2nd test
+
+    t2_new_zu = np.array(source.data["test2"])[pos_mask]
+    t2_mask = ~np.isnan(t2_new_zu)
+    #hist, edges = np.histogram(new_zu, bins=100)
+
+    mean = np.mean(t2_new_zu[t2_mask])
+    std = np.std(t2_new_zu[t2_mask])
+
+    # Create a mask for elements within the threshold
+    cp = clip_threshold * std
+    mask = (t2_new_zu - mean) <= cp
+
+    # Filter the data
+    clipped_data = t2_new_zu[mask]
+
+    t2_hist, t2_edges = np.histogram(clipped_data, bins=100, range=(min(clipped_data),cp+mean))
+    width = t2_edges[1] - t2_edges[0]
+    t2_vbar_width = np.ones_like(t2_hist) * width
+    t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
+
+    fp2.title.text = second_test_name
+    fp2s.yaxis.axis_label = second_name
+    fp2s.xaxis.axis_label = test_name
+    fp2s.y_range = Range1d(start=min(clipped_data), end=cp+mean)
+    fp2s.x_range = Range1d(start=lower, end=upper)
+
     fp.title.text = "Full focal plane: " + test_name
     generate_log_message(log_div, "Ready")
 
 # Attach the callback to the slider and dropdown
 slider.on_change('value', update)
 name_dropdown.on_change('value', update)
+second_dropdown.on_change('value', update)
 run_text_box.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
-l = layout(exit_button, row( run_text_box, name_dropdown, slider, log_div), row(fp, p1))
+l = layout(exit_button, row( run_text_box, name_dropdown, slider, column(st_div, second_toggle),
+                             second_dropdown, log_div),
+           row(fp, column(p1, fp2s, fp2)))
 #save(l, title="trial focal plane")
 
 # Add the layout to the current document
