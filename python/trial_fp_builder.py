@@ -58,6 +58,8 @@ test_name = tests[11]
 second_test_name = test_name
 
 clip_threshold = 5.
+t2_lower = 0
+t2_upper = 0
 
 test_run = None
 
@@ -461,7 +463,7 @@ def tap_callback(event):
 
     # re histogram 2nd test
     t2_mask = ~np.isnan(t2_new_test_data)
-    t2_hist, t2_edges = np.histogram(t2_new_test_data[t2_mask], bins=100)
+    t2_hist, t2_edges = np.histogram(t2_new_test_data[t2_mask], bins=100, range=(t2_lower, t2_upper))
     width = t2_edges[1] - t2_edges[0]
     t2_vbar_width = np.ones_like(t2_hist) * width
     t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
@@ -502,6 +504,8 @@ def update(attr, old, new):
     global second_test_name
     global test_run
     global p
+    global t2_upper
+    global t2_lower
 
     # who triggered this?
     w = new == run_text_box.value
@@ -523,9 +527,12 @@ def update(attr, old, new):
         if not new_run:
             test_name = selected_name
 
+        mean = np.mean(new_test_data)
+        std = np.std(new_test_data)
+
         slider.remove_on_change('value', update)
         slider.start = min(new_test_data)
-        slider.end = max(new_test_data)
+        slider.end = mean + clip_threshold*std
         slider.value = (slider.start, slider.end)
         slider.on_change('value', update)
         lower = slider.start
@@ -588,8 +595,10 @@ def update(attr, old, new):
 
     # Filter the data
     clipped_data = t2_new_zu[mask]
+    t2_lower = min(clipped_data)
+    t2_upper = mean + cp
 
-    t2_hist, t2_edges = np.histogram(clipped_data, bins=100, range=(min(clipped_data),cp+mean))
+    t2_hist, t2_edges = np.histogram(clipped_data, bins=100, range=(t2_lower, t2_upper))
     width = t2_edges[1] - t2_edges[0]
     t2_vbar_width = np.ones_like(t2_hist) * width
     t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
@@ -597,7 +606,7 @@ def update(attr, old, new):
     fp2.title.text = second_test_name
     fp2s.yaxis.axis_label = second_name
     fp2s.xaxis.axis_label = test_name
-    fp2s.y_range = Range1d(start=min(clipped_data), end=cp+mean)
+    fp2s.y_range = Range1d(start=min(clipped_data), end=t2_upper)
     fp2s.x_range = Range1d(start=lower, end=upper)
 
     fp.title.text = "Full focal plane: " + test_name
