@@ -613,7 +613,7 @@ def update(attr, old, new):
     generate_log_message(log_div, "Ready")
 
 # Attach the callback to the slider and dropdown
-slider.on_change('value', update)
+slider.on_change('value_throttled', update)
 name_dropdown.on_change('value', update)
 second_dropdown.on_change('value', update)
 run_text_box.on_change('value', update)
