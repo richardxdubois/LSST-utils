@@ -39,6 +39,25 @@ in_file = data_dir + data["in_file_name"]
 message_log = []
 
 
+def clip_limits(test, threshold):
+
+    mean = np.mean(test)
+    std = np.std(test)
+
+    lower = max(min(test), mean - threshold * std)
+    upper = min(max(test), mean + threshold * std)
+
+    return lower, upper
+
+
+def re_histogram(cds, width_name, test, lower, upper):
+
+    t_hist, t_edges = np.histogram(test, bins=100, range=(lower, upper))
+    width = t_edges[1] - t_edges[0]
+    t_vbar_width = np.ones_like(t_hist) * width
+    cds.data = {"top": t_hist, "x": t_edges[:-1], width_name: t_vbar_width}
+
+
 def generate_log_message(log_div, message):
     message_log.append(message)
 
@@ -413,7 +432,12 @@ fp.add_tools(taptool)
 def tap_callback(event):
     global source
     selected = source.selected
-    selected_index = source.selected.indices[0]
+    try:
+        selected_index = source.selected.indices[0]
+    except IndexError:
+        generate_log_message(log_div, "Hit whitespace! Try again")
+        return
+
     selected_data = source.data
     raft_value = selected_data['raft'][selected_index]
     ccd_value = selected_data['ccd'][selected_index]
@@ -455,18 +479,44 @@ def tap_callback(event):
 
     lower, upper = slider.value
     mask = ~np.isnan(new_test_data)
+    new_test_noNan = new_test_data[mask]
+
+    c_lower, c_upper = clip_limits(new_test_noNan, clip_threshold)
+
+    slider.remove_on_change('value_throttled', update)
+    slider.start = c_lower
+    slider.end = c_upper
+    slider.value = (c_lower, c_upper)
+    slider.on_change('value_throttled', update)
+
+    re_histogram(hist_source, "vbar_width", new_test_noNan, c_lower, c_upper)
+
+    """
     hist, edges = np.histogram(new_test_data[mask], bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
+    """
+
     p1.title.text = test_name
 
     # re histogram 2nd test
     t2_mask = ~np.isnan(t2_new_test_data)
-    t2_hist, t2_edges = np.histogram(t2_new_test_data[t2_mask], bins=100, range=(t2_lower, t2_upper))
+    t2_new_noNaN = t2_new_test_data[t2_mask]
+
+    t2_lower, t2_upper = clip_limits(t2_new_noNaN, clip_threshold)
+
+    re_histogram(t2_hist_source, "t2_vbar_width", t2_new_noNaN, t2_lower, t2_upper)
+
+    fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
+    fp2s.x_range = Range1d(start=c_lower, end=c_upper)
+
+    """
+    t2_hist, t2_edges = np.histogram(t2_new_noNaN, bins=100, range=(t2_lower, t2_upper))
     width = t2_edges[1] - t2_edges[0]
     t2_vbar_width = np.ones_like(t2_hist) * width
     t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
+    """
 
     generate_log_message(log_div, "Ready")
 
@@ -527,14 +577,11 @@ def update(attr, old, new):
         if not new_run:
             test_name = selected_name
 
-        mean = np.mean(new_test_data)
-        std = np.std(new_test_data)
-
-        slider.remove_on_change('value', update)
-        slider.start = min(new_test_data)
-        slider.end = mean + clip_threshold*std
+        slider.remove_on_change('value_throttled', update)
+        slider.start, slider.end = clip_limits(new_test_data, clip_threshold)
         slider.value = (slider.start, slider.end)
-        slider.on_change('value', update)
+        slider.on_change('value_throttled', update)
+
         lower = slider.start
         upper = slider.end
         color_mapper.low = lower
@@ -573,11 +620,14 @@ def update(attr, old, new):
     generate_log_message(log_div, "about to remake histogram")
 
     new_zu = np.array(source.data["z"])
-    #hist, edges = np.histogram(new_zu, bins=100)
+    re_histogram(hist_source, "vbar_width", new_zu, lower, upper)
+    """
     hist, edges = np.histogram(new_zu, bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
+    """
+
     p1.title.text = test_name
 
     # re histogram 2nd test
@@ -589,24 +639,20 @@ def update(attr, old, new):
     mean = np.mean(t2_new_zu[t2_mask])
     std = np.std(t2_new_zu[t2_mask])
 
+    t2_lower, t2_upper = clip_limits(t2_new_zu[t2_mask], clip_threshold)
+
     # Create a mask for elements within the threshold
-    cp = clip_threshold * std
-    mask = (t2_new_zu - mean) <= cp
+    mask = (t2_new_zu > t2_lower) & (t2_new_zu < t2_upper)
 
     # Filter the data
     clipped_data = t2_new_zu[mask]
-    t2_lower = min(clipped_data)
-    t2_upper = mean + cp
 
-    t2_hist, t2_edges = np.histogram(clipped_data, bins=100, range=(t2_lower, t2_upper))
-    width = t2_edges[1] - t2_edges[0]
-    t2_vbar_width = np.ones_like(t2_hist) * width
-    t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
+    re_histogram(t2_hist_source, "t2_vbar_width", clipped_data, t2_lower, t2_upper)
 
     fp2.title.text = second_test_name
     fp2s.yaxis.axis_label = second_name
     fp2s.xaxis.axis_label = test_name
-    fp2s.y_range = Range1d(start=min(clipped_data), end=t2_upper)
+    fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
     fp2s.x_range = Range1d(start=lower, end=upper)
 
     fp.title.text = "Full focal plane: " + test_name
