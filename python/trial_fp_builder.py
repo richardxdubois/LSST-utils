@@ -584,6 +584,7 @@ def update(attr, old, new):
 
         if not new_run:
             test_name = selected_name
+        generate_log_message(log_div,"updating sliders for : " + selected_name)
 
         slider.remove_on_change('value_throttled', update)
         slider.start, slider.end = clip_limits(new_test_data, clip_threshold)
