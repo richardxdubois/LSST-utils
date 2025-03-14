@@ -67,7 +67,7 @@ def generate_log_message(log_div, message):
         message_log.pop(0)
 
     log_div.text = "Log: <br>" + "<br>".join(message_log)
-
+    curdoc().add_next_tick_callback(lambda: None)
 
 p = None
 
