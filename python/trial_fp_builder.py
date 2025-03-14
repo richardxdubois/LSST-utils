@@ -43,11 +43,12 @@ message_log = []
 
 def clip_limits(test, threshold):
 
-    mean = np.mean(test)
-    std = np.std(test)
+    mask = ~np.isnan(test)
+    median = np.median(test[mask])
+    std = np.std(test[mask])
 
-    lower = max(min(test), mean - threshold * std)
-    upper = min(max(test), mean + threshold * std)
+    lower = max(min(test), median - threshold * std)
+    upper = min(max(test), median + threshold * std)
 
     return lower, upper
 
