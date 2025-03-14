@@ -406,7 +406,12 @@ name_dropdown = Select(title="Pick test", value=test_name, options=name_list)
 second_dropdown = Select(title="Pick second test", value=second_test_name, options=name_list)
 second_dropdown.visible = False
 
+log_div = Div(text="Log:<br>", width=400, height=150)
+
 run_text_box = TextInput(title="Pick run", value="None")
+if not DM_stack:
+    run_text_box.visible = False
+    generate_log_message(log_div, "No DM stack or EO - run selection disabled")
 
 # Create a Button to exit the server
 exit_button = Button(label="Exit", button_type="danger")
@@ -424,10 +429,7 @@ def stop_server():
 
 # Attach the stop function to the button click event
 
-
 exit_button.on_click(stop_server)
-
-log_div = Div(text="Log:<br>", width=400, height=150)
 
 # Add TapTool
 taptool = TapTool()
@@ -570,13 +572,17 @@ def update(attr, old, new):
     s = new == second_dropdown.value
 
     new_run = False
-    if DM_stack and selected_run != test_run and w:
-        generate_log_message(log_div, "run_text_box selected: " + selected_run)
-        p = get_new_run(selected_run)
-        generate_log_message(log_div, selected_run + " loaded")
-        test_run = selected_run
-        title_run_base = test_run
-        new_run = True
+    if  selected_run != test_run and w:
+        if DM_stack:
+            generate_log_message(log_div, "run_text_box selected: " + selected_run)
+            p = get_new_run(selected_run)
+            generate_log_message(log_div, selected_run + " loaded")
+            test_run = selected_run
+            title_run_base = test_run
+            new_run = True
+        else:
+            generate_log_message(log_div, "DM stack or EO code unavailble. Request ignored: " + selected_run)
+            return
 
     if (d and selected_name != test_name) or new_run:
         generate_log_message(log_div,"getting new test data: " + selected_name)
