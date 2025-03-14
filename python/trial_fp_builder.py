@@ -413,7 +413,7 @@ if not DM_stack:
     run_text_box.visible = False
     generate_log_message(log_div, "No DM stack or EO - run selection disabled")
 
-clip_select = TextInput(title="Set clip Sigma", value=str(clip_threshold), width=75)
+clip_select = TextInput(title="Set clip sigma", value=str(clip_threshold), width=75)
 
 # Create a Button to exit the server
 exit_button = Button(label="Exit", button_type="danger")
@@ -632,7 +632,7 @@ def update(attr, old, new):
     #new_data = dict(x=x_u[mask], y=y_u[mask],
     #                z=z_u[mask], raft=r_u[mask],
     #                ccd=c_u[mask], amp=amp_u[mask])
-    z_u[mask] = upper * 10.
+    z_u[mask] = lower / 10.
     source.data["z"] = z_u
     source.data["test2"] = source_static["test2"]
     #source.data = new_data
