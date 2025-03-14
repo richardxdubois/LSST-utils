@@ -36,6 +36,8 @@ with open(args.app_config, "r") as f:
 data_dir = data["data_dir"]
 in_file = data_dir + data["in_file_name"]
 
+title_run_base = data["in_file_name"]
+
 message_log = []
 
 
@@ -117,12 +119,15 @@ fp2.visible = False
 fp2s = figure(height=320, width=640, title="2nd test scatter", tools="pan,wheel_zoom,box_zoom,reset,save,hover")
 fp2s.visible = False
 
+# set up the grid of amps
+
 x = np.arange(segments) * amp_width
 y = np.arange(amps) * amp_length/2.
 x, y = np.meshgrid(x, y)
 
 x_flat = x.flatten()
 y_flat = y.flatten()
+
 
 min_z = min(filtered_gains)
 max_z = max(filtered_gains)
@@ -353,7 +358,7 @@ hover = fp.select(dict(type=HoverTool))
 hover.tooltips = [("test", "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
                   ("amp", "@amp")]
 
-fp.title.text = "Full focal plane: " + test_name
+fp.title.text = title_run_base + " Full focal plane: " + test_name
 #  Suppress Axes
 fp.xaxis.visible = False  # Hide x-axis
 fp.yaxis.visible = False  # Hide y-axis
@@ -460,7 +465,7 @@ def tap_callback(event):
         t2_new_test_data = get_new_test(second_test_name, single_raft=current_raft)
         source.data["test2"] = list(t2_new_test_data)
         source_static["test2"] = list(t2_new_test_data)
-        fp.title.text = "Raft " + current_raft + ": " + test_name
+        fp.title.text = title_run_base + " " + current_raft + ": " + test_name
         generate_log_message(log_div, "Switched to single raft mode: " + current_raft)
     else:
         current_raft = None
@@ -473,7 +478,7 @@ def tap_callback(event):
         t2_new_test_data = get_new_test(second_test_name)
         source.data["test2"] = list(t2_new_test_data)
         source_static["test2"] = list(t2_new_test_data)
-        fp.title.text = "Full focal plane: " + test_name
+        fp.title.text = title_run_base + " Full focal plane: " + test_name
 
         generate_log_message(log_div, "Switched to full fp mode")
 
@@ -556,6 +561,7 @@ def update(attr, old, new):
     global p
     global t2_upper
     global t2_lower
+    global title_run_base
 
     # who triggered this?
     w = new == run_text_box.value
@@ -566,7 +572,9 @@ def update(attr, old, new):
     if DM_stack and selected_run != test_run and w:
         generate_log_message(log_div, "run_text_box selected: " + selected_run)
         p = get_new_run(selected_run)
+        generate_log_message(log_div, selected_run + " loaded")
         test_run = selected_run
+        title_run_base = test_run
         new_run = True
 
     if (d and selected_name != test_name) or new_run:
@@ -655,7 +663,11 @@ def update(attr, old, new):
     fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
     fp2s.x_range = Range1d(start=lower, end=upper)
 
-    fp.title.text = "Full focal plane: " + test_name
+    if current_raft is None:
+        fp.title.text = title_run_base + " Full focal plane: " + test_name
+    else:
+        fp.title.text = title_run_base + " " + current_raft + " " + test_name
+
     generate_log_message(log_div, "Ready")
 
 # Attach the callback to the slider and dropdown
