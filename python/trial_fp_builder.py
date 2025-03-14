@@ -413,6 +413,8 @@ if not DM_stack:
     run_text_box.visible = False
     generate_log_message(log_div, "No DM stack or EO - run selection disabled")
 
+clip_select = TextInput(title="Set clip Sigma", value=str(clip_threshold), width=75)
+
 # Create a Button to exit the server
 exit_button = Button(label="Exit", button_type="danger")
 
@@ -565,6 +567,11 @@ def update(attr, old, new):
     global t2_upper
     global t2_lower
     global title_run_base
+    global clip_threshold
+
+    if clip_threshold != float(clip_select.value):
+        clip_threshold = float(clip_select.value)
+        generate_log_message(log_div, "Clipping threshold set to " + str(clip_threshold))
 
     # who triggered this?
     w = new == run_text_box.value
@@ -572,7 +579,7 @@ def update(attr, old, new):
     s = new == second_dropdown.value
 
     new_run = False
-    if  selected_run != test_run and w:
+    if selected_run != test_run and w:
         if DM_stack:
             generate_log_message(log_div, "run_text_box selected: " + selected_run)
             p = get_new_run(selected_run)
@@ -683,9 +690,11 @@ slider.on_change('value_throttled', update)
 name_dropdown.on_change('value', update)
 second_dropdown.on_change('value', update)
 run_text_box.on_change('value', update)
+clip_select.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
-l = layout(exit_button, row( run_text_box, name_dropdown, slider, column(st_div, second_toggle),
+l = layout(exit_button, row( column(run_text_box, clip_select), name_dropdown, slider,
+                             column(st_div, second_toggle),
                              second_dropdown, log_div),
            row(fp, column(p1, fp2s, fp2)))
 #save(l, title="trial focal plane")
