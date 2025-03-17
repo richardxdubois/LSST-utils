@@ -897,11 +897,8 @@ def update(attr, old, new):
         else:
             slider.format = BasicTickFormatter()
 
-        #lower = slider.start
-        #upper = slider.end
         color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
         color_mapper.high = upper * 1.1
-
 
     if (s and second_test_name != second_name) or new_run:
         generate_log_message(log_div, "getting new second test data: " + second_name)
@@ -912,8 +909,8 @@ def update(attr, old, new):
         if not new_run:
             second_test_name = second_name
 
-    z_u = np.array(source_static["z"])
-    lower, upper = clip_limits(z_u, clip_threshold)
+    z_u = np.array(source.data["z"])
+    lower, upper = slider.value
 
     raft_type = np.array(source_static["raft_type"])
 
@@ -925,25 +922,9 @@ def update(attr, old, new):
         pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
         mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
 
-    #z_u[mask] = lower / 10.
-    #source.data["z"] = z_u
-    #source.data = new_data
-
-    """
-    # Update the histogram
-    #new_zu = np.array(new_data["z"])
-    generate_log_message(log_div, "about to remake histogram")
-
-    # Create a mask for elements within the threshold
-    z_u_p = z_u[pos_mask]
-    c_lower, c_upper = clip_limits(z_u_p, clip_threshold)
-
-    c_mask = (z_u_p > c_lower) & (z_u_p < c_upper)
-
-    new_zu = z_u_p[c_mask]
-    """
-
-    new_zu = np.array(source.data["z"])[pos_mask]
+    z_u[mask] = lower / 10.
+    source.data["z"] = z_u
+    new_zu = np.array(source.data["z"])
     t_mask = ~np.isnan(new_zu)
 
     t_lower, t_upper = clip_limits(new_zu[t_mask], clip_threshold)
@@ -956,30 +937,6 @@ def update(attr, old, new):
 
     re_histogram(hist_source, "vbar_width", clipped_data, t_lower, t_upper)
 
-    z_u[mask] = lower / 10.
-    source.data["z"] = z_u
-
-    """
-    step = (t_upper - t_lower) / 20.
-    slider.remove_on_change('value_throttled', update)
-    slider.start, slider.end = (t_lower, t_upper)
-    slider.value = (slider.start, slider.end)
-    slider.step = step
-    slider.on_change('value_throttled', update)
-    if abs(slider.start) < 0.1:
-        slider.format = PrintfTickFormatter(format="%1.2e")
-    else:
-        slider.format = BasicTickFormatter()
-
-
-    #lower, upper = slider_format(lower, upper)
-
-    lower = slider.start
-    upper = slider.end
-    color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
-    color_mapper.high = upper * 1.1
-
-    """
     hist, edges = np.histogram(new_zu, bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
@@ -989,7 +946,8 @@ def update(attr, old, new):
 
     # re histogram 2nd test
 
-    t2_new_zu = np.array(source.data["test2"])[pos_mask]
+    #t2_new_zu = np.array(source.data["test2"])[pos_mask]
+    t2_new_zu = np.array(source.data["test2"])
     t2_mask = ~np.isnan(t2_new_zu)
 
     t2_lower, t2_upper = clip_limits(t2_new_zu[t2_mask], clip_threshold)
