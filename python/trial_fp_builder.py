@@ -15,7 +15,7 @@ except ImportError:
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import PrintfTickFormatter, BasicTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
-                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter)
+                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter, CustomJSTickFormatter)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -71,9 +71,48 @@ def clip_limits(test, threshold):
     upper = Q3 + 1.5 * IQR
 
     lower = max(min(test), lower)
+    """
+    if abs(lower) < 0.01 and lower < 0:
+        lower = 0.
+    """
     upper = min(max(test), upper)
 
     return lower, upper
+
+
+def slider_format(lower, upper):
+    if slider.format == BasicTickFormatter and abs(lower) > 0.01:
+        return
+
+    if lower < 0.01:
+
+        t_lower = np.log(lower)
+        t_upper = np.log(upper)
+        step = t_upper - t_lower
+
+        slider.remove_on_change('value_throttled', update)
+        slider.start, slider.end = (t_lower, t_upper)
+        slider.value = (slider.start, slider.end)
+        slider.on_change('value_throttled', update)
+        slider.format = CustomJSTickFormatter(code="return Math.exp(tick).toFixed(2)")
+        slider.step = step
+        r_lower = np.exp(t_lower)
+        r_upper = np.exp(t_upper)
+    else:
+        t_lower = lower
+        t_upper = upper
+        step = t_upper - t_lower
+
+        slider.remove_on_change('value_throttled', update)
+        slider.start, slider.end = (t_lower, t_upper)
+        slider.value = (slider.start, slider.end)
+        slider.on_change('value_throttled', update)
+        slider.format = BasicTickFormatter()
+        slider.step = step
+        r_lower = t_lower
+        r_upper = t_upper
+
+    return r_lower, r_upper
 
 
 def re_histogram(cds, width_name, test, lower, upper):
@@ -840,23 +879,29 @@ def update(attr, old, new):
 
         if not new_run:
             test_name = selected_name
-        generate_log_message(log_div,"updating sliders for : " + selected_name)
+        generate_log_message(log_div, "updating sliders for : " + selected_name)
 
-        """
+        t_lower, t_upper = clip_limits(new_test_data, clip_threshold)
+        mask = (new_test_data > t_lower) & (new_test_data < t_upper)
+        new_masked = new_test_data[mask]
+        lower, upper = clip_limits(new_masked, clip_threshold)
+
+        step = (upper - lower) / 20.
         slider.remove_on_change('value_throttled', update)
-        
+        slider.start, slider.end = (lower, upper)
         slider.value = (slider.start, slider.end)
+        slider.step = step
         slider.on_change('value_throttled', update)
         if abs(slider.start) < 0.1:
             slider.format = PrintfTickFormatter(format="%1.2e")
         else:
             slider.format = BasicTickFormatter()
 
-        lower = slider.start
-        upper = slider.end
+        #lower = slider.start
+        #upper = slider.end
         color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
         color_mapper.high = upper * 1.1
-        """
+
 
     if (s and second_test_name != second_name) or new_run:
         generate_log_message(log_div, "getting new second test data: " + second_name)
@@ -914,14 +959,20 @@ def update(attr, old, new):
     z_u[mask] = lower / 10.
     source.data["z"] = z_u
 
+    """
+    step = (t_upper - t_lower) / 20.
     slider.remove_on_change('value_throttled', update)
     slider.start, slider.end = (t_lower, t_upper)
     slider.value = (slider.start, slider.end)
+    slider.step = step
     slider.on_change('value_throttled', update)
     if abs(slider.start) < 0.1:
         slider.format = PrintfTickFormatter(format="%1.2e")
     else:
         slider.format = BasicTickFormatter()
+
+
+    #lower, upper = slider_format(lower, upper)
 
     lower = slider.start
     upper = slider.end
@@ -933,7 +984,6 @@ def update(attr, old, new):
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
-    """
 
     p1.title.text = test_name
 
