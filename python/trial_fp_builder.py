@@ -35,20 +35,43 @@ with open(args.app_config, "r") as f:
 
 data_dir = data["data_dir"]
 in_file = data_dir + data["in_file_name"]
+try:
+    do_CR = data["do_CR"]
+except KeyError:
+    do_CR = False
 
 title_run_base = data["in_file_name"]
+
+serial_numbers_pkl = data_dir + data["serial_numbers_pkl"]
 
 message_log = []
 
 
 def clip_limits(test, threshold):
 
+    """
     mask = ~np.isnan(test)
     median = np.median(test[mask])
     std = np.std(test[mask])
 
     lower = max(min(test), median - threshold * std)
     upper = min(max(test), median + threshold * std)
+
+    """
+
+    # Calculate Q1 (25th percentile) and Q3 (75th percentile)
+    Q1 = np.percentile(test, 25)
+    Q3 = np.percentile(test, 75)
+
+    # Calculate the IQR
+    IQR = Q3 - Q1
+
+    # Define outlier bounds
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+
+    lower = max(min(test), lower)
+    upper = min(max(test), upper)
 
     return lower, upper
 
@@ -70,6 +93,7 @@ def generate_log_message(log_div, message):
     log_div.text = "Log: <br>" + "<br>".join(message_log)
     curdoc().add_next_tick_callback(lambda: None)
 
+
 p = None
 
 with open(in_file, 'rb') as f:
@@ -78,6 +102,9 @@ with open(in_file, 'rb') as f:
 tests = list(p.keys())
 test_name = tests[11]
 second_test_name = test_name
+
+with open(serial_numbers_pkl, 'rb') as sn:
+    serial_numbers = pickle.load(sn)
 
 clip_threshold = 5.
 t2_lower = 0
@@ -124,10 +151,13 @@ fp2s.visible = False
 
 x = np.arange(segments) * amp_width
 y = np.arange(amps) * amp_length/2.
-x, y = np.meshgrid(x, y)
+xg, yg = np.meshgrid(x, y)
+xr, yr = np.meshgrid(y, x)
 
-x_flat = x.flatten()
-y_flat = y.flatten()
+x_flat = xg.flatten()
+y_flat = yg.flatten()
+xr_flat = xr.flatten()
+yr_flat = yr.flatten()
 
 
 min_z = min(filtered_gains)
@@ -165,6 +195,157 @@ for cg in ccd_groups:
     y_0 += amp_length + ccd_border
     x_0 = ccd_border
 
+CR_layout = {
+    "R00": {
+        "SG0": ["S21", 0.],
+        "SG1": ["S12", 0.],
+        "SW": ["S22", 0.]
+    },
+    "R04": {
+        "SG0": ["S21", 0.],
+        "SG1": ["S10", 0.],
+        "SW": ["S20", np.pi/2.]
+    },
+    "R40": {
+        "SG0": ["S01", 0.],
+        "SG1": ["S12", 0.],
+        "SW": ["S02", np.pi/2.]
+    },
+    "R44": {
+        "SG0": ["S10", 0.],
+        "SG1": ["S01", 0.],
+        "SW": ["S00", 0.]
+    }
+}
+
+
+def CR_grid(raft):
+
+    # composed of 4 sensors, 2 SW (each with 8 channels) and 2 SG with 16. The layout is rotated counterclockwise
+    # use R00 as the template, starting with SG1
+
+    CR_x = np.empty(0)
+    CR_y = np.empty(0)
+    CR_ccd = np.empty(0)
+    CR_angle = np.empty(0)
+
+    x_SG1 = x_flat + start_ccd[CR_layout[raft]["SG1"][0]][0]
+    CR_x = np.append(CR_x, x_SG1)
+    y_SG1 = y_flat + start_ccd[CR_layout[raft]["SG1"][0]][1]
+    CR_y = np.append(CR_y, y_SG1)
+    CR_ccd = np.append(CR_ccd, np.full(16, "SG1"))
+    CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SG1"][1]))
+
+    if raft == "R00" or raft == "R44":
+        x_SW = x_flat + start_ccd[CR_layout[raft]["SW"][0]][0]
+        y_SW = y_flat + start_ccd[CR_layout[raft]["SW"][0]][1]
+    else:
+        x_SW = xr_flat + start_ccd[CR_layout[raft]["SW"][0]][0] + (amp_width + ccd_border)
+        y_SW = yr_flat + start_ccd[CR_layout[raft]["SW"][0]][1] - (amp_width + ccd_border)
+
+    CR_x = np.append(CR_x, x_SW)
+    CR_y = np.append(CR_y, y_SW)
+
+    CR_ccd = np.append(CR_ccd, np.full(8, "SW1"))
+    CR_ccd = np.append(CR_ccd, np.full(8, "SW0"))
+    CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SW"][1]))
+
+    x_SG = x_flat + start_ccd[CR_layout[raft]["SG0"][0]][0]
+    y_SG = y_flat + start_ccd[CR_layout[raft]["SG0"][0]][1]
+
+    CR_x = np.append(CR_x, x_SG)
+    CR_y = np.append(CR_y, y_SG)
+
+    CR_ccd = np.append(CR_ccd, np.full(16, "SG0"))
+    CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SG0"][1]))
+
+    CR_x += start_raft[raft][0]
+    CR_y += start_raft[raft][1]
+
+    CR_raft = np.full(len(CR_x), raft)
+    CR_raft_type = np.full(len(CR_x), serial_numbers[raft]["type"])
+
+    return CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type
+
+
+def get_CR_test(raft):
+
+    new_test = np.empty(0)
+    amp_names = np.empty(0)
+
+    raft_ccd = raft + "_SG1"
+    try:
+        results = np.array(list(test_data[raft_ccd].values()))[::-1]
+    except:
+        results = np.ones(16) * -1000.
+
+    signal = np.zeros((2, 8))
+    signal[1, :] = results[8:16][::-1]
+    signal[0, :] = results[0:8]
+    z_flat = signal.flatten()
+    new_test = np.append(new_test, z_flat)
+
+    try:
+        amp_n = np.array(list(test_data[raft_ccd].keys()))[::-1]
+    except:
+        amp_n = np.full(16, "SG1")
+
+    amp_n_shaped = np.empty((2, 8), dtype=object)
+    amp_n_shaped[1, :] = amp_n[8:16][::-1]
+    amp_n_shaped[0, :] = amp_n[0:8]
+    amp_n_flat = amp_n_shaped.flatten()
+    amp_names = np.append(amp_names, amp_n_flat)
+
+    signal = np.zeros((2, 8))
+    SW1 = raft + "_SW1"
+    results = np.array(list(test_data[SW1].values()))[::-1]
+    signal[0, :] = results[::-1]
+    SW0 = raft + "_SW0"
+    results = np.array(list(test_data[SW0].values()))
+    signal[1, :] = results
+    z_flat = signal.flatten()
+    new_test = np.append(new_test, z_flat)
+
+    try:
+        amp_n0 = np.array(list(test_data[SW1].keys()))[::-1]
+        amp_n1 = np.array(list(test_data[SW0].keys()))[::-1]
+    except:
+        amp_n1 = np.full(8, "SW1")
+        amp_n0 = np.full(8, "SW0")
+
+    amp_n_shaped = np.empty((2, 8), dtype=object)
+    amp_n_shaped[1, :] = amp_n1[::-1]
+    amp_n_shaped[0, :] = amp_n0
+    amp_n_flat = amp_n_shaped.flatten()
+    amp_names = np.append(amp_names, amp_n_flat)
+
+    raft_ccd = raft + "_SG0"
+    try:
+        results = np.array(list(test_data[raft_ccd].values()))[::-1]
+    except:
+        results = np.ones(16) * -1000.
+
+    signal = np.zeros((2, 8))
+    signal[1, :] = results[8:16][::-1]
+    signal[0, :] = results[0:8]
+    z_flat = signal.flatten()
+    new_test = np.append(new_test, z_flat)
+
+    try:
+        amp_n = np.array(list(test_data[raft_ccd].keys()))[::-1]
+    except:
+        amp_n = np.full(16, "SG0")
+
+    amp_n_shaped = np.empty((2, 8), dtype=object)
+    amp_n_shaped[1, :] = amp_n[8:16][::-1]
+    amp_n_shaped[0, :] = amp_n[0:8]
+    amp_n_flat = amp_n_shaped.flatten()
+
+    amp_names = np.append(amp_names, amp_n_flat)
+
+    return new_test, amp_names
+
+"""
 def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
 
     signal = np.zeros((2, 8))
@@ -184,6 +365,7 @@ def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
                       ("amp", "@amp")]
 
     return source, g
+"""
 
 
 def get_new_test(test_name, single_raft=None):
@@ -202,14 +384,20 @@ def get_new_test(test_name, single_raft=None):
             if single_raft is not None and r != single_raft:
                 continue
 
-            if "R00" in r:
+            if r in list(CR_layout.keys()):
+                if do_CR:
+                    R00_test, _ = get_CR_test(r)
+                    new_test = np.append(new_test, R00_test)
                 continue
+            """
             if "R40" in r:
                continue
             if "R04" in r:
                 continue
             if "R44" in r:
                 continue
+            """
+
            # print(r, raft_offset_x, raft_offset_y)
             for cd in ccd_groups:
                 for c in cd:
@@ -224,14 +412,14 @@ def get_new_test(test_name, single_raft=None):
 
     return new_test
 
+
 def get_new_run(run_name):
     generate_log_message(log_div, "Entered get_new_run " + run_name)
     repo = "/repo/main"
     butler = daf_butler.Butler(repo)
 
     acq_run = run_name  # form is run-id_<weekly>, eg E2233_d_2025_01_27
-    #weekly = "d_2025_01_27"
-    #pattern = f"u/lsstccs/eo_*_{acq_run}_{weekly}"
+
     pattern = f"u/lsstccs/eo_*_{acq_run}"
     collections = butler.registry.queryCollections(pattern)
 
@@ -240,8 +428,9 @@ def get_new_run(run_name):
 
     return amp_data
 
+
 # Add a color bar
-#color_mapper = LinearColorMapper(palette="Viridis256", low=min_z, high=max_z)
+
 color_mapper = LinearColorMapper(palette="Inferno256", low=min_z, high=max_z)
 
 color_bar = ColorBar(color_mapper=color_mapper, location=(0, 0))
@@ -253,14 +442,28 @@ raft_offset_y = 0
 y_scale = 3
 x_scale = 3
 
-source_dict_fp = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[]}
+source_dict_fp = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
 for rg in raft_groups:
     for r in rg:
-        if "R00" in r:
+        if r in CR_layout.keys():
             raft_offset_x = x_scale * amp_length
             raft_offset_y = 0
+            if do_CR:
+                CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
+                R00_test, CR_amp = get_CR_test(r)
+
+                source_dict_fp["x"].extend(CR_x)
+                source_dict_fp["y"].extend(CR_y)
+                source_dict_fp["z"].extend(R00_test)
+                source_dict_fp["ccd"].extend(CR_ccd)
+                source_dict_fp["raft"].extend(CR_raft)
+                source_dict_fp["amp"].extend(CR_amp)
+                source_dict_fp["angle"].extend(CR_angle)
+                source_dict_fp["raft_type"].extend(CR_raft_type)
+
             continue
+        """
         if "R40" in r:
             raft_offset_x = x_scale * amp_length
             #raft_offset_y += y_scale * amp_length
@@ -271,6 +474,7 @@ for rg in raft_groups:
             continue
         if "R44" in r:
             continue
+        """
 
         ccd_offset_x = 0
         ccd_offset_y = 0
@@ -286,6 +490,8 @@ for rg in raft_groups:
                 z_flat = signal.flatten()
                 raft = np.full(len(z_flat), r)
                 ccd = np.full(len(z_flat), c)
+                angle = np.zeros(len(z_flat))
+                raft_type = np.full(len(z_flat), serial_numbers[r]["type"])
 
                 #x_offset = ccd_offset_x + raft_offset_x
                 #y_offset = ccd_offset_y + raft_offset_y
@@ -306,6 +512,8 @@ for rg in raft_groups:
                 source_dict_fp["ccd"].extend(ccd)
                 source_dict_fp["raft"].extend(raft)
                 source_dict_fp["amp"].extend(amp_names_flat)
+                source_dict_fp["angle"].extend(angle)
+                source_dict_fp["raft_type"].extend(raft_type)
 
                 ccd_offset_x += amp_length
             ccd_offset_y += amp_length
@@ -318,7 +526,7 @@ for rg in raft_groups:
 
 source_dict_fp["test2"] = source_dict_fp["z"]
 
-source_dict_raft = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[]}
+source_dict_raft = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
 r = "R01"
 for cd in ccd_groups:
@@ -331,6 +539,8 @@ for cd in ccd_groups:
         z_flat = signal.flatten()
         raft = np.full(len(z_flat), r)
         ccd = np.full(len(z_flat), c)
+        angle = np.zeros(len(z_flat))
+        raft_type = np.full(len(z_flat), serial_numbers[r]["type"])
 
         x_offset = start_raft[r][0] + start_ccd[c][0]
         y_offset = start_raft[r][1] + start_ccd[c][1]
@@ -344,19 +554,39 @@ for cd in ccd_groups:
         source_dict_raft["ccd"].extend(ccd)
         source_dict_raft["raft"].extend(raft)
         source_dict_raft["amp"].extend(amp_names_flat)
+        source_dict_raft["angle"].extend(angle)
+        source_dict_raft["raft_type"].extend(raft_type)
 
 source_dict_raft["test2"] = source_dict_raft["z"]
+
+if do_CR:
+    r = "R00"
+    source_dict_CR = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
+
+    CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
+    R00_test, CR_amp = get_CR_test(r)
+
+    source_dict_CR["x"].extend(CR_x)
+    source_dict_CR["y"].extend(CR_y)
+    source_dict_CR["z"].extend(R00_test)
+    source_dict_CR["ccd"].extend(CR_ccd)
+    source_dict_CR["raft"].extend(CR_raft)
+    source_dict_CR["amp"].extend(CR_amp)
+    source_dict_CR["angle"].extend(CR_angle)
+    source_dict_CR["raft_type"].extend(CR_raft_type)
+
+    source_dict_CR["test2"] = source_dict_CR["z"]
 
 source_dict = deepcopy(source_dict_fp)
 source = ColumnDataSource(source_dict)
 
-g = Rect(x='x', y='y', width=amp_width, height=amp_length / 2., line_color="black")
+g = Rect(x='x', y='y', width=amp_width, height=amp_length / 2., angle='angle', line_color="black")
 g.fill_color = {'field': 'z', 'transform': color_mapper}
 fp.add_glyph(source, g)
 
 # Step 5: Add tooltips
 hover = fp.select(dict(type=HoverTool))
-hover.tooltips = [("test", "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
+hover.tooltips = [("type", "@raft_type"), ("test", "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
                   ("amp", "@amp")]
 
 fp.title.text = title_run_base + " Full focal plane: " + test_name
@@ -369,8 +599,10 @@ fp.xgrid.grid_line_color = None  # Remove x-grid lines
 fp.ygrid.grid_line_color = None  # Remove y-grid lines
 
 mask = ~np.isnan(source_dict["z"])
-z_u = np.array(source_dict["z"])
-res_h, res_edges = np.histogram(z_u[mask], bins=100)
+z_u = np.array(source_dict["z"])[mask]
+lower, upper = clip_limits(z_u, clip_threshold)
+
+res_h, res_edges = np.histogram(z_u, bins=100, range=(lower, upper))
 vbar_width = np.ones_like(res_h) * (res_edges[1] - res_edges[0])
 
 hist_source = ColumnDataSource(data=dict(top=res_h, x=res_edges[:-1], vbar_width=vbar_width))
@@ -379,19 +611,24 @@ source_static = deepcopy(source_dict)
 p1 = figure(width=640, height=640, title=test_name)
 p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
 
+step = (upper - lower) / 20.
+slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step, title="test value range")
+
+color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
+color_mapper.high = upper * 1.1
+
 # set up the second test histogram
 
-test2_u = np.array(source_dict["test2"])
-t2_res_h, t2_res_edges = np.histogram(test2_u[mask], bins=100)
+test2_u = np.array(source_dict["test2"])[mask]
+lower, upper = clip_limits(test2_u, clip_threshold)
+
+t2_res_h, t2_res_edges = np.histogram(test2_u, bins=100, range=(lower, upper))
 t2_vbar_width = np.ones_like(t2_res_h) * (t2_res_edges[1] - t2_res_edges[0])
 
 t2_hist_source = ColumnDataSource(data=dict(top=t2_res_h, x=t2_res_edges[:-1], t2_vbar_width=vbar_width))
 fp2.vbar(top="top", x="x", width="t2_vbar_width", alpha=0.3, fill_color="red", source=t2_hist_source)
 
 fp2s.scatter(x="z", y="test2", source=source)
-
-step = (max_z - min_z) / 20.
-slider = RangeSlider(start=min_z, end=max_z, value=(min_z, max_z), step=step, title="test value range")
 
 # Create a new list with tuple elements replaced by joined strings - some test names are tuples
 name_list = []
@@ -405,6 +642,8 @@ for elem in tests:
 name_dropdown = Select(title="Pick test", value=test_name, options=name_list)
 second_dropdown = Select(title="Pick second test", value=second_test_name, options=name_list)
 second_dropdown.visible = False
+
+type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
 
 log_div = Div(text="Log:<br>", width=400, height=150)
 
@@ -457,13 +696,22 @@ def tap_callback(event):
     generate_log_message(log_div, f"Selected raft: {raft_value}, ccd: {ccd_value}, amp: {amp_value}")
 
     global current_raft
+    global source_static
+
     if current_raft is None:
         current_raft = raft_value
-        source.data = dict(x=source_dict_raft["x"], y=source_dict_raft["y"], z=source_dict_raft["z"],
-                           ccd=source_dict_raft["ccd"], raft=source_dict_raft["raft"], amp=source_dict_raft["amp"])
+        if do_CR and current_raft in list(CR_layout.keys()):
+            source.data = dict(x=source_dict_CR["x"], y=source_dict_CR["y"], z=source_dict_CR["z"],
+                               ccd=source_dict_CR["ccd"], raft=source_dict_CR["raft"], amp=source_dict_CR["amp"],
+                               angle=source_dict_CR["angle"], raft_type=source_dict_CR["raft_type"])
+            source_static = deepcopy(source_dict_CR)
+        else:
+            source.data = dict(x=source_dict_raft["x"], y=source_dict_raft["y"], z=source_dict_raft["z"],
+                               ccd=source_dict_raft["ccd"], raft=source_dict_raft["raft"], amp=source_dict_raft["amp"],
+                               angle=source_dict_raft["angle"], raft_type=source_dict_raft["raft_type"])
 
-        global source_static
-        source_static = deepcopy(source_dict_raft)
+            source_static = deepcopy(source_dict_raft)
+
         new_test_data = get_new_test(test_name, single_raft=current_raft)
         source.data["z"] = list(new_test_data)
         source_static["z"] = list(new_test_data)
@@ -475,8 +723,10 @@ def tap_callback(event):
     else:
         current_raft = None
         source.data = dict(x=source_dict_fp["x"], y=source_dict_fp["y"], z=source_dict_fp["z"],
-                           ccd=source_dict_fp["ccd"], raft=source_dict_fp["raft"], amp=source_dict_fp["amp"])
+                           ccd=source_dict_fp["ccd"], raft=source_dict_fp["raft"], amp=source_dict_fp["amp"],
+                           angle=source_dict_fp["angle"], raft_type=source_dict_fp["raft_type"])
 
+        source_static = deepcopy(source_dict_fp)
         new_test_data = get_new_test(test_name)
         source.data["z"] = list(new_test_data)
         source_static["z"] = list(new_test_data)
@@ -488,8 +738,13 @@ def tap_callback(event):
         generate_log_message(log_div, "Switched to full fp mode")
 
     lower, upper = slider.value
-    mask = ~np.isnan(new_test_data)
-    new_test_noNan = new_test_data[mask]
+
+    z_u = np.array(source.data["z"])
+    raft_type = np.array(source.data["raft_type"])
+
+    mask = ~np.isnan(z_u)
+
+    new_test_noNan = z_u[mask]
 
     c_lower, c_upper = clip_limits(new_test_noNan, clip_threshold)
 
@@ -511,12 +766,13 @@ def tap_callback(event):
     p1.title.text = test_name
 
     # re histogram 2nd test
-    t2_mask = ~np.isnan(t2_new_test_data)
-    t2_new_noNaN = t2_new_test_data[t2_mask]
+    t2z = np.array(source.data["test2"])
+    t2_mask = ~np.isnan(t2z)
+    t2_new_noNaN = t2z[t2_mask]
 
     t2_lower, t2_upper = clip_limits(t2_new_noNaN, clip_threshold)
 
-    re_histogram(t2_hist_source, "t2_vbar_width", t2_new_noNaN, t2_lower, t2_upper)
+    re_histogram(t2_hist_source, "t2_vbar_width", t2z, t2_lower, t2_upper)
 
     fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
     fp2s.x_range = Range1d(start=c_lower, end=c_upper)
@@ -607,8 +863,8 @@ def update(attr, old, new):
 
         lower = slider.start
         upper = slider.end
-        color_mapper.low = lower
-        color_mapper.high = upper * 1.2
+        color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
+        color_mapper.high = upper * 1.1
 
     if (s and second_test_name != second_name) or new_run:
         generate_log_message(log_div, "getting new second test data: " + second_name)
@@ -621,17 +877,20 @@ def update(attr, old, new):
     x_u = np.array(source_static["x"])
     y_u = np.array(source_static["y"])
     z_u = np.array(source_static["z"])
+    raft_type = np.array(source_static["raft_type"])
     r_u = np.array(source_static["raft"])
     c_u = np.array(source_static["ccd"])
     amp_u = np.array(source_static["amp"])
     test2 = np.array(source_static["test2"])
 
     # Filter the data source based on the range and selected name
-    pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
-    mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
-    #new_data = dict(x=x_u[mask], y=y_u[mask],
-    #                z=z_u[mask], raft=r_u[mask],
-    #                ccd=c_u[mask], amp=amp_u[mask])
+    if type_dropdown.value != "all":
+        pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u)) & (raft_type == type_dropdown.value)
+        mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
+    else:
+        pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
+        mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
+
     z_u[mask] = lower / 10.
     source.data["z"] = z_u
     source.data["test2"] = source_static["test2"]
@@ -691,9 +950,10 @@ name_dropdown.on_change('value', update)
 second_dropdown.on_change('value', update)
 run_text_box.on_change('value', update)
 clip_select.on_change('value', update)
+type_dropdown.on_change('value', update)
 
 #output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
-l = layout(exit_button, row( column(run_text_box, clip_select), name_dropdown, slider,
+l = layout(exit_button, row( type_dropdown, column(run_text_box, clip_select), name_dropdown, slider,
                              column(st_div, second_toggle),
                              second_dropdown, log_div),
            row(fp, column(p1, fp2s, fp2)))
