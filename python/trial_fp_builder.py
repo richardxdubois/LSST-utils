@@ -35,6 +35,8 @@ with open(args.app_config, "r") as f:
 
 data_dir = data["data_dir"]
 in_file = data_dir + data["in_file_name"]
+guard_value = data["guard_value"]
+
 try:
     do_CR = data["do_CR"]
 except KeyError:
@@ -49,8 +51,7 @@ message_log = []
 
 def clip_limits(test, threshold):
 
-    """
-    mask = ~np.isnan(test)
+    mask = (~np.isnan(test)) & (test != guard_value)
     median = np.median(test[mask])
     std = np.std(test[mask])
 
@@ -71,11 +72,12 @@ def clip_limits(test, threshold):
     upper = Q3 + 1.5 * IQR
 
     lower = max(min(test), lower)
-    """
+    
     if abs(lower) < 0.01 and lower < 0:
         lower = 0.
-    """
+    
     upper = min(max(test), upper)
+    """
 
     return lower, upper
 
@@ -316,7 +318,7 @@ def get_CR_test(raft):
     try:
         results = np.array(list(test_data[raft_ccd].values()))[::-1]
     except:
-        results = np.ones(16) * -1000.
+        results = np.ones(16) * guard_value
 
     signal = np.zeros((2, 8))
     signal[1, :] = results[8:16][::-1]
