@@ -48,6 +48,16 @@ serial_numbers_pkl = data_dir + data["serial_numbers_pkl"]
 
 message_log = []
 
+log_div = Div(text="Log:<br>", width=400, height=150)
+def generate_log_message(log_div, message):
+    message_log.append(message)
+
+    if len(message_log) > 5:
+        message_log.pop(0)
+
+    log_div.text = "Log: <br>" + "<br>".join(message_log)
+    curdoc().add_next_tick_callback(lambda: None)
+
 
 def clip_limits(test, threshold):
 
@@ -57,6 +67,9 @@ def clip_limits(test, threshold):
 
     lower = max(min(test), median - threshold * std)
     upper = min(max(test), median + threshold * std)
+
+    generate_log_message(log_div, "Clipping median " + str(median) + " std " + str(std) + " thrsh " +
+                         str(clip_threshold))
 
     """
 
@@ -117,22 +130,52 @@ def slider_format(lower, upper):
     return r_lower, r_upper
 
 
+def extract_signal_data(test_data, raft_ccd, angle, raft_ccd2=None):
+    r, c = raft_ccd.split("_")
+
+    try:
+        results = np.array(list(test_data[raft_ccd].values()))[::-1]
+    except:
+        results = np.ones(16) * guard_value
+
+    if angle == 0.:
+        signal = np.zeros((2, 8))
+        signal[1, :] = results[8:16][::-1]
+        signal[0, :] = results[0:8]
+    else:
+        signal = np.zeros((8, 2))
+        signal[:, 1] = results[8:16][::-1]
+        signal[:, 0] = results[0:8]
+
+    return signal.flatten()
+
+
+def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
+    r, c = raft_ccd.split("_")
+
+    try:
+        results = np.array(list(test_data[raft_ccd].keys()))[::-1]
+    except:
+        results = np.full(16) * c
+
+    if angle == 0.:
+        amps = np.zeros((2, 8))
+        amps[1, :] = results[8:16][::-1]
+        amps[0, :] = results[0:8]
+    else:
+        amps = np.zeros((8, 2))
+        amps[:, 1] = results[8:16][::-1]
+        amps[:, 0] = results[0:8]
+
+    return amps.flatten()
+
+
 def re_histogram(cds, width_name, test, lower, upper):
 
     t_hist, t_edges = np.histogram(test, bins=100, range=(lower, upper))
     width = t_edges[1] - t_edges[0]
     t_vbar_width = np.ones_like(t_hist) * width
     cds.data = {"top": t_hist, "x": t_edges[:-1], width_name: t_vbar_width}
-
-
-def generate_log_message(log_div, message):
-    message_log.append(message)
-
-    if len(message_log) > 5:
-        message_log.pop(0)
-
-    log_div.text = "Log: <br>" + "<br>".join(message_log)
-    curdoc().add_next_tick_callback(lambda: None)
 
 
 p = None
@@ -315,6 +358,7 @@ def get_CR_test(raft):
     amp_names = np.empty(0)
 
     raft_ccd = raft + "_SG1"
+    """
     try:
         results = np.array(list(test_data[raft_ccd].values()))[::-1]
     except:
@@ -324,8 +368,12 @@ def get_CR_test(raft):
     signal[1, :] = results[8:16][::-1]
     signal[0, :] = results[0:8]
     z_flat = signal.flatten()
+    """
+    z_flat = extract_signal_data(test_data, raft_ccd, 0)
+
     new_test = np.append(new_test, z_flat)
 
+    """
     try:
         amp_n = np.array(list(test_data[raft_ccd].keys()))[::-1]
     except:
@@ -336,6 +384,8 @@ def get_CR_test(raft):
     amp_n_shaped[0, :] = amp_n[0:8]
     amp_n_flat = amp_n_shaped.flatten()
     amp_names = np.append(amp_names, amp_n_flat)
+    """
+    amp_names = extract_signal_data(test_data, raft_ccd, 0)
 
     signal = np.zeros((2, 8))
     SW1 = raft + "_SW1"
@@ -502,11 +552,15 @@ for rg in raft_groups:
         for cd in ccd_groups:
             for c in cd:
                 raft_ccd = r + "_" + c
+                """
                 results = np.array(list(test_data[raft_ccd].values()))[::-1]
                 signal = np.zeros((2, 8))
                 signal[1, :] = results[8:16][::-1]
-                signal[0, :] = results[0:8]
+                signal[0, :] = results[0:8]       
                 z_flat = signal.flatten()
+                """
+                z_flat = extract_signal_data(test_data, raft_ccd, 0.)
+
                 raft = np.full(len(z_flat), r)
                 ccd = np.full(len(z_flat), c)
                 angle = np.zeros(len(z_flat))
@@ -674,8 +728,6 @@ second_dropdown = Select(title="Pick second test", value=second_test_name, optio
 second_dropdown.visible = False
 
 type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
-
-log_div = Div(text="Log:<br>", width=400, height=150)
 
 run_text_box = TextInput(title="Pick run", value="None")
 if not DM_stack:
@@ -940,12 +992,15 @@ def update(attr, old, new):
     # Filter the data
     clipped_data = new_zu[t_mask]
 
-    re_histogram(hist_source, "vbar_width", clipped_data, t_lower, t_upper)
+    generate_log_message(log_div, "regenerated histogram: " + test_name)
 
+    re_histogram(hist_source, "vbar_width", clipped_data, t_lower, t_upper)
+    """
     hist, edges = np.histogram(new_zu, bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
     vbar_width = np.ones_like(hist) * width
     hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
+    """
 
     p1.title.text = test_name
 
@@ -963,6 +1018,7 @@ def update(attr, old, new):
     # Filter the data
     clipped_data = t2_new_zu[mask]
 
+    generate_log_message(log_div, "regenerated histogram: " + second_name)
     re_histogram(t2_hist_source, "t2_vbar_width", clipped_data, t2_lower, t2_upper)
 
     fp2.title.text = second_test_name
