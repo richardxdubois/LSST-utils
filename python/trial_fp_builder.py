@@ -654,6 +654,9 @@ view_E2V = CDSView(filter=BooleanFilter([True if t == "E2V" else False for t in 
 fp2s.scatter(x="z", y="test2", source=source, view=view_ITL, color="blue", legend_label="ITL")
 fp2s.scatter(x="z", y="test2", source=source, view=view_E2V, color="red", legend_label="E2V")
 
+hover_s = fp2s.select(dict(type=HoverTool))
+hover_s.tooltips = [("type", "@raft_type"), ("test", "@z"), ("test2", "@test2"),
+                    ("ccd", "@ccd"), ("raft", "@raft"), ("amp", "@amp")]
 
 # Create a new list with tuple elements replaced by joined strings - some test names are tuples
 name_list = []
