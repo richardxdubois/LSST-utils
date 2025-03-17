@@ -68,8 +68,7 @@ def clip_limits(test, threshold):
     lower = max(min(test), median - threshold * std)
     upper = min(max(test), median + threshold * std)
 
-    generate_log_message(log_div, "Clipping median " + str(median) + " std " + str(std) + " thrsh " +
-                         str(clip_threshold))
+    generate_log_message(log_div, f"Clipping median {median:.2f} std + {std:.2f} thrsh {clip_threshold:.2f}")
 
     """
 
