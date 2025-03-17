@@ -15,7 +15,7 @@ except ImportError:
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import DatetimeTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
-                          TextInput, TapTool, RadioButtonGroup, Range1d)
+                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -628,7 +628,14 @@ t2_vbar_width = np.ones_like(t2_res_h) * (t2_res_edges[1] - t2_res_edges[0])
 t2_hist_source = ColumnDataSource(data=dict(top=t2_res_h, x=t2_res_edges[:-1], t2_vbar_width=vbar_width))
 fp2.vbar(top="top", x="x", width="t2_vbar_width", alpha=0.3, fill_color="red", source=t2_hist_source)
 
-fp2s.scatter(x="z", y="test2", source=source)
+raft_type = np.array(source_dict["raft_type"])
+view_ITL = CDSView(filter=BooleanFilter([True if t == "ITL" else False for t in raft_type]))
+view_E2V = CDSView(filter=BooleanFilter([True if t == "E2V" else False for t in raft_type]))
+
+
+fp2s.scatter(x="z", y="test2", source=source, view=view_ITL, color="blue", legend_label="ITL")
+fp2s.scatter(x="z", y="test2", source=source, view=view_E2V, color="red", legend_label="E2V")
+
 
 # Create a new list with tuple elements replaced by joined strings - some test names are tuples
 name_list = []
@@ -811,7 +818,6 @@ second_toggle.on_change("active", second_callback)
 # Define callback to update the data
 def update(attr, old, new):
     # Get the new range from the slider
-    lower, upper = slider.value
     selected_name = name_dropdown.value
     second_name = second_dropdown.value
     selected_run = run_text_box.value
@@ -844,13 +850,14 @@ def update(attr, old, new):
             title_run_base = test_run
             new_run = True
         else:
-            generate_log_message(log_div, "DM stack or EO code unavailble. Request ignored: " + selected_run)
+            generate_log_message(log_div, "DM stack or EO code unavailable. Request ignored: " + selected_run)
             return
 
     if (d and selected_name != test_name) or new_run:
         generate_log_message(log_div,"getting new test data: " + selected_name)
         new_test_data = get_new_test(selected_name, current_raft)
         source_static["z"] = list(new_test_data)
+        source.data["z"] = list(new_test_data)
 
         if not new_run:
             test_name = selected_name
@@ -874,14 +881,10 @@ def update(attr, old, new):
         if not new_run:
             second_test_name = second_name
 
-    x_u = np.array(source_static["x"])
-    y_u = np.array(source_static["y"])
+    lower, upper = slider.value
+
     z_u = np.array(source_static["z"])
     raft_type = np.array(source_static["raft_type"])
-    r_u = np.array(source_static["raft"])
-    c_u = np.array(source_static["ccd"])
-    amp_u = np.array(source_static["amp"])
-    test2 = np.array(source_static["test2"])
 
     # Filter the data source based on the range and selected name
     if type_dropdown.value != "all":
