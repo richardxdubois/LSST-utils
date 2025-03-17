@@ -13,7 +13,7 @@ except ImportError:
     DM_stack = False
 
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
-from bokeh.models.formatters import DatetimeTickFormatter
+from bokeh.models.formatters import PrintfTickFormatter, BasicTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
                           TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
@@ -345,28 +345,6 @@ def get_CR_test(raft):
 
     return new_test, amp_names
 
-"""
-def make_ccd(x_offset, y_offset, raft_id, ccd_id, test_results):
-
-    signal = np.zeros((2, 8))
-    signal[1, :] = test_results[8:16][::-1]
-    signal[0, :] = test_results[0:8]
-    z_flat = signal.flatten()
-    raft = np.full(len(z_flat), raft_id)
-    ccd = np.full(len(z_flat), ccd_id)
-
-    source = ColumnDataSource(data=dict(x=x_flat+x_offset, y=y_flat+y_offset, z=z_flat, ccd=ccd,
-                                        raft=raft, amp=amp_names_flat))
-    g = Rect(x='x', y='y', width=amp_width, height=amp_length/2., line_color="black")
-
-    # Step 5: Add tooltips
-    hover = fp.select(dict(type=HoverTool))
-    hover.tooltips = [(test_name, "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
-                      ("amp", "@amp")]
-
-    return source, g
-"""
-
 
 def get_new_test(test_name, single_raft=None):
     t_name = test_name
@@ -612,7 +590,8 @@ p1 = figure(width=640, height=640, title=test_name)
 p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
 
 step = (upper - lower) / 20.
-slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step, title="test value range")
+slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step,
+                     format=BasicTickFormatter(), title="test value range")
 
 color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
 color_mapper.high = upper * 1.1
@@ -863,27 +842,34 @@ def update(attr, old, new):
             test_name = selected_name
         generate_log_message(log_div,"updating sliders for : " + selected_name)
 
+        """
         slider.remove_on_change('value_throttled', update)
-        slider.start, slider.end = clip_limits(new_test_data, clip_threshold)
+        
         slider.value = (slider.start, slider.end)
         slider.on_change('value_throttled', update)
+        if abs(slider.start) < 0.1:
+            slider.format = PrintfTickFormatter(format="%1.2e")
+        else:
+            slider.format = BasicTickFormatter()
 
         lower = slider.start
         upper = slider.end
         color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
         color_mapper.high = upper * 1.1
+        """
 
     if (s and second_test_name != second_name) or new_run:
         generate_log_message(log_div, "getting new second test data: " + second_name)
         t2_new_test_data = get_new_test(second_name, current_raft)
         source_static["test2"] = list(t2_new_test_data)
+        source.data["test2"] = source_static["test2"]
 
         if not new_run:
             second_test_name = second_name
 
-    lower, upper = slider.value
-
     z_u = np.array(source_static["z"])
+    lower, upper = clip_limits(z_u, clip_threshold)
+
     raft_type = np.array(source_static["raft_type"])
 
     # Filter the data source based on the range and selected name
@@ -894,18 +880,54 @@ def update(attr, old, new):
         pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
         mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
 
-    z_u[mask] = lower / 10.
-    source.data["z"] = z_u
-    source.data["test2"] = source_static["test2"]
+    #z_u[mask] = lower / 10.
+    #source.data["z"] = z_u
     #source.data = new_data
 
-
+    """
     # Update the histogram
     #new_zu = np.array(new_data["z"])
     generate_log_message(log_div, "about to remake histogram")
 
-    new_zu = np.array(source.data["z"])
-    re_histogram(hist_source, "vbar_width", new_zu, lower, upper)
+    # Create a mask for elements within the threshold
+    z_u_p = z_u[pos_mask]
+    c_lower, c_upper = clip_limits(z_u_p, clip_threshold)
+
+    c_mask = (z_u_p > c_lower) & (z_u_p < c_upper)
+
+    new_zu = z_u_p[c_mask]
+    """
+
+    new_zu = np.array(source.data["z"])[pos_mask]
+    t_mask = ~np.isnan(new_zu)
+
+    t_lower, t_upper = clip_limits(new_zu[t_mask], clip_threshold)
+
+    # Create a mask for elements within the threshold
+    t_mask = (new_zu > t_lower) & (new_zu < t_upper)
+
+    # Filter the data
+    clipped_data = new_zu[t_mask]
+
+    re_histogram(hist_source, "vbar_width", clipped_data, t_lower, t_upper)
+
+    z_u[mask] = lower / 10.
+    source.data["z"] = z_u
+
+    slider.remove_on_change('value_throttled', update)
+    slider.start, slider.end = (t_lower, t_upper)
+    slider.value = (slider.start, slider.end)
+    slider.on_change('value_throttled', update)
+    if abs(slider.start) < 0.1:
+        slider.format = PrintfTickFormatter(format="%1.2e")
+    else:
+        slider.format = BasicTickFormatter()
+
+    lower = slider.start
+    upper = slider.end
+    color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
+    color_mapper.high = upper * 1.1
+
     """
     hist, edges = np.histogram(new_zu, bins=100, range=(lower, upper))
     width = edges[1] - edges[0]
@@ -919,10 +941,6 @@ def update(attr, old, new):
 
     t2_new_zu = np.array(source.data["test2"])[pos_mask]
     t2_mask = ~np.isnan(t2_new_zu)
-    #hist, edges = np.histogram(new_zu, bins=100)
-
-    mean = np.mean(t2_new_zu[t2_mask])
-    std = np.std(t2_new_zu[t2_mask])
 
     t2_lower, t2_upper = clip_limits(t2_new_zu[t2_mask], clip_threshold)
 
