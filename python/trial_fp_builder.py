@@ -206,12 +206,16 @@ def re_histogram(cds, width_name, test, lower, upper):
 
 p = None
 
+# get the cached pickle file of amp results
+
 with open(in_file, 'rb') as f:
     p = pickle.load(f)
 
 tests = list(p.keys())
 test_name = tests[11]
 second_test_name = test_name
+
+# get the radt, CCD serial number etc (from Seth Digel).
 
 with open(serial_numbers_pkl, 'rb') as sn:
     serial_numbers = pickle.load(sn)
@@ -224,6 +228,8 @@ test_run = None
 
 print(tests)
 
+# start with ptc_gains to get going
+
 test_data = p[test_name]
 gains = np.array(list(itertools.chain.from_iterable(amplifier.values()
                                                     for amplifier in test_data.values())))
@@ -231,14 +237,8 @@ filtered_gains = gains[~np.isnan(gains)]
 min_z = min(filtered_gains)
 max_z = max(filtered_gains)
 
+# get the list of amp names
 amp_names_flat = extract_amp_names(test_data, raft_ccd="R01_S00", angle=0., raft_ccd2=None)
-"""
-amp_names = np.array(list(test_data["R01_S00"].keys()))[::-1]
-amp_names_shaped = np.empty((2,8), dtype=object)
-amp_names_shaped[1, :] = amp_names[8:16][::-1]
-amp_names_shaped[0, :] = amp_names[0:8]
-amp_names_flat = amp_names_shaped.flatten()
-"""
 
 # CCD defined as 1 unit. 8 amps per half, so each is 1/8=0.125 wide and 0.5 high.
 # rafts are 3 CCDs wide and tall, hence 3 units.
@@ -250,12 +250,17 @@ amps = 2
 
 current_raft = None
 
+# define whitespace around the rafts and CCDs
+
 raft_border = 0.2
 ccd_border = 0.05
 
+# placeholder figures
+
 fp = figure(height=1000, width=1000, title="Focal plane", tools="pan,wheel_zoom,box_zoom,lasso_select,reset,save,hover")
 
-# placeholder figures
+p1 = figure(width=640, height=640, title=test_name)
+
 fp2 = figure(height=320, width=640, title="2nd test", tools="pan,wheel_zoom,box_zoom,reset,save,hover")
 fp2.visible = False
 
@@ -630,7 +635,6 @@ slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step,
 color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
 color_mapper.high = upper * 1.1
 
-p1 = figure(width=640, height=640, title=test_name)
 p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source)
 
 # secondary test heatmaps and histogram content
@@ -929,6 +933,7 @@ def update(attr, old, new):
 
     generate_log_message(log_div, "Ready")
 
+
 # Attach the callback to the slider and dropdown
 slider.on_change('value_throttled', update)
 name_dropdown.on_change('value', update)
@@ -937,12 +942,10 @@ run_text_box.on_change('value', update)
 clip_select.on_change('value', update)
 type_dropdown.on_change('value', update)
 
-#output_file("/Volumes/Data/Rubin/camera/trial_fp_builder.html")
 l = layout(exit_button, row( type_dropdown, column(run_text_box, clip_select), name_dropdown, slider,
                              column(st_div, second_toggle),
                              second_dropdown, log_div),
            row(fp, column(p1, fp2s, fp2)))
-#save(l, title="trial focal plane")
 
 # Add the layout to the current document
 curdoc().add_root(l)
