@@ -59,6 +59,9 @@ def generate_log_message(log_div, message):
     curdoc().add_next_tick_callback(lambda: None)
 
 
+type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
+
+
 def clip_limits(test, threshold):
 
     mask = (~np.isnan(test)) & (test != guard_value)
@@ -92,6 +95,41 @@ def clip_limits(test, threshold):
     """
 
     return lower, upper
+
+
+def do_test_stuff(t_source, h_source, t_test_name, use_slider=True, mask_in=None):
+
+    z_u = np.array(source_static[t_test_name])
+    raft_type = np.array(source.data["raft_type"])
+
+    if use_slider:
+        lower, upper = slider.value
+    else:
+        lower, upper = clip_limits(z_u, clip_threshold)
+
+    if mask_in is None:
+        # mask is channels failing cuts. Set them to a guard value.
+        if type_dropdown.value != "all":
+            mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
+        else:
+            mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
+    else:
+        # take mask from main test (probably)
+        mask = mask_in
+
+    z_u[mask] = guard_value
+    t_source.data[t_test_name] = z_u
+
+    t_mask = (lower <= z_u) & (z_u <= upper)
+
+    if t_test_name == "test2":
+        width_name = "t2_vbar_width"
+    else:
+        width_name = "vbar_width"
+
+    re_histogram(h_source, width_name, z_u[t_mask], lower, upper)
+
+    return lower, upper, mask
 
 
 def slider_format(lower, upper):
@@ -670,18 +708,11 @@ fp.yaxis.visible = False  # Hide y-axis
 fp.xgrid.grid_line_color = None  # Remove x-grid lines
 fp.ygrid.grid_line_color = None  # Remove y-grid lines
 
-mask = ~np.isnan(source_dict["z"])
-z_u = np.array(source_dict["z"])[mask]
-lower, upper = clip_limits(z_u, clip_threshold)
-
-res_h, res_edges = np.histogram(z_u, bins=100, range=(lower, upper))
-vbar_width = np.ones_like(res_h) * (res_edges[1] - res_edges[0])
-
-hist_source = ColumnDataSource(data=dict(top=res_h, x=res_edges[:-1], vbar_width=vbar_width))
+hist_source = ColumnDataSource(data=dict(top=[], x=[], vbar_width=[]))
 source_static = deepcopy(source_dict)
 
-p1 = figure(width=640, height=640, title=test_name)
-p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
+lower, upper, mask = do_test_stuff(t_source=source, h_source=hist_source, t_test_name="z", use_slider=False,
+                                   mask_in=None)
 
 step = (upper - lower) / 20.
 slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step,
@@ -690,15 +721,18 @@ slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step,
 color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
 color_mapper.high = upper * 1.1
 
+
+p1 = figure(width=640, height=640, title=test_name)
+p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
+
 # set up the second test histogram
 
-test2_u = np.array(source_dict["test2"])[mask]
-lower, upper = clip_limits(test2_u, clip_threshold)
+t2_hist_source = ColumnDataSource(data=dict(top=[], x=[], t2_vbar_width=[]))
 
-t2_res_h, t2_res_edges = np.histogram(test2_u, bins=100, range=(lower, upper))
-t2_vbar_width = np.ones_like(t2_res_h) * (t2_res_edges[1] - t2_res_edges[0])
+t_lower, t_upper, _ = do_test_stuff(t_source=source, h_source=t2_hist_source, t_test_name="z", use_slider=False,
+                                    mask_in=mask)
 
-t2_hist_source = ColumnDataSource(data=dict(top=t2_res_h, x=t2_res_edges[:-1], t2_vbar_width=vbar_width))
+
 fp2.vbar(top="top", x="x", width="t2_vbar_width", alpha=0.3, fill_color="red", source=t2_hist_source)
 
 raft_type = np.array(source_dict["raft_type"])
@@ -708,6 +742,9 @@ view_E2V = CDSView(filter=BooleanFilter([True if t == "E2V" else False for t in 
 
 fp2s.scatter(x="z", y="test2", source=source, view=view_ITL, color="blue", legend_label="ITL")
 fp2s.scatter(x="z", y="test2", source=source, view=view_E2V, color="red", legend_label="E2V")
+
+fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
+fp2s.x_range = Range1d(start=lower, end=upper)
 
 hover_s = fp2s.select(dict(type=HoverTool))
 hover_s.tooltips = [("type", "@raft_type"), ("test", "@z"), ("test2", "@test2"),
@@ -725,8 +762,6 @@ for elem in tests:
 name_dropdown = Select(title="Pick test", value=test_name, options=name_list)
 second_dropdown = Select(title="Pick second test", value=second_test_name, options=name_list)
 second_dropdown.visible = False
-
-type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
 
 run_text_box = TextInput(title="Pick run", value="None")
 if not DM_stack:
@@ -776,39 +811,6 @@ def update_slider(lower, upper):
     color_mapper.high = upper * 1.1
 
 
-def do_test_stuff(t_source, h_source, t_test_name, use_slider=True, mask_in=None):
-
-    z_u = np.array(source_static[t_test_name])
-    raft_type = np.array(source.data["raft_type"])
-
-    if use_slider:
-        lower, upper = slider.value
-    else:
-        lower, upper = clip_limits(z_u, clip_threshold)
-
-    if mask_in is None:
-        # mask is channels failing cuts. Set them to a guard value.
-        if type_dropdown.value != "all":
-            mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
-        else:
-            mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
-    else:
-        # take mask from main test (probably)
-        mask = mask_in
-
-    z_u[mask] = guard_value
-    t_source.data[t_test_name] = z_u
-
-    t_mask = (lower <= z_u) & (z_u <= upper)
-
-    if t_test_name == "test2":
-        width_name = "t2_vbar_width"
-    else:
-        width_name = "vbar_width"
-
-    re_histogram(h_source, width_name, z_u[t_mask], lower, upper)
-
-    return lower, upper, mask
 
 
 # Define a callback function for TapTool
