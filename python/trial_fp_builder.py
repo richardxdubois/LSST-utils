@@ -49,6 +49,8 @@ serial_numbers_pkl = data_dir + data["serial_numbers_pkl"]
 message_log = []
 
 log_div = Div(text="Log:<br>", width=400, height=150)
+
+
 def generate_log_message(log_div, message):
     message_log.append(message)
 
@@ -72,27 +74,6 @@ def clip_limits(test, threshold):
     upper = min(max(test), median + threshold * std)
 
     generate_log_message(log_div, f"Clipping median {median:.2f} std + {std:.2f} thrsh {clip_threshold:.2f}")
-
-    """
-
-    # Calculate Q1 (25th percentile) and Q3 (75th percentile)
-    Q1 = np.percentile(test, 25)
-    Q3 = np.percentile(test, 75)
-
-    # Calculate the IQR
-    IQR = Q3 - Q1
-
-    # Define outlier bounds
-    lower = Q1 - 1.5 * IQR
-    upper = Q3 + 1.5 * IQR
-
-    lower = max(min(test), lower)
-    
-    if abs(lower) < 0.01 and lower < 0:
-        lower = 0.
-    
-    upper = min(max(test), upper)
-    """
 
     return lower, upper
 
@@ -142,10 +123,18 @@ def slider_format(lower, upper):
         t_upper = np.log(upper)
         step = t_upper - t_lower
 
-        slider.remove_on_change('value_throttled', update)
+        try:
+            slider.remove_on_change('value_throttled', update)
+        except:
+            pass
+
         slider.start, slider.end = (t_lower, t_upper)
         slider.value = (slider.start, slider.end)
-        slider.on_change('value_throttled', update)
+        try:
+            slider.on_change('value_throttled', update)
+        except:
+            pass
+
         slider.format = CustomJSTickFormatter(code="return Math.exp(tick).toFixed(2)")
         slider.step = step
         r_lower = np.exp(t_lower)
@@ -196,11 +185,11 @@ def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
         results = np.full(16) * c
 
     if angle == 0.:
-        amps = np.zeros((2, 8))
+        amps = np.full((2, 8), "")
         amps[1, :] = results[8:16][::-1]
         amps[0, :] = results[0:8]
     else:
-        amps = np.zeros((8, 2))
+        amps = np.full((8, 2), "")
         amps[:, 1] = results[8:16][::-1]
         amps[:, 0] = results[0:8]
 
@@ -237,14 +226,19 @@ print(tests)
 
 test_data = p[test_name]
 gains = np.array(list(itertools.chain.from_iterable(amplifier.values()
-                                           for amplifier in test_data.values())))
+                                                    for amplifier in test_data.values())))
 filtered_gains = gains[~np.isnan(gains)]
+min_z = min(filtered_gains)
+max_z = max(filtered_gains)
 
+amp_names_flat = extract_amp_names(test_data, raft_ccd="R01_S00", angle=0., raft_ccd2=None)
+"""
 amp_names = np.array(list(test_data["R01_S00"].keys()))[::-1]
 amp_names_shaped = np.empty((2,8), dtype=object)
 amp_names_shaped[1, :] = amp_names[8:16][::-1]
 amp_names_shaped[0, :] = amp_names[0:8]
 amp_names_flat = amp_names_shaped.flatten()
+"""
 
 # CCD defined as 1 unit. 8 amps per half, so each is 1/8=0.125 wide and 0.5 high.
 # rafts are 3 CCDs wide and tall, hence 3 units.
@@ -279,10 +273,6 @@ x_flat = xg.flatten()
 y_flat = yg.flatten()
 xr_flat = xr.flatten()
 yr_flat = yr.flatten()
-
-
-min_z = min(filtered_gains)
-max_z = max(filtered_gains)
 
 raft_groups = [["R00", "R01", "R02", "R03", "R04"],
               ["R10", "R11", "R12", "R13", "R14"],
@@ -395,33 +385,11 @@ def get_CR_test(raft):
     amp_names = np.empty(0)
 
     raft_ccd = raft + "_SG1"
-    """
-    try:
-        results = np.array(list(test_data[raft_ccd].values()))[::-1]
-    except:
-        results = np.ones(16) * guard_value
 
-    signal = np.zeros((2, 8))
-    signal[1, :] = results[8:16][::-1]
-    signal[0, :] = results[0:8]
-    z_flat = signal.flatten()
-    """
     z_flat = extract_signal_data(test_data, raft_ccd, 0)
 
     new_test = np.append(new_test, z_flat)
 
-    """
-    try:
-        amp_n = np.array(list(test_data[raft_ccd].keys()))[::-1]
-    except:
-        amp_n = np.full(16, "SG1")
-
-    amp_n_shaped = np.empty((2, 8), dtype=object)
-    amp_n_shaped[1, :] = amp_n[8:16][::-1]
-    amp_n_shaped[0, :] = amp_n[0:8]
-    amp_n_flat = amp_n_shaped.flatten()
-    amp_names = np.append(amp_names, amp_n_flat)
-    """
     amp_names = extract_signal_data(test_data, raft_ccd, 0)
 
     signal = np.zeros((2, 8))
@@ -495,24 +463,11 @@ def get_new_test(test_name, single_raft=None):
                     R00_test, _ = get_CR_test(r)
                     new_test = np.append(new_test, R00_test)
                 continue
-            """
-            if "R40" in r:
-               continue
-            if "R04" in r:
-                continue
-            if "R44" in r:
-                continue
-            """
 
-           # print(r, raft_offset_x, raft_offset_y)
             for cd in ccd_groups:
                 for c in cd:
                     raft_ccd = r + "_" + c
-                    results = np.array(list(test_data[raft_ccd].values()))[::-1]
-                    signal = np.zeros((2, 8))
-                    signal[1, :] = results[8:16][::-1]
-                    signal[0, :] = results[0:8]
-                    z_flat = signal.flatten()
+                    z_flat = extract_signal_data(test_data, raft_ccd, 0., raft_ccd2=None)
 
                     new_test = np.append(new_test, z_flat)
 
@@ -535,6 +490,34 @@ def get_new_run(run_name):
     return amp_data
 
 
+def make_ccd_grid(r, dict_choice):
+    for cd in ccd_groups:
+        for c in cd:
+            raft_ccd = r + "_" + c
+
+            z_flat = extract_signal_data(test_data, raft_ccd, 0.)
+
+            raft = np.full(len(z_flat), r)
+            ccd = np.full(len(z_flat), c)
+            angle = np.zeros(len(z_flat))
+            raft_type = np.full(len(z_flat), serial_numbers[r]["type"])
+
+            x_offset = start_raft[r][0] + start_ccd[c][0]
+            y_offset = start_raft[r][1] + start_ccd[c][1]
+
+            x_new = x_flat + x_offset
+            y_new = y_flat + y_offset
+
+            dict_choice["x"].extend(x_new)
+            dict_choice["y"].extend(y_new)
+            dict_choice["z"].extend(z_flat)
+            dict_choice["ccd"].extend(ccd)
+            dict_choice["raft"].extend(raft)
+            dict_choice["amp"].extend(amp_names_flat)
+            dict_choice["angle"].extend(angle)
+            dict_choice["raft_type"].extend(raft_type)
+
+
 # Add a color bar
 
 color_mapper = LinearColorMapper(palette="Inferno256", low=min_z, high=max_z)
@@ -547,6 +530,8 @@ raft_offset_y = 0
 
 y_scale = 3
 x_scale = 3
+
+# set up full focal plane
 
 source_dict_fp = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
@@ -569,107 +554,22 @@ for rg in raft_groups:
                 source_dict_fp["raft_type"].extend(CR_raft_type)
 
             continue
-        """
-        if "R40" in r:
-            raft_offset_x = x_scale * amp_length
-            #raft_offset_y += y_scale * amp_length
-            continue
-        if "R04" in r:
-            raft_offset_x = 0
-            #raft_offset_y = y_scale * amp_length
-            continue
-        if "R44" in r:
-            continue
-        """
 
-        ccd_offset_x = 0
-        ccd_offset_y = 0
-
-        #print(r, raft_offset_x, raft_offset_y)
-        for cd in ccd_groups:
-            for c in cd:
-                raft_ccd = r + "_" + c
-                """
-                results = np.array(list(test_data[raft_ccd].values()))[::-1]
-                signal = np.zeros((2, 8))
-                signal[1, :] = results[8:16][::-1]
-                signal[0, :] = results[0:8]       
-                z_flat = signal.flatten()
-                """
-                z_flat = extract_signal_data(test_data, raft_ccd, 0.)
-
-                raft = np.full(len(z_flat), r)
-                ccd = np.full(len(z_flat), c)
-                angle = np.zeros(len(z_flat))
-                raft_type = np.full(len(z_flat), serial_numbers[r]["type"])
-
-                #x_offset = ccd_offset_x + raft_offset_x
-                #y_offset = ccd_offset_y + raft_offset_y
-
-                x_offset = start_raft[r][0] + start_ccd[c][0]
-                y_offset = start_raft[r][1] + start_ccd[c][1]
-                #source, g = make_ccd(x_offset=x_offset, y_offset=y_offset, raft_id=r, ccd_id=c,
-                #                     test_results=results)
-                #g.fill_color = {'field': 'z', 'transform': color_mapper}
-                #fp.add_glyph(source, g)
-
-                x_new = x_flat + x_offset
-                y_new = y_flat + y_offset
-
-                source_dict_fp["x"].extend(x_new)
-                source_dict_fp["y"].extend(y_new)
-                source_dict_fp["z"].extend(z_flat)
-                source_dict_fp["ccd"].extend(ccd)
-                source_dict_fp["raft"].extend(raft)
-                source_dict_fp["amp"].extend(amp_names_flat)
-                source_dict_fp["angle"].extend(angle)
-                source_dict_fp["raft_type"].extend(raft_type)
-
-                ccd_offset_x += amp_length
-            ccd_offset_y += amp_length
-            ccd_offset_x = 0
-
-        raft_offset_x += y_scale * amp_length
-
-    raft_offset_x = 0
-    raft_offset_y += y_scale * amp_length
+        rc = make_ccd_grid(r, source_dict_fp)
 
 source_dict_fp["test2"] = source_dict_fp["z"]
 
+# set up main focal plane single raft
+
 source_dict_raft = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
-r = "R01"
-for cd in ccd_groups:
-    for c in cd:
-        raft_ccd = r + "_" + c
-        results = np.array(list(test_data[raft_ccd].values()))[::-1]
-        signal = np.zeros((2, 8))
-        signal[1, :] = results[8:16][::-1]
-        signal[0, :] = results[0:8]
-        z_flat = signal.flatten()
-        raft = np.full(len(z_flat), r)
-        ccd = np.full(len(z_flat), c)
-        angle = np.zeros(len(z_flat))
-        raft_type = np.full(len(z_flat), serial_numbers[r]["type"])
-
-        x_offset = start_raft[r][0] + start_ccd[c][0]
-        y_offset = start_raft[r][1] + start_ccd[c][1]
-
-        x_new = x_flat + x_offset
-        y_new = y_flat + y_offset
-
-        source_dict_raft["x"].extend(x_new)
-        source_dict_raft["y"].extend(y_new)
-        source_dict_raft["z"].extend(z_flat)
-        source_dict_raft["ccd"].extend(ccd)
-        source_dict_raft["raft"].extend(raft)
-        source_dict_raft["amp"].extend(amp_names_flat)
-        source_dict_raft["angle"].extend(angle)
-        source_dict_raft["raft_type"].extend(raft_type)
+rc = make_ccd_grid("R01", source_dict_raft)
 
 source_dict_raft["test2"] = source_dict_raft["z"]
 
 if do_CR:
+    # set up single corner raft
+
     r = "R00"
     source_dict_CR = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
@@ -688,18 +588,24 @@ if do_CR:
     source_dict_CR["test2"] = source_dict_CR["z"]
 
 source_dict = deepcopy(source_dict_fp)
+source_static = deepcopy(source_dict)
+
 source = ColumnDataSource(source_dict)
+
+# set up glyph to represent the raft grid. It is used for all states by changing the ColumnDataSource contents
+# (source.data)
 
 g = Rect(x='x', y='y', width=amp_width, height=amp_length / 2., angle='angle', line_color="black")
 g.fill_color = {'field': 'z', 'transform': color_mapper}
 fp.add_glyph(source, g)
 
-# Step 5: Add tooltips
+#  Add tooltips
 hover = fp.select(dict(type=HoverTool))
 hover.tooltips = [("type", "@raft_type"), ("test", "@z"), ("ccd", "@ccd"), ("raft", "@raft"),
                   ("amp", "@amp")]
 
 fp.title.text = title_run_base + " Full focal plane: " + test_name
+
 #  Suppress Axes
 fp.xaxis.visible = False  # Hide x-axis
 fp.yaxis.visible = False  # Hide y-axis
@@ -708,11 +614,14 @@ fp.yaxis.visible = False  # Hide y-axis
 fp.xgrid.grid_line_color = None  # Remove x-grid lines
 fp.ygrid.grid_line_color = None  # Remove y-grid lines
 
+# primary test heatmaps and histogram content
+
 hist_source = ColumnDataSource(data=dict(top=[], x=[], vbar_width=[]))
-source_static = deepcopy(source_dict)
 
 lower, upper, mask = do_test_stuff(t_source=source, h_source=hist_source, t_test_name="z", use_slider=False,
                                    mask_in=None)
+# seems to be a chicken and egg timing situation for the slider with changing values and defining the callback
+# so this is not using slider_format.
 
 step = (upper - lower) / 20.
 slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step,
@@ -721,17 +630,15 @@ slider = RangeSlider(start=lower, end=upper, value=(lower, upper), step=step,
 color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
 color_mapper.high = upper * 1.1
 
-
 p1 = figure(width=640, height=640, title=test_name)
-p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source,)
+p1.vbar(top="top", x="x", width="vbar_width", alpha=0.3, fill_color="red", source=hist_source)
 
-# set up the second test histogram
+# secondary test heatmaps and histogram content
 
 t2_hist_source = ColumnDataSource(data=dict(top=[], x=[], t2_vbar_width=[]))
 
-t_lower, t_upper, _ = do_test_stuff(t_source=source, h_source=t2_hist_source, t_test_name="z", use_slider=False,
+t_lower, t_upper, _ = do_test_stuff(t_source=source, h_source=t2_hist_source, t_test_name="test2", use_slider=False,
                                     mask_in=mask)
-
 
 fp2.vbar(top="top", x="x", width="t2_vbar_width", alpha=0.3, fill_color="red", source=t2_hist_source)
 
@@ -794,14 +701,20 @@ fp.add_tools(taptool)
 
 
 def update_slider(lower, upper):
-    slider.remove_on_change('value_throttled', update)
+    try:
+        slider.remove_on_change('value_throttled', update)
+    except:
+        pass
 
     slider.start = lower
     slider.end = upper
     slider.value = (lower, upper)
     slider.step = (upper - lower) / 20.
 
-    slider.on_change('value_throttled', update)
+    try:
+        slider.on_change('value_throttled', update)
+    except:
+        pass
     if abs(slider.start) < 0.1:
         slider.format = PrintfTickFormatter(format="%1.2e")
     else:
@@ -809,8 +722,6 @@ def update_slider(lower, upper):
 
     color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
     color_mapper.high = upper * 1.1
-
-
 
 
 # Define a callback function for TapTool
