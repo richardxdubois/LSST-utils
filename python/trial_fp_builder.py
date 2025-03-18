@@ -797,6 +797,9 @@ def tap_callback(event):
     global current_raft
     global source_static
 
+    # reset sensor type selection
+
+    type_dropdown.value = "all"
 
     if current_raft is None:
         # switch from fp to either CR or main fp raft
@@ -841,34 +844,41 @@ def tap_callback(event):
     source.data["test2"] = list(t2_new_test_data)
     source_static["test2"] = list(t2_new_test_data)
 
-    lower, upper = slider.value
+    #lower, upper = slider.value
 
     z_u = np.array(source.data["z"])
     raft_type = np.array(source.data["raft_type"])
 
-    mask = ~np.isnan(z_u)
+    lower, upper = clip_limits(z_u, clip_threshold)
 
-    new_test_noNan = z_u[mask]
+    if type_dropdown.value != "all":
+        mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
+    else:
+        mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
 
-    c_lower, c_upper = clip_limits(new_test_noNan, clip_threshold)
+    z_u[mask] = guard_value
+    source.data["z"] = z_u
 
-    rc = update_slider(c_lower, c_upper)
+    t_mask = (lower <= z_u) & (z_u <= upper)
 
-    re_histogram(hist_source, "vbar_width", new_test_noNan, c_lower, c_upper)
+    rc = update_slider(lower, upper)
+
+    re_histogram(hist_source, "vbar_width", z_u[t_mask], lower, upper)
 
     p1.title.text = test_name
 
     # re histogram 2nd test
     t2z = np.array(source.data["test2"])
-    t2_mask = ~np.isnan(t2z)
-    t2_new_noNaN = t2z[t2_mask]
+    t2z[mask] = guard_value
+    source.data["test2"] = t2z
 
-    t2_lower, t2_upper = clip_limits(t2_new_noNaN, clip_threshold)
+    t2_lower, t2_upper = clip_limits(t2z, clip_threshold)
+    t2_mask = (t2_lower <= t2z) & (t2z <= t2_upper)
 
-    re_histogram(t2_hist_source, "t2_vbar_width", t2z, t2_lower, t2_upper)
+    re_histogram(t2_hist_source, "t2_vbar_width", t2z[t2_mask], t2_lower, t2_upper)
 
     fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
-    fp2s.x_range = Range1d(start=c_lower, end=c_upper)
+    fp2s.x_range = Range1d(start=lower, end=upper)
 
     generate_log_message(log_div, "Ready")
 
