@@ -853,21 +853,6 @@ def tap_callback(event):
     c_lower, c_upper = clip_limits(new_test_noNan, clip_threshold)
 
     rc = update_slider(c_lower, c_upper)
-    """
-    slider.remove_on_change('value_throttled', update)
-    slider.start = c_lower
-    slider.end = c_upper
-    slider.value = (c_lower, c_upper)
-    slider.step = (c_upper - c_lower) / 20.
-    slider.on_change('value_throttled', update)
-    if abs(slider.start) < 0.1:
-        slider.format = PrintfTickFormatter(format="%1.2e")
-    else:
-        slider.format = BasicTickFormatter()
-
-    color_mapper.low = c_lower * 0.8 if c_lower > 0 else c_lower * 1.2
-    color_mapper.high = c_upper * 1.1
-    """
 
     re_histogram(hist_source, "vbar_width", new_test_noNan, c_lower, c_upper)
 
@@ -966,21 +951,6 @@ def update(attr, old, new):
         lower, upper = clip_limits(new_masked, clip_threshold)
 
         rc = update_slider(lower, upper)
-        """
-        step = (upper - lower) / 20.
-        slider.remove_on_change('value_throttled', update)
-        slider.start, slider.end = (lower, upper)
-        slider.value = (slider.start, slider.end)
-        slider.step = step
-        slider.on_change('value_throttled', update)
-        if abs(slider.start) < 0.1:
-            slider.format = PrintfTickFormatter(format="%1.2e")
-        else:
-            slider.format = BasicTickFormatter()
-
-        color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
-        color_mapper.high = upper * 1.1
-        """
 
     if (s and second_test_name != second_name) or new_run:
         # select 2nd test. Replace "test2" in source_static and source.data
