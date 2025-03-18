@@ -775,6 +775,42 @@ def update_slider(lower, upper):
     color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
     color_mapper.high = upper * 1.1
 
+
+def do_test_stuff(t_source, h_source, t_test_name, use_slider=True, mask_in=None):
+
+    z_u = np.array(source_static[t_test_name])
+    raft_type = np.array(source.data["raft_type"])
+
+    if use_slider:
+        lower, upper = slider.value
+    else:
+        lower, upper = clip_limits(z_u, clip_threshold)
+
+    if mask_in is None:
+        # mask is channels failing cuts. Set them to a guard value.
+        if type_dropdown.value != "all":
+            mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
+        else:
+            mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
+    else:
+        # take mask from main test (probably)
+        mask = mask_in
+
+    z_u[mask] = guard_value
+    t_source.data[t_test_name] = z_u
+
+    t_mask = (lower <= z_u) & (z_u <= upper)
+
+    if t_test_name == "test2":
+        width_name = "t2_vbar_width"
+    else:
+        width_name = "vbar_width"
+
+    re_histogram(h_source, width_name, z_u[t_mask], lower, upper)
+
+    return lower, upper, mask
+
+
 # Define a callback function for TapTool
 def tap_callback(event):
     # used for selecting a single raft to view; then toggle back
@@ -844,38 +880,17 @@ def tap_callback(event):
     source.data["test2"] = list(t2_new_test_data)
     source_static["test2"] = list(t2_new_test_data)
 
-    #lower, upper = slider.value
-
-    z_u = np.array(source.data["z"])
-    raft_type = np.array(source.data["raft_type"])
-
-    lower, upper = clip_limits(z_u, clip_threshold)
-
-    if type_dropdown.value != "all":
-        mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
-    else:
-        mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
-
-    z_u[mask] = guard_value
-    source.data["z"] = z_u
-
-    t_mask = (lower <= z_u) & (z_u <= upper)
-
+    lower, upper, mask = do_test_stuff(t_source=source, h_source=hist_source, t_test_name="z", use_slider=False)
     rc = update_slider(lower, upper)
-
-    re_histogram(hist_source, "vbar_width", z_u[t_mask], lower, upper)
 
     p1.title.text = test_name
 
     # re histogram 2nd test
-    t2z = np.array(source.data["test2"])
-    t2z[mask] = guard_value
-    source.data["test2"] = t2z
 
-    t2_lower, t2_upper = clip_limits(t2z, clip_threshold)
-    t2_mask = (t2_lower <= t2z) & (t2z <= t2_upper)
-
-    re_histogram(t2_hist_source, "t2_vbar_width", t2z[t2_mask], t2_lower, t2_upper)
+    t2_lower, t2_upper, _ = do_test_stuff(t_source=source, h_source=t2_hist_source, t_test_name="test2",
+                                          use_slider=False,
+                                          mask_in=mask
+                                          )
 
     fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
     fp2s.x_range = Range1d(start=lower, end=upper)
@@ -977,63 +992,16 @@ def update(attr, old, new):
     # fetch the test data array - "z". Sliders either were determined when the test was updated or
     # via manual adjustment. Get the data from the original test from source_static.
 
-    z_u = np.array(source_static["z"])
-    lower, upper = slider.value
-
-    raft_type = np.array(source.data["raft_type"])
-
-    # Filter the data source based on the range and selected name
-    # pos_mask: within slider range, not NaN and selected raft type
-    # mask: !pos_mask - outside slider range, NaN or wrong selected raft type
-
-    if type_dropdown.value != "all":
-        pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u)) & (raft_type == type_dropdown.value)
-        mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
-    else:
-        pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
-        mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
-
-    # reset "bad channels" to appear black in the heatmap and be ignored by the clipper
-
-    z_u[mask] = guard_value
-
-    # update source.data with the revised test array to trigger the update
-
-    source.data["z"] = z_u
-
-    #new_zu = np.array(source.data["z"])
-    #t_mask = ~np.isnan(z_u)
-
-    t_lower, t_upper = clip_limits(z_u, clip_threshold)
-
-    # Create a mask for elements within the threshold
-    t_mask = (z_u > t_lower) & (z_u < t_upper)
-
-    # Filter the data
-    clipped_data = z_u[t_mask]
-
-    generate_log_message(log_div, "regenerated histogram: " + test_name)
-
-    re_histogram(hist_source, "vbar_width", clipped_data, t_lower, t_upper)
+    lower, upper, mask = do_test_stuff(t_source=source, h_source=hist_source, t_test_name="z", use_slider=True,
+                                       mask_in=None)
 
     p1.title.text = test_name
 
     # re histogram 2nd test
 
-    t2_new_zu = np.array(source_static["test2"])
-    t2_new_zu[mask] = guard_value
-    source.data["test2"] = t2_new_zu
-
-    t2_lower, t2_upper = clip_limits(t2_new_zu, clip_threshold)
-
-    # Create a mask for elements within the threshold
-    t2_mask = (t2_new_zu > t2_lower) & (t2_new_zu < t2_upper)
-
-    # Filter the data
-    clipped_data = t2_new_zu[t2_mask]
-
-    generate_log_message(log_div, "regenerated histogram: " + second_name)
-    re_histogram(t2_hist_source, "t2_vbar_width", clipped_data, t2_lower, t2_upper)
+    t2_lower, t2_upper, _ = do_test_stuff(t_source=source, h_source=t2_hist_source, t_test_name="test2",
+                                          use_slider=False,
+                                          mask_in=mask)
 
     fp2.title.text = second_test_name
     fp2s.yaxis.axis_label = second_name
