@@ -758,8 +758,26 @@ taptool = TapTool()
 fp.add_tools(taptool)
 
 
+def update_slider(lower, upper):
+    slider.remove_on_change('value_throttled', update)
+
+    slider.start = lower
+    slider.end = upper
+    slider.value = (lower, upper)
+    slider.step = (upper - lower) / 20.
+
+    slider.on_change('value_throttled', update)
+    if abs(slider.start) < 0.1:
+        slider.format = PrintfTickFormatter(format="%1.2e")
+    else:
+        slider.format = BasicTickFormatter()
+
+    color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
+    color_mapper.high = upper * 1.1
+
 # Define a callback function for TapTool
 def tap_callback(event):
+    # used for selecting a single raft to view; then toggle back
     global source
     selected = source.selected
     try:
@@ -779,7 +797,9 @@ def tap_callback(event):
     global current_raft
     global source_static
 
+
     if current_raft is None:
+        # switch from fp to either CR or main fp raft
         current_raft = raft_value
         if do_CR and current_raft in list(CR_layout.keys()):
             source.data = dict(x=source_dict_CR["x"], y=source_dict_CR["y"], z=source_dict_CR["z"],
@@ -793,30 +813,33 @@ def tap_callback(event):
 
             source_static = deepcopy(source_dict_raft)
 
-        new_test_data = get_new_test(test_name, single_raft=current_raft)
-        source.data["z"] = list(new_test_data)
-        source_static["z"] = list(new_test_data)
-        t2_new_test_data = get_new_test(second_test_name, single_raft=current_raft)
-        source.data["test2"] = list(t2_new_test_data)
-        source_static["test2"] = list(t2_new_test_data)
+        kwargs = {"test_name": test_name, "single_raft": current_raft}
+        kwargs2 = {"test_name": second_test_name, "single_raft": current_raft}
+
         fp.title.text = title_run_base + " " + current_raft + ": " + test_name
         generate_log_message(log_div, "Switched to single raft mode: " + current_raft)
     else:
+        # switch from single raft to full fp
         current_raft = None
         source.data = dict(x=source_dict_fp["x"], y=source_dict_fp["y"], z=source_dict_fp["z"],
                            ccd=source_dict_fp["ccd"], raft=source_dict_fp["raft"], amp=source_dict_fp["amp"],
                            angle=source_dict_fp["angle"], raft_type=source_dict_fp["raft_type"])
 
         source_static = deepcopy(source_dict_fp)
-        new_test_data = get_new_test(test_name)
-        source.data["z"] = list(new_test_data)
-        source_static["z"] = list(new_test_data)
-        t2_new_test_data = get_new_test(second_test_name)
-        source.data["test2"] = list(t2_new_test_data)
-        source_static["test2"] = list(t2_new_test_data)
+
+        kwargs = {"test_name": test_name, "single_raft": current_raft}
+        kwargs2 = {"test_name": second_test_name, "single_raft": current_raft}
+
         fp.title.text = title_run_base + " Full focal plane: " + test_name
 
         generate_log_message(log_div, "Switched to full fp mode")
+
+    new_test_data = get_new_test(**kwargs)
+    source.data["z"] = list(new_test_data)
+    source_static["z"] = list(new_test_data)
+    t2_new_test_data = get_new_test(**kwargs2)
+    source.data["test2"] = list(t2_new_test_data)
+    source_static["test2"] = list(t2_new_test_data)
 
     lower, upper = slider.value
 
@@ -829,20 +852,24 @@ def tap_callback(event):
 
     c_lower, c_upper = clip_limits(new_test_noNan, clip_threshold)
 
+    rc = update_slider(c_lower, c_upper)
+    """
     slider.remove_on_change('value_throttled', update)
     slider.start = c_lower
     slider.end = c_upper
     slider.value = (c_lower, c_upper)
+    slider.step = (c_upper - c_lower) / 20.
     slider.on_change('value_throttled', update)
+    if abs(slider.start) < 0.1:
+        slider.format = PrintfTickFormatter(format="%1.2e")
+    else:
+        slider.format = BasicTickFormatter()
+
+    color_mapper.low = c_lower * 0.8 if c_lower > 0 else c_lower * 1.2
+    color_mapper.high = c_upper * 1.1
+    """
 
     re_histogram(hist_source, "vbar_width", new_test_noNan, c_lower, c_upper)
-
-    """
-    hist, edges = np.histogram(new_test_data[mask], bins=100, range=(lower, upper))
-    width = edges[1] - edges[0]
-    vbar_width = np.ones_like(hist) * width
-    hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
-    """
 
     p1.title.text = test_name
 
@@ -857,13 +884,6 @@ def tap_callback(event):
 
     fp2s.y_range = Range1d(start=t2_lower, end=t2_upper)
     fp2s.x_range = Range1d(start=c_lower, end=c_upper)
-
-    """
-    t2_hist, t2_edges = np.histogram(t2_new_noNaN, bins=100, range=(t2_lower, t2_upper))
-    width = t2_edges[1] - t2_edges[0]
-    t2_vbar_width = np.ones_like(t2_hist) * width
-    t2_hist_source.data = dict(top=t2_hist, x=t2_edges[:-1], t2_vbar_width=t2_vbar_width)
-    """
 
     generate_log_message(log_div, "Ready")
 
@@ -945,6 +965,8 @@ def update(attr, old, new):
         new_masked = new_test_data[mask]
         lower, upper = clip_limits(new_masked, clip_threshold)
 
+        rc = update_slider(lower, upper)
+        """
         step = (upper - lower) / 20.
         slider.remove_on_change('value_throttled', update)
         slider.start, slider.end = (lower, upper)
@@ -958,6 +980,7 @@ def update(attr, old, new):
 
         color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
         color_mapper.high = upper * 1.1
+        """
 
     if (s and second_test_name != second_name) or new_run:
         # select 2nd test. Replace "test2" in source_static and source.data
