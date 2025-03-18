@@ -916,6 +916,7 @@ def update(attr, old, new):
 
     new_run = False
     if selected_run != test_run and w:
+        # new run selected - replace dict of measurements - p
         if DM_stack:
             generate_log_message(log_div, "run_text_box selected: " + selected_run)
             p = get_new_run(selected_run)
@@ -928,6 +929,8 @@ def update(attr, old, new):
             return
 
     if (d and selected_name != test_name) or new_run:
+        # new test name selected. Replace "z" in source_static and source.data
+        # clip the data and set the sliders to the clipped lower and upper
         generate_log_message(log_div,"getting new test data: " + selected_name)
         new_test_data = get_new_test(selected_name, current_raft)
         source_static["z"] = list(new_test_data)
@@ -957,6 +960,7 @@ def update(attr, old, new):
         color_mapper.high = upper * 1.1
 
     if (s and second_test_name != second_name) or new_run:
+        # select 2nd test. Replace "test2" in source_static and source.data
         generate_log_message(log_div, "getting new second test data: " + second_name)
         t2_new_test_data = get_new_test(second_name, current_raft)
         source_static["test2"] = list(t2_new_test_data)
@@ -965,12 +969,20 @@ def update(attr, old, new):
         if not new_run:
             second_test_name = second_name
 
-    z_u = np.array(source.data["z"])
+    # stuff done for all entries to update - histograms are remade every time
+
+    # fetch the test data array - "z". Sliders either were determined when the test was updated or
+    # via manual adjustment. Get the data from the original test from source_static.
+
+    z_u = np.array(source_static["z"])
     lower, upper = slider.value
 
-    raft_type = np.array(source_static["raft_type"])
+    raft_type = np.array(source.data["raft_type"])
 
     # Filter the data source based on the range and selected name
+    # pos_mask: within slider range, not NaN and selected raft type
+    # mask: !pos_mask - outside slider range, NaN or wrong selected raft type
+
     if type_dropdown.value != "all":
         pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u)) & (raft_type == type_dropdown.value)
         mask = ((z_u < lower) | (z_u > upper) | np.isnan(z_u)) | (raft_type != type_dropdown.value)
@@ -978,44 +990,44 @@ def update(attr, old, new):
         pos_mask = (z_u >= lower) & (z_u <= upper) & (~np.isnan(z_u))
         mask = (z_u < lower) | (z_u > upper) | np.isnan(z_u)
 
-    z_u[mask] = lower / 10.
-    source.data["z"] = z_u
-    new_zu = np.array(source.data["z"])
-    t_mask = ~np.isnan(new_zu)
+    # reset "bad channels" to appear black in the heatmap and be ignored by the clipper
 
-    t_lower, t_upper = clip_limits(new_zu[t_mask], clip_threshold)
+    z_u[mask] = guard_value
+
+    # update source.data with the revised test array to trigger the update
+
+    source.data["z"] = z_u
+
+    #new_zu = np.array(source.data["z"])
+    #t_mask = ~np.isnan(z_u)
+
+    t_lower, t_upper = clip_limits(z_u, clip_threshold)
 
     # Create a mask for elements within the threshold
-    t_mask = (new_zu > t_lower) & (new_zu < t_upper)
+    t_mask = (z_u > t_lower) & (z_u < t_upper)
 
     # Filter the data
-    clipped_data = new_zu[t_mask]
+    clipped_data = z_u[t_mask]
 
     generate_log_message(log_div, "regenerated histogram: " + test_name)
 
     re_histogram(hist_source, "vbar_width", clipped_data, t_lower, t_upper)
-    """
-    hist, edges = np.histogram(new_zu, bins=100, range=(lower, upper))
-    width = edges[1] - edges[0]
-    vbar_width = np.ones_like(hist) * width
-    hist_source.data = dict(top=hist, x=edges[:-1], vbar_width=vbar_width)
-    """
 
     p1.title.text = test_name
 
     # re histogram 2nd test
 
-    #t2_new_zu = np.array(source.data["test2"])[pos_mask]
-    t2_new_zu = np.array(source.data["test2"])
-    t2_mask = ~np.isnan(t2_new_zu)
+    t2_new_zu = np.array(source_static["test2"])
+    t2_new_zu[mask] = guard_value
+    source.data["test2"] = t2_new_zu
 
-    t2_lower, t2_upper = clip_limits(t2_new_zu[t2_mask], clip_threshold)
+    t2_lower, t2_upper = clip_limits(t2_new_zu, clip_threshold)
 
     # Create a mask for elements within the threshold
-    mask = (t2_new_zu > t2_lower) & (t2_new_zu < t2_upper)
+    t2_mask = (t2_new_zu > t2_lower) & (t2_new_zu < t2_upper)
 
     # Filter the data
-    clipped_data = t2_new_zu[mask]
+    clipped_data = t2_new_zu[t2_mask]
 
     generate_log_message(log_div, "regenerated histogram: " + second_name)
     re_histogram(t2_hist_source, "t2_vbar_width", clipped_data, t2_lower, t2_upper)
