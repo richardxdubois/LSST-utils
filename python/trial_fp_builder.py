@@ -368,8 +368,8 @@ def CR_grid(raft):
         CR_ccd = np.append(CR_ccd, np.full(8, "SW1"))
         CR_ccd = np.append(CR_ccd, np.full(8, "SW0"))
     else:
-        CR_ccd = np.append(CR_ccd, np.full(16, "SW0"))
-        CR_ccd = np.append(CR_ccd, np.full(16, "SW1"))
+        CR_ccd = np.append(CR_ccd, np.full(8, "SW0"))
+        CR_ccd = np.append(CR_ccd, np.full(8, "SW1"))
 
     CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SW"][1]))
 
