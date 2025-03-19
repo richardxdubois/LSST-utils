@@ -61,7 +61,7 @@ def generate_log_message(log_div, message):
 type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
 
 
-def clip_limits(test, threshold):
+def clip_limits(name, test, threshold):
 
     mask = (~np.isnan(test)) & (test != guard_value)
     median = np.median(test[mask])
@@ -70,7 +70,7 @@ def clip_limits(test, threshold):
     lower = max(min(test), median - threshold * std)
     upper = min(max(test), median + threshold * std)
 
-    generate_log_message(log_div, f"Clipping median {median:.2f} std + {std:.2f} thrsh {clip_threshold:.2f}")
+    generate_log_message(log_div, f"{name} Clipping median {median:.2f} std + {std:.2f} thrsh {clip_threshold:.2f}")
 
     return lower, upper
 
@@ -83,7 +83,7 @@ def do_test_stuff(t_source, h_source, t_test_name, use_slider=True, mask_in=None
     if use_slider:
         lower, upper = slider.value
     else:
-        lower, upper = clip_limits(z_u, clip_threshold)
+        lower, upper = clip_limits(t_test_name, z_u, clip_threshold)
 
     if mask_in is None:
         # mask is channels failing cuts. Set them to a guard value.
@@ -391,7 +391,7 @@ def CR_grid(raft):
     return CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type
 
 
-def get_CR_test(raft):
+def get_CR_test(raft, test_data):
 
     new_test = np.empty(0)
     amp_names = np.empty(0)
@@ -497,7 +497,7 @@ def get_new_test(test_name, single_raft=None):
 
             if r in list(CR_layout.keys()):
                 if do_CR:
-                    R00_test, _ = get_CR_test(r)
+                    R00_test, _ = get_CR_test(r, test_data)
                     new_test = np.append(new_test, R00_test)
                 continue
 
@@ -579,14 +579,14 @@ for rg in raft_groups:
             raft_offset_y = 0
             if do_CR:
                 CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
-                R00_test, CR_amp = get_CR_test(r)
+                #R00_test, CR_amp = get_CR_test(r, test_data)
 
                 source_dict_fp["x"].extend(CR_x)
                 source_dict_fp["y"].extend(CR_y)
-                source_dict_fp["z"].extend(R00_test)
+                source_dict_fp["z"].extend(np.ones_like(CR_y))
                 source_dict_fp["ccd"].extend(CR_ccd)
                 source_dict_fp["raft"].extend(CR_raft)
-                source_dict_fp["amp"].extend(CR_amp)
+                source_dict_fp["amp"].extend(np.ones_like(CR_y))
                 source_dict_fp["angle"].extend(CR_angle)
                 source_dict_fp["raft_type"].extend(CR_raft_type)
 
@@ -611,14 +611,14 @@ if do_CR:
     source_dict_CR = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
     CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
-    R00_test, CR_amp = get_CR_test(r)
+    #R00_test, CR_amp = get_CR_test(r, test_data)
 
     source_dict_CR["x"].extend(CR_x)
     source_dict_CR["y"].extend(CR_y)
-    source_dict_CR["z"].extend(R00_test)
+    source_dict_CR["z"].extend(np.ones_like(CR_x))
     source_dict_CR["ccd"].extend(CR_ccd)
     source_dict_CR["raft"].extend(CR_raft)
-    source_dict_CR["amp"].extend(CR_amp)
+    source_dict_CR["amp"].extend(np.ones_like(CR_x))
     source_dict_CR["angle"].extend(CR_angle)
     source_dict_CR["raft_type"].extend(CR_raft_type)
 
@@ -892,6 +892,7 @@ def update(attr, old, new):
     w = new == run_text_box.value
     d = new == name_dropdown.value
     s = new == second_dropdown.value
+    clip = new == clip_select.value
 
     new_run = False
     if selected_run != test_run and w:
@@ -907,7 +908,7 @@ def update(attr, old, new):
             generate_log_message(log_div, "DM stack or EO code unavailable. Request ignored: " + selected_run)
             return
 
-    if (d and selected_name != test_name) or new_run:
+    if (d and selected_name != test_name) or new_run or clip:
         # new test name selected. Replace "z" in source_static and source.data
         # clip the data and set the sliders to the clipped lower and upper
         generate_log_message(log_div,"getting new test data: " + selected_name)
@@ -919,10 +920,10 @@ def update(attr, old, new):
             test_name = selected_name
         generate_log_message(log_div, "updating sliders for : " + selected_name)
 
-        t_lower, t_upper = clip_limits(new_test_data, clip_threshold)
+        t_lower, t_upper = clip_limits(test_name, new_test_data, clip_threshold)
         mask = (new_test_data > t_lower) & (new_test_data < t_upper)
         new_masked = new_test_data[mask]
-        lower, upper = clip_limits(new_masked, clip_threshold)
+        lower, upper = clip_limits(test_name, new_masked, clip_threshold)
 
         rc = update_slider(lower, upper)
 
