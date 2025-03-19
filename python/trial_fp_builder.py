@@ -982,3 +982,4 @@ l = layout(exit_button, row( type_dropdown, column(run_text_box, clip_select), n
 
 # Add the layout to the current document
 curdoc().add_root(l)
+curdoc().title = "LSSTCam focal plane EO viewer"
