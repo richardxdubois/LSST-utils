@@ -30,9 +30,6 @@ args = parser.parse_args()
 with open(args.app_config, "r") as f:
     data = yaml.safe_load(f)
 
-#data_dir = "/Volumes/Data/Rubin/camera/"
-#in_file = data_dir + "E2233_amps_data.npy"
-
 data_dir = data["data_dir"]
 in_file = data_dir + data["in_file_name"]
 guard_value = data["guard_value"]
@@ -161,6 +158,8 @@ def extract_signal_data(test_data, raft_ccd, angle, raft_ccd2=None):
 
     try:
         results = np.array(list(test_data[raft_ccd].values()))[::-1]
+        if raft_ccd2 is not None:
+            results = np.append(results, np.array(list(test_data[raft_ccd2].values()))[::-1])
     except:
         results = np.ones(16) * guard_value
 
@@ -181,15 +180,17 @@ def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
 
     try:
         results = np.array(list(test_data[raft_ccd].keys()))[::-1]
+        if raft_ccd2 is not None:
+            results = np.append(results, np.array(list(test_data[raft_ccd2].keys()))[::-1])
     except:
-        results = np.full(16) * c
+        results = np.full(16, c)
 
     if angle == 0.:
-        amps = np.full((2, 8), "")
+        amps = np.empty((2, 8), dtype=object)
         amps[1, :] = results[8:16][::-1]
         amps[0, :] = results[0:8]
     else:
-        amps = np.full((8, 2), "")
+        amps = np.empty((8, 2), dtype=object)
         amps[:, 1] = results[8:16][::-1]
         amps[:, 0] = results[0:8]
 
@@ -325,7 +326,7 @@ CR_layout = {
     "R40": {
         "SG0": ["S01", 0.],
         "SG1": ["S12", 0.],
-        "SW": ["S02", np.pi/2.]
+        "SW": ["S02", 3*np.pi/2.]
     },
     "R44": {
         "SG0": ["S10", 0.],
@@ -362,8 +363,14 @@ def CR_grid(raft):
     CR_x = np.append(CR_x, x_SW)
     CR_y = np.append(CR_y, y_SW)
 
-    CR_ccd = np.append(CR_ccd, np.full(8, "SW1"))
-    CR_ccd = np.append(CR_ccd, np.full(8, "SW0"))
+    # Kludge for R44 - not understood
+    if raft != "R44":
+        CR_ccd = np.append(CR_ccd, np.full(8, "SW1"))
+        CR_ccd = np.append(CR_ccd, np.full(8, "SW0"))
+    else:
+        CR_ccd = np.append(CR_ccd, np.full(16, "SW0"))
+        CR_ccd = np.append(CR_ccd, np.full(16, "SW1"))
+
     CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SW"][1]))
 
     x_SG = x_flat + start_ccd[CR_layout[raft]["SG0"][0]][0]
@@ -389,24 +396,40 @@ def get_CR_test(raft):
     new_test = np.empty(0)
     amp_names = np.empty(0)
 
+    # SG1
+
     raft_ccd = raft + "_SG1"
 
     z_flat = extract_signal_data(test_data, raft_ccd, 0)
 
     new_test = np.append(new_test, z_flat)
 
-    amp_names = extract_signal_data(test_data, raft_ccd, 0)
+    amp_names_flat = extract_amp_names(test_data, raft_ccd, 0)
+    amp_names = np.append(amp_names, amp_names_flat)
 
-    signal = np.zeros((2, 8))
+    # SW0 + SW1
+
     SW1 = raft + "_SW1"
+    SW0 = raft + "_SW0"
+
+    """
+    signal = np.zeros((2, 8))
     results = np.array(list(test_data[SW1].values()))[::-1]
     signal[0, :] = results[::-1]
-    SW0 = raft + "_SW0"
     results = np.array(list(test_data[SW0].values()))
     signal[1, :] = results
     z_flat = signal.flatten()
     new_test = np.append(new_test, z_flat)
+    """
+    # Kludge for R44 (don't understand why it is needed
+    if raft != "R44":
+        z_flat = extract_signal_data(test_data, SW1, CR_layout[raft]["SW"][1], SW0)
+    else:
+        z_flat = extract_signal_data(test_data, SW0, CR_layout[raft]["SW"][1], SW1)
 
+    new_test = np.append(new_test, z_flat)
+
+    """
     try:
         amp_n0 = np.array(list(test_data[SW1].keys()))[::-1]
         amp_n1 = np.array(list(test_data[SW0].keys()))[::-1]
@@ -418,7 +441,16 @@ def get_CR_test(raft):
     amp_n_shaped[1, :] = amp_n1[::-1]
     amp_n_shaped[0, :] = amp_n0
     amp_n_flat = amp_n_shaped.flatten()
+    """
+    # Kludge for R44 (don't understand why it is needed
+    if raft != "R44":
+        amp_n_flat = extract_amp_names(test_data, SW1, CR_layout[raft]["SW"][1], SW0)
+    else:
+        amp_n_flat = extract_amp_names(test_data, SW0, CR_layout[raft]["SW"][1], SW1)
+
     amp_names = np.append(amp_names, amp_n_flat)
+
+    # SG0
 
     raft_ccd = raft + "_SG0"
     try:
