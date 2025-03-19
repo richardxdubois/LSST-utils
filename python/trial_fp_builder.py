@@ -579,14 +579,14 @@ for rg in raft_groups:
             raft_offset_y = 0
             if do_CR:
                 CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
-                #R00_test, CR_amp = get_CR_test(r, test_data)
+                R00_test, CR_amp = get_CR_test(r, test_data)
 
                 source_dict_fp["x"].extend(CR_x)
                 source_dict_fp["y"].extend(CR_y)
-                source_dict_fp["z"].extend(np.ones_like(CR_y))
+                source_dict_fp["z"].extend(R00_test)
                 source_dict_fp["ccd"].extend(CR_ccd)
                 source_dict_fp["raft"].extend(CR_raft)
-                source_dict_fp["amp"].extend(np.ones_like(CR_y))
+                source_dict_fp["amp"].extend(CR_amp)
                 source_dict_fp["angle"].extend(CR_angle)
                 source_dict_fp["raft_type"].extend(CR_raft_type)
 
