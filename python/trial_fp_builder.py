@@ -15,7 +15,7 @@ except ImportError:
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import PrintfTickFormatter, BasicTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
-                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter, CustomJSTickFormatter)
+                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter, CheckboxButtonGroup)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
@@ -59,6 +59,25 @@ def generate_log_message(log_div, message):
 
 
 type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
+# Create a CheckboxButtonGroup widget
+slider_checkbox_group = CheckboxButtonGroup(labels=["Slider refresh"], active=[])
+
+# Create a Div to display the current state
+div_slider_check = Div(text="Slider state: Off")
+slider_refresh = False
+
+# Define a callback to update the div whenever the checkbox state changes
+
+
+def slider_checkbox_callback(attr, old, new):
+    global slider_refresh
+    state = "On" if new else "Off"
+    slider_refresh = True if new else False
+    div_slider_check.text = f"Slider state: {state}"
+
+
+# Attach the callback to the checkbox's active property
+slider_checkbox_group.on_change('active', slider_checkbox_callback)
 
 
 def clip_limits(name, test, threshold):
@@ -1004,6 +1023,9 @@ def update(attr, old, new):
 
     lower, upper, mask = do_test_stuff(t_source=source, h_source=hist_source, t_test_name="z", use_slider=True,
                                        mask_in=None)
+    if slider_refresh:
+        color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
+        color_mapper.high = upper * 1.1
 
     p1.title.text = test_name
 
@@ -1036,7 +1058,7 @@ clip_select.on_change('value', update)
 type_dropdown.on_change('value', update)
 
 l = layout(exit_button, row( type_dropdown, column(run_text_box, clip_select), name_dropdown, slider,
-                             column(st_div, second_toggle),
+                             column(div_slider_check, slider_checkbox_group), column(st_div, second_toggle),
                              second_dropdown, log_div),
            row(fp, column(p1, fp2s, fp2)))
 
