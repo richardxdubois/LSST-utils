@@ -152,12 +152,16 @@ def slider_format(lower, upper):
 
     return r_lower, r_upper
 
+# elements are:  equivalent location on normal raft
+#                rotation angle of box (rad)
+#                direction (1, -1)
+#                order first and second 8 segments
 
 CR_layout = {
     "R00": {
         "SG0": ["S12", np.pi/2., 1, 1],
         "SG1": ["S21", 0., -1, 1],
-        "SW": ["S22", 0., 1, 1]
+        "SW": ["S22", 0., -1, 1]
     },
     "R04": {
         "SG0": ["S21", 0., 1, 1],
@@ -239,6 +243,11 @@ def extract_signal_data(test_data, raft_ccd, angle, raft_ccd2=None):
 
 def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
     r, c = raft_ccd.split("_")
+    c0 = c
+    if raft_ccd2 is not None:
+        _, c2 = raft_ccd2.split("_")
+    else:
+        c2 = c0
 
     try:
         results = np.array(list(test_data[raft_ccd].keys()))[::-1]
@@ -267,8 +276,11 @@ def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
             shape = (8, 2)
 
     amps = np.empty(shape, dtype=object)
+    ccds_c0 = np.full(shape, c0)
 
     if shape == (2, 8):
+        ccds_c0[order, :] = c0
+        ccds_c0[1 - order, :] = c2
         if direction == 1:
             amps[order, :] = results[0:8]
             amps[1 - order, :] = results[15:7:-1]
@@ -276,6 +288,8 @@ def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
             amps[order, :] = results[7::-1]
             amps[1 - order, :] = results[8:16]
     elif shape == (8, 2):
+        ccds_c0[:, order] = c0
+        ccds_c0[:, 1-order] = c2
         if direction == 1:
             amps[:, order] = results[0:8]
             amps[:, 1 - order] = results[15:7:-1]
@@ -294,7 +308,7 @@ def extract_amp_names(test_data, raft_ccd, angle, raft_ccd2=None):
         amps[:, 0] = results[0:8]
     """
 
-    return amps.flatten()
+    return amps.flatten(), ccds_c0.flatten()
 
 
 def re_histogram(cds, width_name, test, lower, upper):
@@ -339,7 +353,7 @@ min_z = min(filtered_gains)
 max_z = max(filtered_gains)
 
 # get the list of amp names
-amp_names_flat = extract_amp_names(test_data, raft_ccd="R01_S00", angle=0., raft_ccd2=None)
+amp_names_flat, _ = extract_amp_names(test_data, raft_ccd="R01_S00", angle=0., raft_ccd2=None)
 
 # CCD defined as 1 unit. 8 amps per half, so each is 1/8=0.125 wide and 0.5 high.
 # rafts are 3 CCDs wide and tall, hence 3 units.
@@ -483,6 +497,7 @@ def get_CR_test(raft, test_data):
 
     new_test = np.empty(0)
     amp_names = np.empty(0)
+    ccds = np.empty(0)
 
     # SG1
 
@@ -492,8 +507,9 @@ def get_CR_test(raft, test_data):
 
     new_test = np.append(new_test, z_flat)
 
-    amp_names_flat = extract_amp_names(test_data, raft_ccd, CR_layout[raft]["SG1"][1])
+    amp_names_flat, ccd_names_flat = extract_amp_names(test_data, raft_ccd, CR_layout[raft]["SG1"][1])
     amp_names = np.append(amp_names, amp_names_flat)
+    ccds = np.append(ccds, ccd_names_flat)
 
     # SW0 + SW1
 
@@ -504,9 +520,10 @@ def get_CR_test(raft, test_data):
 
     new_test = np.append(new_test, z_flat)
 
-    amp_n_flat = extract_amp_names(test_data, SW0, CR_layout[raft]["SW"][1], SW1)
+    amp_n_flat, ccd_names_flat = extract_amp_names(test_data, SW0, CR_layout[raft]["SW"][1], SW1)
 
     amp_names = np.append(amp_names, amp_n_flat)
+    ccds = np.append(ccds, ccd_names_flat)
 
     # SG0
 
@@ -515,10 +532,11 @@ def get_CR_test(raft, test_data):
     z_flat = extract_signal_data(test_data, raft_ccd, CR_layout[raft]["SG0"][1])
     new_test = np.append(new_test, z_flat)
 
-    amp_n_flat = extract_amp_names(test_data, raft_ccd, CR_layout[raft]["SG0"][1])
+    amp_n_flat, ccd_names_flat = extract_amp_names(test_data, raft_ccd, CR_layout[raft]["SG0"][1])
     amp_names = np.append(amp_names, amp_n_flat)
+    ccds = np.append(ccds, ccd_names_flat)
 
-    return new_test, amp_names
+    return new_test, amp_names, ccds
 
 
 def get_new_test(test_name, single_raft=None):
@@ -539,7 +557,7 @@ def get_new_test(test_name, single_raft=None):
 
             if r in list(CR_layout.keys()):
                 if do_CR:
-                    R00_test, _ = get_CR_test(r, test_data)
+                    R00_test, _, _ = get_CR_test(r, test_data)
                     new_test = np.append(new_test, R00_test)
                 continue
 
@@ -621,12 +639,12 @@ for rg in raft_groups:
             raft_offset_y = 0
             if do_CR:
                 CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
-                R00_test, CR_amp = get_CR_test(r, test_data)
+                R00_test, CR_amp, CR_ccds = get_CR_test(r, test_data)
 
                 source_dict_fp["x"].extend(CR_x)
                 source_dict_fp["y"].extend(CR_y)
                 source_dict_fp["z"].extend(R00_test)
-                source_dict_fp["ccd"].extend(CR_ccd)
+                source_dict_fp["ccd"].extend(CR_ccds)
                 source_dict_fp["raft"].extend(CR_raft)
                 source_dict_fp["amp"].extend(CR_amp)
                 source_dict_fp["angle"].extend(CR_angle)
@@ -653,14 +671,14 @@ if do_CR:
     source_dict_CR = {"x":[], "y":[], "z":[], "ccd":[], "raft":[], "amp":[], "test2":[], "angle":[], "raft_type":[]}
 
     CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type = CR_grid(r)
-    #R00_test, CR_amp = get_CR_test(r, test_data)
+    R00_test, CR_amp, CR_ccds = get_CR_test(r, test_data)
 
     source_dict_CR["x"].extend(CR_x)
     source_dict_CR["y"].extend(CR_y)
-    source_dict_CR["z"].extend(np.ones_like(CR_x))
-    source_dict_CR["ccd"].extend(CR_ccd)
+    source_dict_CR["z"].extend(R00_test)
+    source_dict_CR["ccd"].extend(CR_ccds)
     source_dict_CR["raft"].extend(CR_raft)
-    source_dict_CR["amp"].extend(np.ones_like(CR_x))
+    source_dict_CR["amp"].extend(CR_amp)
     source_dict_CR["angle"].extend(CR_angle)
     source_dict_CR["raft_type"].extend(CR_raft_type)
 
