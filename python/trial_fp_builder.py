@@ -60,20 +60,20 @@ def generate_log_message(log_div, message):
 
 type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
 # Create a CheckboxButtonGroup widget
-slider_checkbox_group = CheckboxButtonGroup(labels=["Slider refresh"], active=[])
+slider_checkbox_group = CheckboxButtonGroup(labels=["CMap refresh"], active=[])
 
 # Create a Div to display the current state
-div_slider_check = Div(text="Slider state: Off")
-slider_refresh = False
+div_slider_check = Div(text="state: Off")
+cm_refresh = False
 
 # Define a callback to update the div whenever the checkbox state changes
 
 
 def slider_checkbox_callback(attr, old, new):
-    global slider_refresh
+    global cm_refresh
     state = "On" if new else "Off"
-    slider_refresh = True if new else False
-    div_slider_check.text = f"Slider state: {state}"
+    cm_refresh = True if new else False
+    div_slider_check.text = f"state: {state}"
 
 
 # Attach the callback to the checkbox's active property
@@ -1023,7 +1023,7 @@ def update(attr, old, new):
 
     lower, upper, mask = do_test_stuff(t_source=source, h_source=hist_source, t_test_name="z", use_slider=True,
                                        mask_in=None)
-    if slider_refresh:
+    if cm_refresh:
         color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
         color_mapper.high = upper * 1.1
 
