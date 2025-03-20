@@ -314,22 +314,22 @@ for cg in ccd_groups:
 
 CR_layout = {
     "R00": {
-        "SG0": ["S21", 0.],
-        "SG1": ["S12", 0.],
+        "SG0": ["S12", np.pi/2.],
+        "SG1": ["S21", 0.],
         "SW": ["S22", 0.]
     },
     "R04": {
         "SG0": ["S21", 0.],
-        "SG1": ["S10", 0.],
+        "SG1": ["S10", np.pi/2.],
         "SW": ["S20", np.pi/2.]
     },
     "R40": {
         "SG0": ["S01", 0.],
-        "SG1": ["S12", 0.],
-        "SW": ["S02", 3*np.pi/2.]
+        "SG1": ["S12", 3.*np.pi/2.],
+        "SW": ["S02", np.pi/2.]
     },
     "R44": {
-        "SG0": ["S10", 0.],
+        "SG0": ["S10", np.pi/2.],
         "SG1": ["S01", 0.],
         "SW": ["S00", 0.]
     }
@@ -346,10 +346,23 @@ def CR_grid(raft):
     CR_ccd = np.empty(0)
     CR_angle = np.empty(0)
 
+    # SG1
+
+    if raft == "R00" or raft == "R44":
+        x_SG1 = x_flat + start_ccd[CR_layout[raft]["SG1"][0]][0]
+        y_SG1 = y_flat + start_ccd[CR_layout[raft]["SG1"][0]][1]
+    else:
+        x_SG1 = xr_flat + start_ccd[CR_layout[raft]["SG1"][0]][0] + (amp_width + ccd_border)
+        y_SG1 = yr_flat + start_ccd[CR_layout[raft]["SG1"][0]][1] - (amp_width + ccd_border)
+
+    """
     x_SG1 = x_flat + start_ccd[CR_layout[raft]["SG1"][0]][0]
-    CR_x = np.append(CR_x, x_SG1)
     y_SG1 = y_flat + start_ccd[CR_layout[raft]["SG1"][0]][1]
+    """
+
     CR_y = np.append(CR_y, y_SG1)
+    CR_x = np.append(CR_x, x_SG1)
+
     CR_ccd = np.append(CR_ccd, np.full(16, "SG1"))
     CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SG1"][1]))
 
@@ -373,11 +386,22 @@ def CR_grid(raft):
 
     CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SW"][1]))
 
-    x_SG = x_flat + start_ccd[CR_layout[raft]["SG0"][0]][0]
-    y_SG = y_flat + start_ccd[CR_layout[raft]["SG0"][0]][1]
+    # SG0
 
-    CR_x = np.append(CR_x, x_SG)
-    CR_y = np.append(CR_y, y_SG)
+    if raft == "R40" or raft == "R04":
+        x_SG0 = x_flat + start_ccd[CR_layout[raft]["SG0"][0]][0]
+        y_SG0 = y_flat + start_ccd[CR_layout[raft]["SG0"][0]][1]
+    else:
+        x_SG0 = xr_flat + start_ccd[CR_layout[raft]["SG0"][0]][0] + (amp_width + ccd_border)
+        y_SG0 = yr_flat + start_ccd[CR_layout[raft]["SG0"][0]][1] - (amp_width + ccd_border)
+
+    """
+    x_SG0 = x_flat + start_ccd[CR_layout[raft]["SG0"][0]][0]
+    y_SG0 = y_flat + start_ccd[CR_layout[raft]["SG0"][0]][1]
+    """
+
+    CR_x = np.append(CR_x, x_SG0)
+    CR_y = np.append(CR_y, y_SG0)
 
     CR_ccd = np.append(CR_ccd, np.full(16, "SG0"))
     CR_angle = np.append(CR_angle, np.full(16, CR_layout[raft]["SG0"][1]))
@@ -400,11 +424,11 @@ def get_CR_test(raft, test_data):
 
     raft_ccd = raft + "_SG1"
 
-    z_flat = extract_signal_data(test_data, raft_ccd, 0)
+    z_flat = extract_signal_data(test_data, raft_ccd, CR_layout[raft]["SG1"][1])
 
     new_test = np.append(new_test, z_flat)
 
-    amp_names_flat = extract_amp_names(test_data, raft_ccd, 0)
+    amp_names_flat = extract_amp_names(test_data, raft_ccd, CR_layout[raft]["SG1"][1])
     amp_names = np.append(amp_names, amp_names_flat)
 
     # SW0 + SW1
@@ -453,6 +477,8 @@ def get_CR_test(raft, test_data):
     # SG0
 
     raft_ccd = raft + "_SG0"
+
+    """
     try:
         results = np.array(list(test_data[raft_ccd].values()))[::-1]
     except:
@@ -473,7 +499,11 @@ def get_CR_test(raft, test_data):
     amp_n_shaped[1, :] = amp_n[8:16][::-1]
     amp_n_shaped[0, :] = amp_n[0:8]
     amp_n_flat = amp_n_shaped.flatten()
+    """
+    z_flat = extract_signal_data(test_data, raft_ccd, CR_layout[raft]["SG0"][1])
+    new_test = np.append(new_test, z_flat)
 
+    amp_n_flat = extract_amp_names(test_data, raft_ccd, CR_layout[raft]["SG0"][1])
     amp_names = np.append(amp_names, amp_n_flat)
 
     return new_test, amp_names
