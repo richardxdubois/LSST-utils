@@ -1,0 +1,10 @@
+data_dir: "/Volumes/Data/Rubin/camera/"
+
+#in_file_name: "E2233_amps_data.npy"
+in_file_name: "E1110_amps_data.npy"
+
+do_CR: True
+
+serial_numbers_pkl: "raft_CCD_serial_numbers.pkl"
+
+guard_value: -1000.
