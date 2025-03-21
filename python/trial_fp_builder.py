@@ -391,7 +391,7 @@ ccd_border = 0.05
 
 # placeholder figures
 
-fp = figure(height=1000, width=1000, title="Focal plane", tools="pan,wheel_zoom,box_zoom,lasso_select,reset,save,hover")
+fp = figure(height=1000, width=1100, title="Focal plane", tools="pan,wheel_zoom,box_zoom,lasso_select,reset,save,hover")
 
 p1 = figure(width=640, height=640, title=test_name)
 
