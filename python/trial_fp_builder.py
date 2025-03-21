@@ -5,6 +5,8 @@ from copy import deepcopy
 import yaml
 import argparse
 from tornado.ioloop import IOLoop
+from tornado import gen
+
 try:
     import lsst.daf.butler as daf_butler
     import lsst.eo.pipe as eo_pipe
@@ -800,11 +802,27 @@ second_toggle = RadioButtonGroup(labels=["On", "Off"], active=1)
 st_div = Div(text="Second histos")
 
 
-# Define a function to stop the server
+# Define a function to stop the server - define tornado co-routines to ensure the log msg and button
+# colour change happen before stopping the server
+
 def stop_server():
-    generate_log_message(log_div, ("Server is shutting down..."))
+    curdoc().add_next_tick_callback(lambda: async_generate_log_message(log_div, "Server is shutting down..."))
+    curdoc().add_next_tick_callback(lambda: change_button_color(exit_button, "light"))
+    curdoc().add_next_tick_callback(exit_server)
+
+
+# Function to update the log message in the Div
+async def async_generate_log_message(log_div, message):
+    log_div.text = message
+
+
+async def exit_server():
     print("Server is shutting down...")
     IOLoop.current().stop()
+
+
+async def change_button_color(button, color):
+    button.button_type = color
 
 # Attach the stop function to the button click event
 
