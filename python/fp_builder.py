@@ -587,7 +587,7 @@ class fp_builder():
                 elapsed_time = end_time - start_time
 
                 self.generate_log_message(
-                    self.log_div, new_run_name + " loaded after " + str(elapsed_time) + " seconds")
+                    self.log_div, f"{new_run_name} loaded after {str(elapsed_time):.2f} seconds")
                 self.title_run_base = self.test_run
                 new_run = True
                 self.new_pickle = False
