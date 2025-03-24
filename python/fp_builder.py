@@ -657,7 +657,10 @@ class fp_builder():
             # take mask from main test (probably)
             mask = mask_in
 
-        #z_u[mask] = self.guard_value
+        # turn values black in the heatmap if colour map not refreshing with the slider values
+        if not self.cm_refresh:
+            z_u[mask] = self.guard_value
+
         t_source.data[t_test_name] = z_u
 
         t_mask = (lower <= z_u) & (z_u <= upper)
