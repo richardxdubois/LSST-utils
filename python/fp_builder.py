@@ -5,6 +5,8 @@ from copy import deepcopy
 import yaml
 import argparse
 import re
+from pathlib import Path
+
 from tornado.ioloop import IOLoop
 from tornado import gen
 
@@ -178,6 +180,10 @@ class fp_builder():
                     if w_code not in self.runs_versions[E_code]:
                         self.runs_versions[E_code].append(w_code)
 
+        self.pickled_runs = []
+        rc = self.find_run_pickles()
+        self.new_pickle = False
+
         print(self.tests)
 
         # start with ptc_gains to get going
@@ -302,7 +308,8 @@ class fp_builder():
                             ("ccd", "@ccd"), ("raft", "@raft"), ("amp", "@amp")]
 
         canvas_layout = layout(self.exit_button,
-                                row(self.type_dropdown, column(self.run_text_box, self.clip_select),
+                                row(self.type_dropdown,
+                                column( self.clip_select, self.run_text_box, self.run_pickle_dropdown),
                                 self.name_dropdown, self.slider,
                                     column(self.div_slider_check, self.slider_checkbox_group),
                                 column(self.st_div, self.second_toggle),
@@ -317,7 +324,12 @@ class fp_builder():
 
         self.log_div = Div(text="Log:<br>", width=400, height=150)
 
+        self.type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
         self.name_dropdown = Select(title="Pick test", value=self.test_name, options=self.name_list)
+        self.run_pickle_dropdown = Select(title="Pick pickle", value=self.in_file,
+                                          options=list(self.pickled_runs),
+                                          width=400)
+
         self.second_dropdown = Select(title="Pick second test", value=self.second_test_name, options=self.name_list)
         self.second_dropdown.visible = False
 
@@ -332,7 +344,6 @@ class fp_builder():
         self.second_toggle = RadioButtonGroup(labels=["On", "Off"], active=1)
         self.st_div = Div(text="Second histos")
 
-        self.type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
         # Create a CheckboxButtonGroup widget
         self.slider_checkbox_group = CheckboxButtonGroup(labels=["CMap refresh"], active=[])
 
@@ -359,6 +370,7 @@ class fp_builder():
         # Attach the callback to the slider and dropdown
         self.clip_select.on_change('value', self.update)
         self.type_dropdown.on_change('value', self.update)
+        self.run_pickle_dropdown.on_change('value', self.update)
 
         # Attach the callback to the checkbox's active property
         self.slider_checkbox_group.on_change('active', self.slider_checkbox_callback)
@@ -513,17 +525,23 @@ class fp_builder():
         d = new == self.name_dropdown.value
         s = new == self.second_dropdown.value
         clip = new == self.clip_select.value
+        self.new_pickle = new == self.run_pickle_dropdown.value
 
         new_run = False
-        if selected_run != self.test_run and w:
-            # new run selected - replace dict of measurements - p
-            if self.DM_stack:
-                self.generate_log_message(self.log_div, "run_text_box selected: " + selected_run)
-                self.amp_results = self.get_new_run(selected_run)
+        if (selected_run != self.test_run and w) or self.new_pickle:
+            # new run selected - replace dict of measurements - amp_results
+            if self.DM_stack or self.new_pickle:
+                new_run_name = self.run_pickle_dropdown.value if self.pickled_runs else selected_run
+                self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
+
+                kwargs = {"run_name": self.run_pickle_dropdown.value} if self.new_pickle else {"run_name": selected_run}
+                self.amp_results = self.get_new_run(**kwargs)
+
                 self.generate_log_message(self.log_div, selected_run + " loaded")
-                self.test_run = selected_run
+                self.test_run = selected_run if w else self.run_pickle_dropdown.value.split('/')[-1]
                 self.title_run_base = self.test_run
                 new_run = True
+                self.new_pickle = False
             else:
                 self.generate_log_message(self.log_div, "DM stack or EO code unavailable. Request ignored: " + selected_run)
                 return
@@ -950,18 +968,32 @@ class fp_builder():
 
         return new_test
 
+    def find_run_pickles(self):
+
+        path = Path(self.data_dir)
+        self.pickled_runs = list(path.glob('*.npy'))  # '*/' for non-recursive
+
+        self.pickled_runs = [file.as_posix() for file in self.pickled_runs]
+
     def get_new_run(self, run_name):
         self.generate_log_message(self.log_div, "Entered get_new_run " + run_name)
-        repo = "/repo/main"
-        butler = daf_butler.Butler(repo)
 
-        acq_run = run_name  # form is run-id_<weekly>, eg E2233_d_2025_01_27
+        if self.new_pickle:
+            rc = self.find_run_pickles()
+            with open(run_name, 'rb') as f:
+                amp_data = pickle.load(f)
 
-        pattern = f"u/lsstccs/eo_*_{acq_run}"
-        collections = butler.registry.queryCollections(pattern)
+        else:
+            repo = "/repo/main"
+            butler = daf_butler.Butler(repo)
 
-        amp_data = eo_pipe.get_amp_data(repo, collections)
-        self.generate_log_message(self.log_div, "new amp data acquired")
+            acq_run = run_name  # form is run-id_<weekly>, eg E2233_d_2025_01_27
+
+            pattern = f"u/lsstccs/eo_*_{acq_run}"
+            collections = butler.registry.queryCollections(pattern)
+
+            amp_data = eo_pipe.get_amp_data(repo, collections)
+            self.generate_log_message(self.log_div, "new amp data acquired")
 
         return amp_data
 
