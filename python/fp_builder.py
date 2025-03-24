@@ -151,6 +151,13 @@ class fp_builder():
         # for querying runs from the butler
         self.test_run = None
 
+        self.good_runs_list = data['good_runs_file']
+        gr = self.data_dir + self.good_runs_list
+        with open(gr, "r") as f:
+            self.good_runs = yaml.safe_load(f)
+
+        self.good_runs_versions = [(t + "_" + self.good_runs[t]) for t in self.good_runs]
+
         if self.DM_stack:
 
             repo = "/repo/main"
@@ -313,7 +320,8 @@ class fp_builder():
 
         canvas_layout = layout(self.exit_button,
                                 row(self.type_dropdown,
-                                column( self.clip_select, self.run_text_box, self.run_pickle_dropdown),
+                                column( self.clip_select, self.run_text_box, self.good_runs_dropdown,
+                                        self.run_pickle_dropdown),
                                 self.name_dropdown, self.slider,
                                     column(self.div_slider_check, self.slider_checkbox_group),
                                 column(self.st_div, self.second_toggle),
@@ -338,8 +346,11 @@ class fp_builder():
         self.second_dropdown.visible = False
 
         self.run_text_box = TextInput(title="Pick run", value="None")
+        self.good_runs_dropdown = Select(title="Pick run", value=self.good_runs["E1110"],
+                                         options=self.good_runs_versions)
         if not self.DM_stack:
             self.run_text_box.visible = False
+            self.good_runs_dropdown.visible = False
             self.generate_log_message(self.log_div, "No DM stack or EO - run selection disabled")
 
         self.exit_button = Button(label="Exit", button_type="danger")
@@ -367,7 +378,6 @@ class fp_builder():
 
     def set_callbacks(self):
 
-        #self.slider.on_change('value', self.update)
         self.name_dropdown.on_change('value', self.update)
         self.second_dropdown.on_change('value', self.update)
         self.run_text_box.on_change('value', self.update)
@@ -375,6 +385,7 @@ class fp_builder():
         self.clip_select.on_change('value', self.update)
         self.type_dropdown.on_change('value', self.update)
         self.run_pickle_dropdown.on_change('value', self.update)
+        self.good_runs_dropdown.on_change('value', self.update)
 
         # Attach the callback to the checkbox's active property
         self.slider_checkbox_group.on_change('active', self.slider_checkbox_callback)
@@ -519,6 +530,8 @@ class fp_builder():
         selected_name = self.name_dropdown.value
         second_name = self.second_dropdown.value
         selected_run = self.run_text_box.value
+        run_pickle = self.run_pickle_dropdown.value
+        good_run = self.good_runs_dropdown.value
 
         if self.clip_threshold != float(self.clip_select.value):
             self.clip_threshold = float(self.clip_select.value)
@@ -529,20 +542,34 @@ class fp_builder():
         d = new == self.name_dropdown.value
         s = new == self.second_dropdown.value
         clip = new == self.clip_select.value
-        self.new_pickle = new == self.run_pickle_dropdown.value
+        self.new_pickle = new == run_pickle
+        new_good_run = new == good_run
 
         new_run = False
-        if (selected_run != self.test_run and w) or self.new_pickle:
+        if (selected_run != self.test_run and w) or self.new_pickle or new_good_run or new_run:
             # new run selected - replace dict of measurements - amp_results
             if self.DM_stack or self.new_pickle:
-                new_run_name = self.run_pickle_dropdown.value if self.pickled_runs else selected_run
+                if w:
+                    new_run_name = self.name_dropdown.value
+                    kwargs = {"run_name": selected_run}
+                    self.test_run = selected_run
+                elif self.new_pickle:
+                    new_run_name = run_pickle
+                    kwargs = {"run_name": run_pickle}
+                    self.test_run = run_pickle
+                elif new_good_run:
+                    new_run_name = new_good_run
+                    kwargs = {"run_name": new_good_run}
+                    self.test_run = new_good_run
+
+                #new_run_name = run_pickle if self.pickled_runs else selected_run
                 self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
 
-                kwargs = {"run_name": self.run_pickle_dropdown.value} if self.new_pickle else {"run_name": selected_run}
+                #kwargs = {"run_name": self.run_pickle_dropdown.value} if run_pickle else {"run_name": selected_run}
                 self.amp_results = self.get_new_run(**kwargs)
 
                 self.generate_log_message(self.log_div, selected_run + " loaded")
-                self.test_run = selected_run if w else self.run_pickle_dropdown.value.split('/')[-1]
+                #self.test_run = selected_run if w else self.run_pickle_dropdown.value.split('/')[-1]
                 self.title_run_base = self.test_run
                 new_run = True
                 self.new_pickle = False
