@@ -320,7 +320,7 @@ class fp_builder():
 
         canvas_layout = layout(self.exit_button,
                                 row(self.type_dropdown,
-                                column( self.clip_select, self.run_text_box, self.good_runs_dropdown,
+                                column( self.clip_select, row(self.run_text_box, self.good_runs_dropdown),
                                         self.run_pickle_dropdown),
                                 self.name_dropdown, self.slider,
                                     column(self.div_slider_check, self.slider_checkbox_group),
