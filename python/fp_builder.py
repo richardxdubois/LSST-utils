@@ -4,6 +4,7 @@ import pickle
 from copy import deepcopy
 import yaml
 import argparse
+import re
 from tornado.ioloop import IOLoop
 from tornado import gen
 
@@ -143,6 +144,39 @@ class fp_builder():
 
         # for querying runs from the butler
         self.test_run = None
+
+        if self.DM_stack:
+
+            repo = "/repo/main"
+            butler = daf_butler.Butler(repo)
+
+            # query for full list of DM versions vs run
+            pattern_version = f"u/lsstccs/eo_*_*"
+
+            collections_v = butler.registry.queryCollections(pattern_version)
+
+            # Define the regular expression pattern
+
+            #  .*?_E(\d+)_(.+)$:
+            #  .*?_ matches any characters up to the first _E.
+            #  E(\d+): Matches E followed by one or more digits, capturing the digits as the first group.
+            #  _(.+)$: Matches an underscore followed by any characters until the end of the string, capturing this part as the second group.
+
+            pattern = r".*?_E(\d+)_(.+)$"
+
+            self.runs_versions = {}
+            for r in collections_v:
+
+                # Search for the pattern in the input string
+                match = re.search(pattern, r)
+
+                if match:
+                    E_code = f"E{match.group(1)}"  # Extract run
+                    w_code = f"w_{match.group(2)}"  # Extract DM version
+
+                    self.runs_versions.setdefault(E_code, [])
+                    if w_code not in self.runs_versions[E_code]:
+                        self.runs_versions[E_code].append(w_code)
 
         print(self.tests)
 
@@ -462,8 +496,9 @@ class fp_builder():
 
         self.generate_log_message(self.log_div, "Ready")
 
-    # Define callback to update the data via most of the widgets
     def update(self, attr, old, new):
+        # Define callback to update "source.data" ColumnDataSource via most of the widgets
+
         # Get the new range from the slider
         selected_name = self.name_dropdown.value
         second_name = self.second_dropdown.value
