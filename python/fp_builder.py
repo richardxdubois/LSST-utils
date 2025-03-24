@@ -405,8 +405,8 @@ class fp_builder():
 
     # Define a callback to update the div whenever the checkbox state changes
     def slider_checkbox_callback(self, attr, old, new):
-        state = "On" if new else "Off"
-        self.cm_refresh = True if new else False
+        state = "Off" if new else "On"
+        self.cm_refresh = False if new else True
         self.div_slider_check.text = f"state: {state}"
 
     # Define a function to stop the server - define async functions to ensure the log msg and button
