@@ -30,6 +30,7 @@ class fp_builder():
             self.DM_stack = True
         except ImportError:
             self.DM_stack = False
+            print("Could not load DM or EO code")
 
         parser = argparse.ArgumentParser()
 
