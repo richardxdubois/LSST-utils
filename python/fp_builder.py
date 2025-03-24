@@ -566,6 +566,7 @@ class fp_builder():
                 self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
 
                 #kwargs = {"run_name": self.run_pickle_dropdown.value} if run_pickle else {"run_name": selected_run}
+                print("Fetching new run", new_run_name)
                 self.amp_results = self.get_new_run(**kwargs)
 
                 self.generate_log_message(self.log_div, selected_run + " loaded")
