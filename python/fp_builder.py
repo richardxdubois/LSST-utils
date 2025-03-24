@@ -6,6 +6,7 @@ import yaml
 import argparse
 import re
 from pathlib import Path
+import time
 
 from tornado.ioloop import IOLoop
 from tornado import gen
@@ -549,9 +550,11 @@ class fp_builder():
         if (selected_run != self.test_run and w) or self.new_pickle or new_good_run or new_run:
             # new run selected - replace dict of measurements - amp_results
             if self.DM_stack or self.new_pickle:
+
                 self.good_runs_dropdown.remove_on_change('value', self.update)
                 self.run_pickle_dropdown.remove_on_change('value', self.update)
                 self.run_text_box.remove_on_change('value', self.update)
+
                 if w:
                     new_run_name = self.name_dropdown.value
                     kwargs = {"run_name": selected_run}
@@ -575,15 +578,16 @@ class fp_builder():
                 self.run_pickle_dropdown.on_change('value', self.update)
                 self.run_text_box.on_change('value', self.update)
 
-                #new_run_name = run_pickle if self.pickled_runs else selected_run
                 self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
 
-                #kwargs = {"run_name": self.run_pickle_dropdown.value} if run_pickle else {"run_name": selected_run}
                 print("Fetching new run", new_run_name)
+                start_time = time.time()
                 self.amp_results = self.get_new_run(**kwargs)
+                end_time = time.time()
+                elapsed_time = end_time - start_time
 
-                self.generate_log_message(self.log_div, selected_run + " loaded")
-                #self.test_run = selected_run if w else self.run_pickle_dropdown.value.split('/')[-1]
+                self.generate_log_message(
+                    self.log_div, new_run_name + " loaded after " + str(elapsed_time) + " seconds")
                 self.title_run_base = self.test_run
                 new_run = True
                 self.new_pickle = False
