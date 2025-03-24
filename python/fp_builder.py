@@ -18,19 +18,22 @@ from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 from bokeh.transform import transform
 
+try:
+    import lsst.daf.butler as daf_butler
+    import lsst.eo.pipe as eo_pipe
+
+    DM_stack = True
+except ImportError:
+    DM_stack = False
+    print("Could not load DM or EO code")
+
 
 class fp_builder():
     def __init__(self):
 
-        # in case the DM stack and EO pipe code is unavailable. In that case, only pickle files can be used.
+        self.DM_stack = DM_stack
 
-        try:
-            import lsst.daf.butler as daf_butler
-            import lsst.eo.pipe as eo_pipe
-            self.DM_stack = True
-        except ImportError:
-            self.DM_stack = False
-            print("Could not load DM or EO code")
+        # in case the DM stack and EO pipe code is unavailable. In that case, only pickle files can be used.
 
         parser = argparse.ArgumentParser()
 
