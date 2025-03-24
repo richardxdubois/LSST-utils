@@ -658,7 +658,7 @@ class fp_builder():
     def generate_log_message(self, log_div, message):
         self.message_log.append(message)
 
-        if len(self.message_log) > 5:
+        if len(self.message_log) > 10:
             self.message_log.pop(0)
 
         self.log_div.text = "Log: <br>" + "<br>".join(self.message_log)
