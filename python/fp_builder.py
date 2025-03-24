@@ -559,8 +559,8 @@ class fp_builder():
                     self.test_run = run_pickle
                 elif new_good_run:
                     new_run_name = good_run
-                    kwargs = {"run_name": new_good_run}
-                    self.test_run = new_good_run
+                    kwargs = {"run_name": good_run}
+                    self.test_run = good_run
 
                 #new_run_name = run_pickle if self.pickled_runs else selected_run
                 self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
