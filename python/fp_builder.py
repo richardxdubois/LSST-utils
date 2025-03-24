@@ -549,24 +549,31 @@ class fp_builder():
         if (selected_run != self.test_run and w) or self.new_pickle or new_good_run or new_run:
             # new run selected - replace dict of measurements - amp_results
             if self.DM_stack or self.new_pickle:
+                self.good_runs_dropdown.remove_on_change('value', self.update)
+                self.run_pickle_dropdown.remove_on_change('value', self.update)
+                self.run_text_box.remove_on_change('value', self.update)
                 if w:
                     new_run_name = self.name_dropdown.value
                     kwargs = {"run_name": selected_run}
                     self.test_run = selected_run
-                    #self.good_runs_dropdown.value = "None"
-                    #self.run_pickle_dropdown.value = "None"
+                    self.good_runs_dropdown.value = "None"
+                    self.run_pickle_dropdown.value = "None"
                 elif self.new_pickle:
                     new_run_name = run_pickle
                     kwargs = {"run_name": run_pickle}
                     self.test_run = run_pickle
-                    #self.run_text_box.value = "None"
-                    #self.good_runs_dropdown.value = "None"
+                    self.run_text_box.value = "None"
+                    self.good_runs_dropdown.value = "None"
                 elif new_good_run:
                     new_run_name = good_run
                     kwargs = {"run_name": good_run}
                     self.test_run = good_run
-                    #self.run_text_box.value = "None"
-                    #self.run_pickle_dropdown.value = "None"
+                    self.run_text_box.value = "None"
+                    self.run_pickle_dropdown.value = "None"
+
+                self.good_runs_dropdown.on_change('value', self.update)
+                self.run_pickle_dropdown.on_change('value', self.update)
+                self.run_text_box.on_change('value', self.update)
 
                 #new_run_name = run_pickle if self.pickled_runs else selected_run
                 self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
