@@ -60,7 +60,7 @@ class fp_builder():
 
         # flag to update colour map ranges after each slider change or not (default not)
 
-        self.cm_refresh = False
+        self.cm_refresh = True
 
         self.source_dict_raft = None
         self.source_dict_fp = None
@@ -352,7 +352,7 @@ class fp_builder():
         self.slider_checkbox_group = CheckboxButtonGroup(labels=["CMap refresh"], active=[])
 
         # Create a Div to display the current state
-        self.div_slider_check = Div(text="state: Off")
+        self.div_slider_check = Div(text="state: On")
 
         # Add TapTool
         self.taptool = TapTool()
@@ -657,7 +657,7 @@ class fp_builder():
             # take mask from main test (probably)
             mask = mask_in
 
-        z_u[mask] = self.guard_value
+        #z_u[mask] = self.guard_value
         t_source.data[t_test_name] = z_u
 
         t_mask = (lower <= z_u) & (z_u <= upper)
