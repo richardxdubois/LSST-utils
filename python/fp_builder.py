@@ -347,7 +347,7 @@ class fp_builder():
 
         self.run_text_box = TextInput(title="Pick run", value="None")
         self.good_runs_dropdown = Select(title="Pick run", value=self.good_runs["E1110"],
-                                         options=self.good_runs_versions)
+                                         options=self.good_runs_versions, width=100)
         if not self.DM_stack:
             self.run_text_box.visible = False
             self.good_runs_dropdown.visible = False
@@ -558,7 +558,7 @@ class fp_builder():
                     kwargs = {"run_name": run_pickle}
                     self.test_run = run_pickle
                 elif new_good_run:
-                    new_run_name = new_good_run
+                    new_run_name = good_run
                     kwargs = {"run_name": new_good_run}
                     self.test_run = new_good_run
 
