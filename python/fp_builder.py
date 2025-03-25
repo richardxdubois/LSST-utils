@@ -1150,7 +1150,7 @@ class fp_builder():
         locate all the pickle files in the data dir
         :return:
         """
-        path = Path(self.data_dir)
+        path = Path(self.data_dir + "/run_pickles/")
         self.pickled_runs = list(path.glob('*.npy'))  # '*/' for non-recursive
 
         self.pickled_runs = [file.as_posix() for file in self.pickled_runs]
