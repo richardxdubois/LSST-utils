@@ -1153,7 +1153,7 @@ class fp_builder():
         path = Path(self.data_dir + "/run_pickles/")
         self.pickled_runs = list(path.glob('*.npy'))  # '*/' for non-recursive
 
-        self.pickled_runs = [file.as_posix() for file in self.pickled_runs]
+        self.pickled_runs = np.sort([file.as_posix() for file in self.pickled_runs])
 
     def get_new_run(self, run_name):
         """
