@@ -339,15 +339,15 @@ class fp_builder():
 
         self.type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
         self.name_dropdown = Select(title="Pick test", value=self.test_name, options=self.name_list)
-        self.run_pickle_dropdown = Select(title="Pick run from pickle file", value=self.in_file,
+        self.run_pickle_dropdown = Select(title="Pick run from pickle file list", value=self.in_file,
                                           options=list(self.pickled_runs),
                                           width=400)
 
         self.second_dropdown = Select(title="Pick second test", value=self.second_test_name, options=self.name_list)
         self.second_dropdown.visible = False
 
-        self.run_text_box = TextInput(title="Input run", value="None")
-        self.good_runs_dropdown = Select(title="Pick good run", value=self.good_runs["E1110"],
+        self.run_text_box = TextInput(title="Input run (run_version)", value="None")
+        self.good_runs_dropdown = Select(title="Pick good run from list", value=self.good_runs["E1110"],
                                          options=self.good_runs_versions, width=200)
         if not self.DM_stack:
             self.run_text_box.visible = False
