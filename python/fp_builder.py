@@ -31,6 +31,19 @@ except ImportError:
 
 class fp_builder():
     def __init__(self):
+        """
+        fp_builder initializes the Bokeh application for visualizing LSSTCam focal plane EO data. It builds
+        a heatmap, plus histogram of selected test. Optionally will scatterplot and histogram a second test.
+        Content of all are subject to a 2-ended slider.
+
+        One can also change from full focal plane to single raft and back by clicking on the desired raft in
+        the heatmap (and then anywhere to toggle back).
+
+        Attributes:
+            log_div (Div): A Bokeh Div widget for displaying logs.
+            exit_button (Button): A Bokeh Button widget to exit the server.
+            canvas_layout (Column): The layout that organizes the widgets.
+        """
 
         self.DM_stack = DM_stack
 
@@ -346,7 +359,10 @@ class fp_builder():
         curdoc().title = "LSSTCam focal plane EO viewer"
 
     def create_widgets(self):
-
+        """
+        Defines all the widgets, except slider.
+        :return:
+        """
         self.log_div = Div(text="Log:<br>", width=400, height=150)
 
         self.type_dropdown = Select(title="Pick sensor", value="all", options=["all", "E2V", "ITL"])
@@ -390,7 +406,9 @@ class fp_builder():
         self.color_bar = ColorBar(color_mapper=self.color_mapper, location=(0, 0))
 
     def set_callbacks(self):
-
+        """
+        Define (almost) all the callbacks for the widgets. Most invoke self.update
+        """
         self.name_dropdown.on_change('value', self.update)
         self.second_dropdown.on_change('value', self.update)
         self.run_text_box.on_change('value', self.update)
@@ -437,24 +455,51 @@ class fp_builder():
     # colour change happen before stopping the server
 
     def stop_server(self):
+        """
+         Stops the Bokeh server gracefully.
+
+         This method updates the log message, changes the button color,
+         and then stops the Tornado IOLoop to shut down the server.
+         """
+
         curdoc().add_next_tick_callback(lambda: self.async_generate_log_message(self.log_div, "Server is shutting down..."))
         curdoc().add_next_tick_callback(lambda: self.change_button_color(self.exit_button, "light"))
         curdoc().add_next_tick_callback(self.exit_server)
 
     # Function to update the log message in the Div
     async def async_generate_log_message(self, log_div, message):
+        """
+        Asynchronously updates the log message in the Div widget.
+
+        Args:
+            log_div (Div): The Div widget to update.
+            message (str): The message to display in the log_div.
+        """
         log_div.text = message
 
     async def exit_server(self):
+        """
+        Stops the Tornado IOLoop, effectively shutting down the server.
+        """
+
         print("Server is shutting down...")
         IOLoop.current().stop()
 
     async def change_button_color(self, button, color):
+        """
+        Asynchronously changes the button color.
+
+        Args:
+            button (Button): The button widget whose color will be changed.
+            color (str): The new color for the button.
+        """
         button.button_type = color
 
     # Define a callback function for TapTool
     def tap_callback(self, event):
-        # used for selecting a single raft to view; then toggle back
+        """
+        Handles the tap event: toggles between full fp mode and single raft
+        """
         selected = self.source.selected
         try:
             selected_index = self.source.selected.indices[0]
@@ -537,7 +582,9 @@ class fp_builder():
         self.generate_log_message(self.log_div, "Ready")
 
     def update(self, attr, old, new):
-        # Define callback to update "source.data" ColumnDataSource via most of the widgets
+        """
+        Define callback to update "source.data" ColumnDataSource via most of the widgets
+        """
 
         # Get the new range from the slider
         selected_name = self.name_dropdown.value
@@ -681,6 +728,13 @@ class fp_builder():
         curdoc().add_next_tick_callback(lambda: None)
 
     def clip_limits(self, name, test, threshold):
+        """
+        Use a clipped median to set limits
+        :param name: test name
+        :param test:  test data
+        :param threshold: n_sigma
+        :return:
+        """
 
         mask = (~np.isnan(test)) & (test != self.guard_value)
         median = np.median(test[mask])
@@ -695,7 +749,15 @@ class fp_builder():
         return lower, upper
 
     def do_test_stuff(self, t_source, h_source, t_test_name, use_slider=True, mask_in=None):
-
+        """
+        Gather repetitive actions for histogramming tests and applying limits to the heatmap
+        :param t_source: self.source usually
+        :param h_source: ColumnDataSource used for histograms
+        :param t_test_name: test name
+        :param use_slider: use the slider limits rather than set new ones
+        :param mask_in: optionally take an input mask, applied to the test data
+        :return:
+        """
         z_u = np.array(self.source_static[t_test_name])
         raft_type = np.array(t_source.data["raft_type"])
 
@@ -737,6 +799,14 @@ class fp_builder():
 #                order first and second 8 segments
 
     def extract_signal_data(self, test_data, raft_ccd, angle, raft_ccd2=None):
+        """
+        Package the 16 channels of segment data into either a (2,8) or (8,2), shape then flatten.
+        :param test_data: all data for this test
+        :param raft_ccd: "raft_ccd" input
+        :param angle: angle applied to the cell in the heatmap
+        :param raft_ccd2: optional second sensor, used for SW sensors with only 8 channels each
+        :return:
+        """
         r, c = raft_ccd.split("_")
 
         try:
@@ -785,6 +855,14 @@ class fp_builder():
         return signal.flatten()
 
     def extract_amp_names(self, test_data, raft_ccd, angle, raft_ccd2=None):
+        """
+        Package the 16 channels of sensor and segment names into either (2,8) or (8,2) shapes. then flatten.
+        :param test_data: all data for this test
+        :param raft_ccd: "raft_ccd" input
+        :param angle: angle applied to the cell in the heatmap
+        :param raft_ccd2: optional second sensor, used for SW sensors with only 8 channels each
+        :return:
+        """
         r, c = raft_ccd.split("_")
         c0 = c
         if raft_ccd2 is not None:
@@ -843,7 +921,15 @@ class fp_builder():
         return amps.flatten(), ccds_c0.flatten()
 
     def re_histogram(self, cds, width_name, test, lower, upper):
-
+        """
+        do routine histogramming
+        :param cds: histogram ColumnDataSource
+        :param width_name: column name of the bin widths
+        :param test: test data
+        :param lower: lower limit
+        :param upper: upper limit
+        :return:
+        """
         t_hist, t_edges = np.histogram(test, bins=100, range=(lower, upper))
         width = t_edges[1] - t_edges[0]
         t_vbar_width = np.ones_like(t_hist) * width
@@ -851,7 +937,10 @@ class fp_builder():
 
 # set up the grid of amps
     def amp_grid(self):
-
+        """
+        set up static grid of segments for full focal plane
+        :return:
+        """
         x = np.arange(self.segments) * self.amp_width
         y = np.arange(self.amps) * self.amp_length/2.
         xg, yg = np.meshgrid(x, y)
@@ -895,10 +984,11 @@ class fp_builder():
             x_0 = self.ccd_border
 
     def CR_grid(self, raft):
-
-        # composed of 4 sensors, 2 SW (each with 8 channels) and 2 SG with 16. The layout is rotated counterclockwise
-        # use R00 as the template, starting with SG1
-
+        """
+        set up the Corner Raft grid. Only 4 sensors per raft
+        composed of 4 sensors, 2 SW (each with 8 channels) and 2 SG with 16. The layout is rotated counterclockwise
+        use R00 as the template, starting with SG1
+        """
         CR_x = np.empty(0)
         CR_y = np.empty(0)
         CR_ccd = np.empty(0)
@@ -958,7 +1048,12 @@ class fp_builder():
         return CR_x, CR_y, CR_ccd, CR_raft, CR_angle, CR_raft_type
 
     def get_CR_test(self, raft, test_data):
-
+        """
+        Fetch Corner Raft test data
+        :param raft:
+        :param test_data:
+        :return:
+        """
         new_test = np.empty(0)
         amp_names = np.empty(0)
         ccds = np.empty(0)
@@ -1003,7 +1098,12 @@ class fp_builder():
         return new_test, amp_names, ccds
 
     def get_new_test(self, t_name, single_raft=None):
-
+        """
+        Fetch a new test
+        :param t_name: test name
+        :param single_raft: optional name of single raft
+        :return:
+        """
         if "HIGH" in t_name or "LOW" in t_name:
             t_name_split = t_name.split("_")
             t_name = (t_name_split[0], t_name_split[1])
@@ -1033,13 +1133,21 @@ class fp_builder():
         return new_test
 
     def find_run_pickles(self):
-
+        """
+        locate all the pickle files in the data dir
+        :return:
+        """
         path = Path(self.data_dir)
         self.pickled_runs = list(path.glob('*.npy'))  # '*/' for non-recursive
 
         self.pickled_runs = [file.as_posix() for file in self.pickled_runs]
 
     def get_new_run(self, run_name):
+        """
+        Fetch a new run: from explicit run name, from good run list or from list of pickle files
+        :param run_name:
+        :return:
+        """
         self.generate_log_message(self.log_div, "Entered get_new_run " + run_name)
 
         if self.new_pickle:
@@ -1062,7 +1170,12 @@ class fp_builder():
         return amp_data
 
     def update_slider(self, lower, upper):
-
+        """
+        Update slider properties and optionally the colour map
+        :param lower:
+        :param upper:
+        :return:
+        """
         # have to turn off callback while values are changed or the callback will be triggered
         try:
             self.slider.remove_on_change('value_throttled', self.update)
