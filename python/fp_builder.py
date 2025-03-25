@@ -39,6 +39,19 @@ class fp_builder():
         One can also change from full focal plane to single raft and back by clicking on the desired raft in
         the heatmap (and then anywhere to toggle back).
 
+        Workflow:
+            define widgets
+            declare callbacks
+
+            create x-y grid of CCD and raft positions
+            create dicts for full focal plane, single raft, CR using a default run and test
+
+            define the canvas layout
+            start up the event loop
+
+            tap_callback responds to clicking on the heatmap
+            update responds to most of the widgets
+
         Attributes:
             log_div (Div): A Bokeh Div widget for displaying logs.
             exit_button (Button): A Bokeh Button widget to exit the server.
@@ -935,10 +948,10 @@ class fp_builder():
         t_vbar_width = np.ones_like(t_hist) * width
         cds.data = {"top": t_hist, "x": t_edges[:-1], width_name: t_vbar_width}
 
-# set up the grid of amps
     def amp_grid(self):
         """
-        set up static grid of segments for full focal plane
+        set up the x-y locations for each CCD (self.start_ccd) and raft (self.start_raft)
+        Corner Rafts don't use this.
         :return:
         """
         x = np.arange(self.segments) * self.amp_width
@@ -1201,6 +1214,12 @@ class fp_builder():
         self.color_mapper.high = upper * 1.1
 
     def make_ccd_grid(self, r, dict_choice):
+        """
+        sets up grid for focal plane and populates input ColumnDataSource
+        :param r:  raft
+        :param dict_choice: ColumnDataSource to use (full, single raft, CR raft)
+        :return:
+        """
         for cd in self.ccd_groups:
             for c in cd:
                 raft_ccd = r + "_" + c
