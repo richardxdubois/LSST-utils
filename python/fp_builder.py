@@ -319,15 +319,26 @@ class fp_builder():
         hover_s.tooltips = [("type", "@raft_type"), ("test", "@z"), ("test2", "@test2"),
                             ("ccd", "@ccd"), ("raft", "@raft"), ("amp", "@amp")]
 
+        # select sensor type and set clip threshold
+        layout_1 = column(self.type_dropdown, self.clip_select)
+        # run selection via butler
+        layout_2 = row(self.run_text_box, self.good_runs_dropdown)
+        # run selection via pickle file
+        layout_3 = self.run_pickle_dropdown
+        # pick test name and slider
+        layout_4 = row(self.name_dropdown, self.slider)
+        # toggle colour map refresh
+        layout_5 = column(self.div_slider_check, self.slider_checkbox_group)
+        # toggle 2nd histogram/scatterplot
+        layout_6 = column(self.st_div, self.second_toggle)
+        # pulldown for 2nd histo, and message log
+        layout_7 = row(self.second_dropdown, self.log_div)
+        # plots
+        layout_8 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
+
         canvas_layout = layout(self.exit_button,
-                                row(self.type_dropdown,
-                                column( self.clip_select, row(self.run_text_box, self.good_runs_dropdown),
-                                        self.run_pickle_dropdown),
-                                self.name_dropdown, self.slider,
-                                    column(self.div_slider_check, self.slider_checkbox_group),
-                                column(self.st_div, self.second_toggle),
-                                    self.second_dropdown, self.log_div),
-                                row(self.fp, column(self.histo1, self.scatter12, self.histo2)))
+                      row(layout_1, layout_2, layout_3, layout_4, layout_5, layout_6, layout_7),
+                            layout_8)
 
         # Add the layout to the current document
         curdoc().add_root(canvas_layout)
@@ -337,7 +348,7 @@ class fp_builder():
 
         self.log_div = Div(text="Log:<br>", width=400, height=150)
 
-        self.type_dropdown = Select(title="Pick type", value="all", options=["all", "E2V", "ITL"])
+        self.type_dropdown = Select(title="Pick sensor", value="all", options=["all", "E2V", "ITL"])
         self.name_dropdown = Select(title="Pick test", value=self.test_name, options=self.name_list)
         self.run_pickle_dropdown = Select(title="Pick run from pickle file list", value=self.in_file,
                                           options=list(self.pickled_runs),
