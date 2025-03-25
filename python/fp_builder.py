@@ -74,6 +74,7 @@ class fp_builder():
 
         self.data_dir = data["data_dir"]
         self.in_file = self.data_dir + data["in_file_name"]
+        self.run_pickles_path = self.data_dir + "run_pickles/"
 
         self.guard_value = data["guard_value"]
 
@@ -348,7 +349,7 @@ class fp_builder():
         # select sensor type and set clip threshold
         layout_1 = column(self.type_dropdown, self.clip_select)
         # run selection via butler
-        layout_2 = row(self.run_text_box, self.good_runs_dropdown)
+        layout_2 = row(self.run_text_box)  #, self.good_runs_dropdown)
         # run selection via pickle file
         layout_3 = self.run_pickle_dropdown
         # pick test name and slider
@@ -1150,10 +1151,10 @@ class fp_builder():
         locate all the pickle files in the data dir
         :return:
         """
-        path = Path(self.data_dir + "/run_pickles/")
+        path = Path(self.run_pickles_path)
         self.pickled_runs = list(path.glob('*.npy'))  # '*/' for non-recursive
 
-        self.pickled_runs = np.sort([file.as_posix() for file in self.pickled_runs])
+        self.pickled_runs = np.sort([Path(file.as_posix()).name for file in self.pickled_runs])
 
     def get_new_run(self, run_name):
         """
@@ -1165,7 +1166,8 @@ class fp_builder():
 
         if self.new_pickle:
             rc = self.find_run_pickles()
-            with open(run_name, 'rb') as f:
+            fname = self.run_pickles_path +  run_name
+            with open(fname, 'rb') as f:
                 amp_data = pickle.load(f)
 
         else:
