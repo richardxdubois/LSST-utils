@@ -337,7 +337,8 @@ class fp_builder():
         layout_8 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
 
         canvas_layout = layout(self.exit_button,
-                      row(layout_1, layout_2, layout_3, layout_4, layout_5, layout_6, layout_7),
+                      row(layout_1,
+                          column(layout_2, layout_3), layout_4, layout_5, layout_6, layout_7),
                             layout_8)
 
         # Add the layout to the current document
