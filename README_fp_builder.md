@@ -1,6 +1,6 @@
-Instructions for running the trial fp builder bokeh server app 2025-03-12
+# Instructions for running the trial fp builder bokeh server app 2025-03-12
 
-Purpose of the app is to demonstrate exploration of the Run7 EO test campaign,
+Purpose of the app is to provide exploration of the Run7 EO test campaign,
 using heatmaps of parameters across the full focal plane, coupled with
 histograms of selected parameters and optiional correlation with a second
 parameter. It is a trial bit of code to see if this approach is useful.
