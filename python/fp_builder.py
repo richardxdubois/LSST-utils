@@ -145,7 +145,7 @@ class fp_builder():
         with open(self.in_file, 'rb') as f:
             self.amp_results = pickle.load(f)
 
-        self.tests = list(self.amp_results.keys())
+        rc = self.set_test_list()
         self.test_name = self.tests[11]
         self.second_test_name = self.test_name
 
@@ -236,14 +236,6 @@ class fp_builder():
         filtered_gains = self.gains[~np.isnan(self.gains)]
         self.min_z = min(filtered_gains)
         self.max_z = max(filtered_gains)
-
-        self.name_list = []
-
-        for elem in self.tests:
-            if isinstance(elem, tuple) and len(elem) == 2:
-                self.name_list.append(f"{elem[0]}_{elem[1]}")
-            else:
-                self.name_list.append(elem)
 
         # get the list of amp names (never change for focal plane)
 
@@ -668,6 +660,23 @@ class fp_builder():
                 print("Fetching new run", new_run_name)
                 start_time = time.time()
                 self.amp_results = self.get_new_run(**kwargs)
+                rc = self.set_test_list()
+
+                self.name_dropdown.remove_on_change('value', self.update)
+                self.second_dropdown.remove_on_change('value', self.update)
+
+                self.name_dropdown.options = self.name_list
+                self.second_dropdown.options = self.name_list
+
+                if selected_name not in self.name_list:
+                    selected_name = self.name_list[0]
+                    self.name_dropdown.value = selected_name
+                    self.second_dropdown.value = second_name
+                    second_name = self.name_list[0]
+
+                self.name_dropdown.on_change('value', self.update)
+                self.second_dropdown.on_change('value', self.update)
+
                 end_time = time.time()
                 elapsed_time = end_time - start_time
 
@@ -754,6 +763,19 @@ class fp_builder():
 
         self.log_div.text = "Log: <br>" + "<br>".join(self.message_log)
         curdoc().add_next_tick_callback(lambda: None)
+
+    def set_test_list(self):
+
+        self.name_list = []
+        # tests seems to be able to have zero length!
+        self.tests = [key for key, value in self.amp_results.items() if isinstance(value, dict) and len(value) > 0]
+        self.test_name = self.tests[0]
+
+        for elem in self.tests:
+            if isinstance(elem, tuple) and len(elem) == 2:
+                self.name_list.append(f"{elem[0]}_{elem[1]}")
+            else:
+                self.name_list.append(elem)
 
     def clip_limits(self, name, test, threshold):
         """
