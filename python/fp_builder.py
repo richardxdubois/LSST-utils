@@ -7,6 +7,7 @@ import argparse
 import re
 from pathlib import Path
 import time
+from scipy.stats.mstats import winsorize
 
 from tornado.ioloop import IOLoop
 from tornado import gen
@@ -679,11 +680,13 @@ class fp_builder():
             if not new_run:
                 self.test_name = selected_name
             self.generate_log_message(self.log_div, "updating sliders for : " + selected_name)
+            lower, upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
 
-            t_lower, t_upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
-            mask = (new_test_data > t_lower) & (new_test_data < t_upper)
-            new_masked = new_test_data[mask]
-            lower, upper = self.clip_limits(self.test_name, new_masked, self.clip_threshold)
+            #t_lower, t_upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
+            #mask = (new_test_data > t_lower) & (new_test_data < t_upper)
+            #new_masked = new_test_data[mask]
+
+            #lower, upper = self.clip_limits(self.test_name, new_masked, self.clip_threshold)
 
             rc = self.update_slider(lower, upper)
 
@@ -751,14 +754,19 @@ class fp_builder():
         """
 
         mask = (~np.isnan(test)) & (test != self.guard_value)
-        median = np.median(test[mask])
-        std = np.std(test[mask])
+        t_mask = test[mask]
 
-        lower = max(min(test), median - threshold * std)
-        upper = min(max(test), median + threshold * std)
+        # trying to clip big outliers
+        clipped_data = winsorize(t_mask, limits=[0.0025, 0.0025])
+
+        median = np.median(clipped_data)
+        std = np.std(clipped_data)
+
+        lower = max(min(clipped_data), median - threshold * std)
+        upper = min(max(clipped_data), median + threshold * std)
 
         self.generate_log_message(self.log_div,
-                                  f"{name} Clipping median {median:.2f} std + {std:.2f} thrsh {self.clip_threshold:.2f}")
+                                  f"{name} Clipping median {median:.2e} std + {std:.2e} thrsh {self.clip_threshold:.2f}")
 
         return lower, upper
 
@@ -773,6 +781,9 @@ class fp_builder():
         :return:
         """
         z_u = np.array(self.source_static[t_test_name])
+        mask_nan = np.isnan(z_u)
+        z_u[mask_nan] = self.guard_value
+
         raft_type = np.array(t_source.data["raft_type"])
 
         if use_slider:
@@ -789,10 +800,14 @@ class fp_builder():
         else:
             # take mask from main test (probably)
             mask = mask_in
+            z_u[mask] = self.guard_value
 
         # turn values black in the heatmap if colour map not refreshing with the slider values
         if not self.cm_refresh:
             z_u[mask] = self.guard_value
+        elif self.type_dropdown.value != "all":
+            mask_type = (raft_type != self.type_dropdown.value)
+            z_u[mask_type] = self.guard_value
 
         t_source.data[t_test_name] = z_u
 
