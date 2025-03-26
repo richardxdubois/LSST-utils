@@ -15,10 +15,11 @@ from tornado import gen
 from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import PrintfTickFormatter, BasicTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
-                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter, CheckboxButtonGroup)
+                          TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter, CheckboxButtonGroup,
+                          CustomJS)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
-from bokeh.transform import transform
+
 
 try:
     import lsst.daf.butler as daf_butler
@@ -365,7 +366,7 @@ class fp_builder():
         # plots
         layout_8 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
 
-        canvas_layout = layout(self.exit_button,
+        canvas_layout = layout(row(self.exit_button, self.doc_button),
                       row(layout_1,
                           column(layout_2, layout_3), layout_4, layout_5, layout_6, layout_7),
                             layout_8)
@@ -421,6 +422,8 @@ class fp_builder():
 
         self.color_bar = ColorBar(color_mapper=self.color_mapper, location=(0, 0))
 
+        self.doc_button = Button(label="Help", button_type="success")
+
     def set_callbacks(self):
         """
         Define (almost) all the callbacks for the widgets. Most invoke self.update
@@ -442,11 +445,18 @@ class fp_builder():
 
         self.second_toggle.on_change("active", self.second_callback)
 
+        doc_url = "https://richardxdubois.github.io/LSST-utils/README_fp_builder.md"
+        self.doc_callback = CustomJS(code=f"window.open('{doc_url}', '_blank');")
+
+        self.doc_button.js_on_click(self.doc_callback)
+
         # Attach the callback to the TapTool's event
         self.fp.add_tools(self.taptool)
         self.fp.on_event('tap', self.tap_callback)
 
         self.fp.add_layout(self.color_bar, 'right')
+
+    # callback for Help url
 
     # Define a callback to toggle the visibility of the plot
     def second_callback(self, attr, old, new):
