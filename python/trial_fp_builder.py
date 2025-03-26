@@ -802,7 +802,7 @@ second_toggle = RadioButtonGroup(labels=["On", "Off"], active=1)
 st_div = Div(text="Second histos")
 
 
-# Define a function to stop the server - define tornado co-routines to ensure the log msg and button
+# Define a function to stop the server - define async functions to ensure the log msg and button
 # colour change happen before stopping the server
 
 def stop_server():

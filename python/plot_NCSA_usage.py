@@ -17,25 +17,61 @@ project = []
 scratch = []
 repo = []
 
+who = {}
+
 f = open(ncsa)
 
 header = True
 for lines in f:
     strp_line = lines.strip("\n").strip()
     fields = strp_line.split(",")
-    if fields[1] == "user":
+    if fields[0].strip() == "user":
         continue
 
-    if fields[1] == "home":
-        uhome.append(int(fields[2]))
-    elif fields[1] == "jhome":
-        jhome.append(int(fields[2]))
-    elif fields[1] == "project":
-        project.append(int(fields[2]))
-    elif fields[1] == "scratch":
-        scratch.append(int(fields[2]))
-    elif fields[1] == "repo":
-        repo.append(int(fields[2]))
+    user = fields[0]
+    data_type = fields[1]
+    size = fields[2]
+    who.setdefault(user, {})
+    who[user][data_type] = int(size)
+
+    if data_type == "home":
+        uhome.append(int(size))
+    elif data_type == "jhome":
+        jhome.append(int(size))
+    elif data_type == "project":
+        project.append(int(size))
+    elif data_type == "scratch":
+        scratch.append(int(size))
+    elif data_type == "repo":
+        repo.append(int(size))
+
+print("Home big users")
+big_home = 0
+n_big_home = 0
+for w in who:
+    try:
+        s = who[w]["home"]
+    except KeyError:
+        continue
+    if s > 100:
+        print(w, s)
+        big_home += s
+        n_big_home += 1
+print("\nSum of big homes", big_home, " # bigs ", n_big_home, "\n\n")
+
+print("Project big users")
+big_project = 0
+n_big_project = 0
+for w in who:
+    try:
+        s = who[w]["project"]
+    except KeyError:
+        continue
+    if s > 100:
+        print(w, s)
+        big_project += s
+        n_big_project += 1
+print("\nSum of big project", big_project, "# bigs ", n_big_project, "\n\n")
 
 
 hist, edges = np.histogram(uhome, bins=15, range=(0.1,100))
