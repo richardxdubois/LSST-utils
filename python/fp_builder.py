@@ -173,6 +173,7 @@ class fp_builder():
 
         # n_sigma clip threshold displays
         self.clip_threshold = 5.
+        self.clip_threshold_initial = self.clip_threshold
 
         self.t2_lower = 0
         self.t2_upper = 0
@@ -780,6 +781,14 @@ class fp_builder():
         :param mask_in: optionally take an input mask, applied to the test data
         :return:
         """
+
+        if t_test_name == "test2":
+            width_name = "t2_vbar_width"
+            clip_t = self.clip_threshold_initial
+        else:
+            width_name = "vbar_width"
+            clip_t = self.clip_threshold
+
         z_u = np.array(self.source_static[t_test_name])
         mask_nan = np.isnan(z_u)
         z_u[mask_nan] = self.guard_value
@@ -789,7 +798,7 @@ class fp_builder():
         if use_slider:
             lower, upper = self.slider.value
         else:
-            lower, upper = self.clip_limits(t_test_name, z_u, self.clip_threshold)
+            lower, upper = self.clip_limits(t_test_name, z_u, clip_t)
 
         if mask_in is None:
             # mask is channels failing cuts. Set them to a guard value.
@@ -812,11 +821,6 @@ class fp_builder():
         t_source.data[t_test_name] = z_u
 
         t_mask = (lower <= z_u) & (z_u <= upper)
-
-        if t_test_name == "test2":
-            width_name = "t2_vbar_width"
-        else:
-            width_name = "vbar_width"
 
         self.re_histogram(h_source, width_name, z_u[t_mask], lower, upper)
 
