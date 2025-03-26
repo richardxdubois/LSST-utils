@@ -662,6 +662,9 @@ class fp_builder():
                 self.amp_results = self.get_new_run(**kwargs)
                 rc = self.set_test_list()
 
+                # fix up the test dropdown menus, including potentially that the current test is not
+                # in the new run
+
                 self.name_dropdown.remove_on_change('value', self.update)
                 self.second_dropdown.remove_on_change('value', self.update)
 
@@ -673,6 +676,7 @@ class fp_builder():
                     self.name_dropdown.value = selected_name
                     self.second_dropdown.value = second_name
                     second_name = self.name_list[0]
+                    self.generate_log_message(self.log_div, "list of tests has changed!")
 
                 self.name_dropdown.on_change('value', self.update)
                 self.second_dropdown.on_change('value', self.update)
