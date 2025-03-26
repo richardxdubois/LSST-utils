@@ -771,15 +771,19 @@ class fp_builder():
     def set_test_list(self):
 
         self.name_list = []
+        self.test_name_aliases = {}
         # tests seems to be able to have zero length!
         self.tests = [key for key, value in self.amp_results.items() if isinstance(value, dict) and len(value) > 0]
         self.test_name = self.tests[0]
 
         for elem in self.tests:
+            e = elem
             if isinstance(elem, tuple) and len(elem) == 2:
-                self.name_list.append(f"{elem[0]}_{elem[1]}")
+                e = f"{elem[0]}_{elem[1]}"
+                self.name_list.append(e)
             else:
-                self.name_list.append(elem)
+                self.name_list.append(e)
+            self.test_name_aliases[e] = elem
 
     def clip_limits(self, name, test, threshold):
         """
@@ -1172,12 +1176,13 @@ class fp_builder():
         :param t_name: test name
         :param single_raft: optional name of single raft
         :return:
-        """
+
         if "HIGH" in t_name or "LOW" in t_name:
             t_name_split = t_name.split("_")
             t_name = (t_name_split[0], t_name_split[1])
-
-        self.test_data = self.amp_results[t_name]
+        """
+        tn_name = self.test_name_aliases[t_name]
+        self.test_data = self.amp_results[tn_name]
 
         new_test = np.empty(0)
 
