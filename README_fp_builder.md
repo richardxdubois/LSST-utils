@@ -50,7 +50,8 @@ Usage notes:
  * examine a 2nd test by turning on the second test switch. Then select the
    desired test. A scatterplot and histogram appear. It can be hidden by
    turning the switch off again.
- * use the Exit button to terminate the app
+ * You'll see a new box appear to select a 2nd run to compare to the original run. Turning off the Second run mode will return to single run mode.
+ * use the Exit button to terminate the app (unless you are sharing a server)
 
 Notes and caveats:
 
