@@ -99,6 +99,7 @@ class fp_builder():
 
         self.amp_results = None
         self.amp_results_2 = None  # optional 2nd run for 2nd histogram
+        self.second_run_active = False
 
         self.raft_groups = None
         self.ccd_groups = None
@@ -663,6 +664,8 @@ class fp_builder():
         w2 = new == self.run_text_box_2.value
         np2 = new == self.run_pickle_dropdown_2.value
 
+        self.second_run_active = False
+
         new_run = False
         if (selected_run != self.test_run and w) or self.new_pickle or new_good_run or new_run:
             # new run selected - replace dict of measurements - amp_results
@@ -747,6 +750,7 @@ class fp_builder():
             self.run_pickle_dropdown_2.remove_on_change('value', self.update)
             self.run_text_box_2.remove_on_change('value', self.update)
             self.new_pickle = False
+            new_run = True
 
             if w2:
                 if not DM_stack:
@@ -765,7 +769,7 @@ class fp_builder():
                 self.run_text_box.value = "None"
                 self.new_pickle = True
 
-            print("Fetching new second run", selected_run_2)
+            print("Fetching new second run", self.test_run_2)
             start_time = time.time()
             new_amp_results = self.get_new_run(**kwargs)
             if new_amp_results is not None:
@@ -797,6 +801,10 @@ class fp_builder():
         if (s and self.second_test_name != second_name) or new_run or new_second_run:
             # select 2nd test. Replace "test2" in source_static and source.data
             self.generate_log_message(self.log_div, "getting new second test data: " + second_name)
+
+            if self.second_toggle_2.active == 0:
+                self.second_run_active = True
+
             t2_new_test_data = self.get_new_test(second_name, self.current_raft)
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
@@ -1268,13 +1276,13 @@ class fp_builder():
         :return:
 
         """
-        tn_name = self.name_aliases[t_name]
-        if self.second_toggle_2.active == 1:
+        if not self.second_run_active:
             tn_name = self.name_aliases[t_name]
             self.test_data = self.amp_results[tn_name]
+            test_data = self.test_data
         else:
             tn_name = self.name_aliases_2[t_name]
-            self.test_data = self.amp_results_2[tn_name]
+            test_data = self.amp_results_2[tn_name]
 
         new_test = np.empty(0)
 
@@ -1292,7 +1300,7 @@ class fp_builder():
                 for cd in self.ccd_groups:
                     for c in cd:
                         raft_ccd = r + "_" + c
-                        z_flat = self.extract_signal_data(self.test_data, raft_ccd, 0., raft_ccd2=None)
+                        z_flat = self.extract_signal_data(test_data, raft_ccd, 0., raft_ccd2=None)
 
                         new_test = np.append(new_test, z_flat)
 
