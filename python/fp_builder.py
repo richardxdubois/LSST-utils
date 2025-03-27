@@ -75,8 +75,9 @@ class fp_builder():
             data = yaml.safe_load(f)
 
         self.data_dir = data["data_dir"]
-        self.in_file = self.data_dir + data["in_file_name"]
-        self.run_pickles_path = self.data_dir + "run_pickles/"
+        pickles_loc = "run_pickles/"
+        self.run_pickles_path = self.data_dir + pickles_loc
+        self.in_file = self.run_pickles_path + data["in_file_name"]
 
         self.guard_value = data["guard_value"]
 
@@ -150,6 +151,7 @@ class fp_builder():
         self.tests, self.test_name, self.name_list, self.name_aliases = self.set_test_list(self.amp_results)
         self.test_name = self.tests[11]
         self.second_test_name = self.test_name
+        self.test_run = data["in_file_name"]
 
         # define the figures
 
@@ -182,7 +184,7 @@ class fp_builder():
         self.t2_upper = 0
 
         # for querying runs from the butler
-        self.test_run = None
+        #self.test_run = None
 
         self.good_runs_list = data['good_runs_file']
         gr = self.data_dir + self.good_runs_list
@@ -497,6 +499,11 @@ class fp_builder():
         else:  # "Off"
             self.run_text_box_2.visible = False
             self.run_pickle_dropdown_2.visible = False
+            # trigger refreshing the primary run
+            if ".npy" in self.test_run:
+                self.run_pickle_dropdown.value = self.test_run
+            else:
+                self.name_dropdown.value - self.test_run
 
     # Define a callback to update the div whenever the checkbox state changes
     def slider_checkbox_callback(self, attr, old, new):
@@ -750,7 +757,6 @@ class fp_builder():
             self.run_pickle_dropdown_2.remove_on_change('value', self.update)
             self.run_text_box_2.remove_on_change('value', self.update)
             self.new_pickle = False
-            new_run = True
 
             if w2:
                 if not DM_stack:
