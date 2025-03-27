@@ -98,6 +98,7 @@ class fp_builder():
         # map of test results: map of tests; map of rafts; map of sensors; map of segments; test value
 
         self.amp_results = None
+        self.amp_results_2 = None  # optional 2nd run for 2nd histogram
 
         self.raft_groups = None
         self.ccd_groups = None
@@ -145,7 +146,7 @@ class fp_builder():
         with open(self.in_file, 'rb') as f:
             self.amp_results = pickle.load(f)
 
-        rc = self.set_test_list()
+        self.tests, self.test_name, self.name_list, self.name_aliases = self.set_test_list(self.amp_results)
         self.test_name = self.tests[11]
         self.second_test_name = self.test_name
 
@@ -344,24 +345,27 @@ class fp_builder():
         # select sensor type and set clip threshold
         layout_1 = column(self.type_dropdown, self.clip_select)
         # run selection via butler
-        layout_2 = row(self.run_text_box)  #, self.good_runs_dropdown)
+        layout_2 = row(self.run_text_box, self.run_pickle_dropdown)  #, self.good_runs_dropdown)
         # run selection via pickle file
-        layout_3 = self.run_pickle_dropdown
+        layout_3 = column(self.run_text_box_2, self.run_pickle_dropdown_2)
         # pick test name and slider
-        layout_4 = row(self.name_dropdown, self.slider)
+        layout_4 = row(column(self.name_dropdown, self.second_dropdown),
+                              self.slider, self.log_div)
         # toggle colour map refresh
         layout_5 = column(self.div_slider_check, self.slider_checkbox_group)
         # toggle 2nd histogram/scatterplot
         layout_6 = column(self.st_div, self.second_toggle)
-        # pulldown for 2nd histo, and message log
-        layout_7 = row(self.second_dropdown, self.log_div)
-        # plots
-        layout_8 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
+        layout_7 = column(self.st_div_2, self.second_toggle_2)
 
-        canvas_layout = layout(row(self.exit_button, self.doc_button),
-                      row(layout_1,
-                          column(layout_2, layout_3), layout_4, layout_5, layout_6, layout_7),
-                            layout_8)
+        # plots
+        layout_9 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
+
+        layout_0 = row(self.exit_button, self.doc_button, layout_5, layout_6, layout_7)
+
+        canvas_layout = layout(layout_0,
+                               row(layout_1,
+                                   column(layout_2, layout_3), layout_4),
+                               layout_9)
 
         # Add the layout to the current document
         curdoc().add_root(canvas_layout)
@@ -378,7 +382,7 @@ class fp_builder():
         self.name_dropdown = Select(title="Pick test", value=self.test_name, options=self.name_list)
         self.run_pickle_dropdown = Select(title="Pick run from pickle list (fast)", value=self.in_file,
                                           options=list(self.pickled_runs),
-                                          width=400)
+                                          width=300)
 
         self.second_dropdown = Select(title="Pick second test", value=self.second_test_name, options=self.name_list)
         self.second_dropdown.visible = False
@@ -386,6 +390,17 @@ class fp_builder():
         self.run_text_box = TextInput(title="Input run from butler: <run_version) (slow)", value="None")
         self.good_runs_dropdown = Select(title="Pick good run from list", value=self.good_runs["E1110"],
                                          options=self.good_runs_versions, width=200)
+
+        # replicate to handle an optional 2nd run to display the 2nd histogram from
+        self.run_pickle_dropdown_2 = Select(title="Pick 2nd run from pickle list (fast)", value=self.in_file,
+                                          options=list(self.pickled_runs),
+                                          width=300, visible=False)
+        self.run_text_box_2 = TextInput(title="Input 2nd run from butler: <run_version) (slow)", value="None",
+                                        visible=False)
+
+        self.second_toggle_2 = RadioButtonGroup(labels=["On", "Off"], active=1, visible=False)
+        self.st_div_2 = Div(text="Second run", visible=False)
+
         if not self.DM_stack:
             self.run_text_box.visible = False
             self.good_runs_dropdown.visible = False
@@ -429,6 +444,9 @@ class fp_builder():
         self.run_pickle_dropdown.on_change('value', self.update)
         self.good_runs_dropdown.on_change('value', self.update)
 
+        self.run_text_box_2.on_change('value', self.update)
+        self.run_pickle_dropdown_2.on_change('value', self.update)
+
         # Attach the callback to the checkbox's active property
         self.slider_checkbox_group.on_change('active', self.slider_checkbox_callback)
 
@@ -436,6 +454,7 @@ class fp_builder():
         self.exit_button.on_click(self.stop_server)
 
         self.second_toggle.on_change("active", self.second_callback)
+        self.second_toggle_2.on_change("active", self.second_callback_2)
 
         doc_url = "https://richardxdubois.github.io/LSST-utils/README_fp_builder.md"
         self.doc_callback = CustomJS(code=f"window.open('{doc_url}', '_blank');")
@@ -450,18 +469,33 @@ class fp_builder():
 
     # callback for Help url
 
-    # Define a callback to toggle the visibility of the plot
+    # Define a callback to toggle the visibility of the plot and second run controls
     def second_callback(self, attr, old, new):
+
         if self.second_toggle.active == 0:  # "On"
             self.histo2.visible = True
             self.scatter12.visible = True
             self.second_dropdown.visible = True
             self.histo1.height = 320
+            self.second_toggle_2.visible = True
+            self.st_div_2.visible = True
         else:  # "Off"
             self.histo2.visible = False
             self.scatter12.visible = False
             self.second_dropdown.visible = False
             self.histo1.height = 640
+            self.second_toggle_2.visible = False
+            self.st_div_2.visible = False
+
+    def second_callback_2(self, attr, old, new):
+
+        if self.second_toggle_2.active == 0:  # "On"
+            if self.DM_stack:
+                self.run_text_box_2.visible = True
+            self.run_pickle_dropdown_2.visible = True
+        else:  # "Off"
+            self.run_text_box_2.visible = False
+            self.run_pickle_dropdown_2.visible = False
 
     # Define a callback to update the div whenever the checkbox state changes
     def slider_checkbox_callback(self, attr, old, new):
@@ -611,6 +645,9 @@ class fp_builder():
         run_pickle = self.run_pickle_dropdown.value
         good_run = self.good_runs_dropdown.value
 
+        selected_run_2 = self.run_text_box_2.value
+        run_pickle_2 = self.run_pickle_dropdown_2.value
+
         if self.clip_threshold != float(self.clip_select.value):
             self.clip_threshold = float(self.clip_select.value)
             self.generate_log_message(self.log_div, "Clipping threshold set to " + str(self.clip_threshold))
@@ -623,6 +660,9 @@ class fp_builder():
         self.new_pickle = new == run_pickle
         new_good_run = new == good_run
 
+        w2 = new == self.run_text_box_2.value
+        np2 = new == self.run_pickle_dropdown_2.value
+
         new_run = False
         if (selected_run != self.test_run and w) or self.new_pickle or new_good_run or new_run:
             # new run selected - replace dict of measurements - amp_results
@@ -633,6 +673,13 @@ class fp_builder():
                 self.run_text_box.remove_on_change('value', self.update)
 
                 if w:
+                    if not DM_stack:
+                        self.run_pickle_dropdown_2.on_change('value', self.update)
+                        self.run_text_box_2.on_change('value', self.update)
+                        self.generate_log_message(self.log_div,
+                                                  "DM stack or EO code unavailable. Request ignored: " + selected_run_2)
+                        return
+
                     new_run_name = self.name_dropdown.value
                     kwargs = {"run_name": selected_run}
                     self.test_run = selected_run
@@ -664,16 +711,13 @@ class fp_builder():
                     self.amp_results = new_amp_results
                 else:
                     return
-                rc = self.set_test_list()
+                self.tests, self.test_name, self.name_list, self.name_aliases = self.set_test_list(self.amp_results)
 
                 # fix up the test dropdown menus, including potentially that the current test is not
                 # in the new run. Need to turn off their callbacks first.
 
                 self.name_dropdown.remove_on_change('value', self.update)
                 self.second_dropdown.remove_on_change('value', self.update)
-
-                self.name_dropdown.options = self.name_list
-                self.second_dropdown.options = self.name_list
 
                 if selected_name not in self.name_list:
                     selected_name = self.name_list[0]
@@ -697,6 +741,44 @@ class fp_builder():
                 self.generate_log_message(self.log_div, "DM stack or EO code unavailable. Request ignored: " + selected_run)
                 return
 
+        new_second_run = w2 or np2
+        if new_second_run:
+            self.second_dropdown.remove_on_change('value', self.update)
+            self.run_pickle_dropdown_2.remove_on_change('value', self.update)
+            self.run_text_box_2.remove_on_change('value', self.update)
+            self.new_pickle = False
+
+            if w2:
+                if not DM_stack:
+                    self.run_pickle_dropdown_2.on_change('value', self.update)
+                    self.run_text_box_2.on_change('value', self.update)
+                    self.generate_log_message(self.log_div,
+                                              "DM stack or EO code unavailable. Request ignored: " + selected_run_2)
+                    return
+                kwargs = {"run_name": selected_run_2}
+                self.test_run_2 = selected_run_2
+                self.run_pickle_dropdown_2.value = "None"
+                self.generate_log_message(self.log_div, "run_text_box_2 selected: " + selected_run_2)
+            else:
+                kwargs = {"run_name": run_pickle_2}
+                self.test_run_2 = run_pickle_2
+                self.run_text_box.value = "None"
+                self.new_pickle = True
+
+            print("Fetching new second run", selected_run_2)
+            start_time = time.time()
+            new_amp_results = self.get_new_run(**kwargs)
+            if new_amp_results is not None:
+                self.amp_results_2 = new_amp_results
+                _, second_name, self.name_list_2, self.name_aliases_2 = self.set_test_list(self.amp_results_2)
+                self.second_test_name = second_name
+                self.second_dropdown.value = second_name
+                self.second_dropdown.options = self.name_list_2
+
+                self.second_dropdown.on_change('value', self.update)
+                self.run_pickle_dropdown_2.on_change('value', self.update)
+                self.run_text_box_2.on_change('value', self.update)
+
         if (d and selected_name != self.test_name) or new_run or clip:
             # new test name selected. Replace "z" in source_static and source.data
             # clip the data and set the sliders to the clipped lower and upper
@@ -712,7 +794,7 @@ class fp_builder():
 
             rc = self.update_slider(lower, upper)
 
-        if (s and self.second_test_name != second_name) or new_run:
+        if (s and self.second_test_name != second_name) or new_run or new_second_run:
             # select 2nd test. Replace "test2" in source_static and source.data
             self.generate_log_message(self.log_div, "getting new second test data: " + second_name)
             t2_new_test_data = self.get_new_test(second_name, self.current_raft)
@@ -742,7 +824,11 @@ class fp_builder():
                                                    use_slider=False,
                                                    mask_in=mask)
 
-        self.histo2.title.text = self.second_test_name
+        if self.second_toggle_2.active == 0 and self.test_run != self.test_run_2:
+            self.histo2.title.text = self.test_run_2 + ": " + self.second_test_name
+        else:
+            self.histo2.title.text = self.second_test_name
+
         self.scatter12.yaxis.axis_label = self.second_test_name
         self.scatter12.xaxis.axis_label = self.test_name
         self.scatter12.y_range = Range1d(start=t2_lower, end=t2_upper)
@@ -766,26 +852,28 @@ class fp_builder():
         self.log_div.text = "Log: <br>" + "<br>".join(self.message_log)
         curdoc().add_next_tick_callback(lambda: None)
 
-    def set_test_list(self):
+    def set_test_list(self, amp_results):
         """
         Update tests list. This can change in a new run. Also, some tests appear to have zero content.
         Ignore them.
         :return:
         """
-        self.name_list = []
-        self.test_name_aliases = {}
+        name_list = []
+        name_aliases = {}
         # tests seems to be able to have zero length!
-        self.tests = [key for key, value in self.amp_results.items() if isinstance(value, dict) and len(value) > 0]
-        self.test_name = self.tests[0]
+        tests = [key for key, value in amp_results.items() if isinstance(value, dict) and len(value) > 0]
+        test_name = tests[0]
 
-        for elem in self.tests:
+        for elem in tests:
             e = elem
             if isinstance(elem, tuple) and len(elem) == 2:
                 e = f"{elem[0]}_{elem[1]}"
-                self.name_list.append(e)
+                name_list.append(e)
             else:
-                self.name_list.append(e)
-            self.test_name_aliases[e] = elem
+                name_list.append(e)
+            name_aliases[e] = elem
+
+        return tests, test_name, name_list, name_aliases
 
     def clip_limits(self, name, test, threshold):
         """
@@ -1180,8 +1268,13 @@ class fp_builder():
         :return:
 
         """
-        tn_name = self.test_name_aliases[t_name]
-        self.test_data = self.amp_results[tn_name]
+        tn_name = self.name_aliases[t_name]
+        if self.second_toggle_2.active == 1:
+            tn_name = self.name_aliases[t_name]
+            self.test_data = self.amp_results[tn_name]
+        else:
+            tn_name = self.name_aliases_2[t_name]
+            self.test_data = self.amp_results_2[tn_name]
 
         new_test = np.empty(0)
 
