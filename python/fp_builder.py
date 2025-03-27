@@ -659,11 +659,15 @@ class fp_builder():
 
                 print("Fetching new run", new_run_name)
                 start_time = time.time()
-                self.amp_results = self.get_new_run(**kwargs)
+                new_amp_results = self.get_new_run(**kwargs)
+                if new_amp_results is not None:
+                    self.amp_results = new_amp_results
+                else:
+                    return
                 rc = self.set_test_list()
 
                 # fix up the test dropdown menus, including potentially that the current test is not
-                # in the new run
+                # in the new run. Need to turn off their callbacks first.
 
                 self.name_dropdown.remove_on_change('value', self.update)
                 self.second_dropdown.remove_on_change('value', self.update)
@@ -705,12 +709,6 @@ class fp_builder():
                 self.test_name = selected_name
             self.generate_log_message(self.log_div, "updating sliders for : " + selected_name)
             lower, upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
-
-            #t_lower, t_upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
-            #mask = (new_test_data > t_lower) & (new_test_data < t_upper)
-            #new_masked = new_test_data[mask]
-
-            #lower, upper = self.clip_limits(self.test_name, new_masked, self.clip_threshold)
 
             rc = self.update_slider(lower, upper)
 
@@ -769,7 +767,11 @@ class fp_builder():
         curdoc().add_next_tick_callback(lambda: None)
 
     def set_test_list(self):
-
+        """
+        Update tests list. This can change in a new run. Also, some tests appear to have zero content.
+        Ignore them.
+        :return:
+        """
         self.name_list = []
         self.test_name_aliases = {}
         # tests seems to be able to have zero length!
@@ -1177,9 +1179,6 @@ class fp_builder():
         :param single_raft: optional name of single raft
         :return:
 
-        if "HIGH" in t_name or "LOW" in t_name:
-            t_name_split = t_name.split("_")
-            t_name = (t_name_split[0], t_name_split[1])
         """
         tn_name = self.test_name_aliases[t_name]
         self.test_data = self.amp_results[tn_name]
@@ -1237,10 +1236,14 @@ class fp_builder():
             acq_run = run_name  # form is run-id_<weekly>, eg E2233_d_2025_01_27
 
             pattern = f"u/lsstccs/eo_*_{acq_run}"
-            collections = butler.registry.queryCollections(pattern)
+            try:
+                collections = butler.registry.queryCollections(pattern)
 
-            amp_data = eo_pipe.get_amp_data(repo, collections)
-            self.generate_log_message(self.log_div, "new amp data acquired")
+                amp_data = eo_pipe.get_amp_data(repo, collections)
+                self.generate_log_message(self.log_div, "new amp data acquired")
+            except:
+                self.generate_log_message(self.log_div, "Failed to retrieve " + run_name + " from butler")
+                amp_data = None
 
         return amp_data
 
