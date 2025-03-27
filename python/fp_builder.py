@@ -876,7 +876,8 @@ class fp_builder():
         name_aliases = {}
         # tests seems to be able to have zero length!
         tests = [key for key, value in amp_results.items() if isinstance(value, dict) and len(value) > 0]
-        test_name = tests[0]
+
+        test_name = tests[0] if self.test_name not in tests else self.test_name
 
         for elem in tests:
             e = elem
