@@ -61,6 +61,7 @@ class fp_builder():
         """
 
         self.DM_stack = DM_stack
+        self.verbose = False
 
         # in case the DM stack and EO pipe code is unavailable. In that case, only pickle files can be used.
 
@@ -231,7 +232,8 @@ class fp_builder():
         rc = self.find_run_pickles()
         self.new_pickle = False
 
-        print(self.tests)
+        if self.verbose:
+            print(self.tests)
 
         # start with ptc_gains to get going
 
@@ -836,7 +838,8 @@ class fp_builder():
                                                 t_test_name="z",
                                                 use_slider=True,
                                                 mask_in=None)
-        print(self.test_name, lower, upper)
+        if self.verbose:
+            print(self.test_name, lower, upper)
 
         if self.cm_refresh:
             self.color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
@@ -850,7 +853,8 @@ class fp_builder():
                                                    t_test_name="test2",
                                                    use_slider=False,
                                                    mask_in=mask)
-        print(self.second_test_name, t2_lower, t2_upper)
+        if self.verbose:
+            print(self.second_test_name, t2_lower, t2_upper)
 
         if self.second_toggle_2.active == 0 and self.test_run != self.test_run_2:
             self.histo2.title.text = self.test_run_2 + ": " + self.second_test_name
@@ -921,7 +925,8 @@ class fp_builder():
 
         median = np.median(clipped_data)
         std = np.std(clipped_data)
-        print("Clip", name, median, std, min(clipped_data), max(clipped_data), min(t_mask), max(t_mask))
+        if self.verbose:
+            print("Clip", name, median, std, min(clipped_data), max(clipped_data), min(t_mask), max(t_mask))
 
         lower = max(min(clipped_data), median - threshold * std)
         upper = min(max(clipped_data), median + threshold * std)
@@ -954,7 +959,8 @@ class fp_builder():
         z_u = np.array(self.source_static[t_test_name])
         mask_nan = np.isnan(z_u)
         z_u[mask_nan] = self.guard_value
-        print("Entered do_test_stuff", t_test_name, z_u[0:5])
+        if self.verbose:
+            print("Entered do_test_stuff", t_test_name, z_u[0:5])
 
         raft_type = np.array(t_source.data["raft_type"])
 
