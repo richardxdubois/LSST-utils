@@ -148,7 +148,8 @@ class fp_builder():
         with open(self.in_file, 'rb') as f:
             self.amp_results = pickle.load(f)
 
-        self.tests, self.test_name, self.name_list, self.name_aliases = self.set_test_list(self.amp_results)
+        self.tests, self.test_name, self.name_list, self.name_aliases = (
+            self.set_test_list(self.test_name, self.amp_results))
         self.test_name = self.tests[11]
         self.second_test_name = self.test_name
         self.test_run = data["in_file_name"]
@@ -379,7 +380,7 @@ class fp_builder():
         Defines all the widgets, except slider.
         :return:
         """
-        self.log_div = Div(text="Log:<br>", width=400, height=150)
+        self.log_div = Div(text="Log:<br>", width=400, height=200)
 
         self.type_dropdown = Select(title="Pick sensor", value="all", options=["all", "E2V", "ITL"])
         self.name_dropdown = Select(title="Pick test", value=self.test_name, options=self.name_list)
@@ -721,7 +722,8 @@ class fp_builder():
                     self.amp_results = new_amp_results
                 else:
                     return
-                self.tests, self.test_name, self.name_list, self.name_aliases = self.set_test_list(self.amp_results)
+                self.tests, self.test_name, self.name_list, self.name_aliases = (
+                    self.set_test_list(self.test_name, self.amp_results))
 
                 # fix up the test dropdown menus, including potentially that the current test is not
                 # in the new run. Need to turn off their callbacks first.
@@ -780,7 +782,8 @@ class fp_builder():
             new_amp_results = self.get_new_run(**kwargs)
             if new_amp_results is not None:
                 self.amp_results_2 = new_amp_results
-                _, second_name, self.name_list_2, self.name_aliases_2 = self.set_test_list(self.amp_results_2)
+                _, second_name, self.name_list_2, self.name_aliases_2 = (
+                    self.set_test_list(self.second_test_name, self.amp_results_2))
                 self.second_test_name = second_name
                 self.second_dropdown.value = second_name
                 self.second_dropdown.options = self.name_list_2
@@ -794,8 +797,14 @@ class fp_builder():
             # clip the data and set the sliders to the clipped lower and upper
             self.generate_log_message(self.log_div, "getting new test data: " + selected_name)
             new_test_data = self.get_new_test(selected_name, self.current_raft)
+            self.second_test_name = second_name
+
+            if self.second_toggle_2.active == 0:
+                self.second_run_active = True
+
             self.source_static["z"] = list(new_test_data)
             self.source.data["z"] = list(new_test_data)
+            self.source.data["test2"] = self.source_static["test2"]
 
             if not new_run:
                 self.test_name = selected_name
@@ -815,7 +824,7 @@ class fp_builder():
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
-            if not new_run:
+            if not (new_run or new_second_run):
                 self.second_test_name = second_name
 
         # stuff done for all entries to update - histograms are remade every time
@@ -823,9 +832,12 @@ class fp_builder():
         # fetch the test data array - "z". Sliders either were determined when the test was updated or
         # via manual adjustment. Get the data from the original test from source_static.
 
-        lower, upper, mask = self.do_test_stuff(t_source=self.source, h_source=self.hist_source, t_test_name="z",
+        lower, upper, mask = self.do_test_stuff(t_source=self.source, h_source=self.hist_source,
+                                                t_test_name="z",
                                                 use_slider=True,
                                                 mask_in=None)
+        print(self.test_name, lower, upper)
+
         if self.cm_refresh:
             self.color_mapper.low = lower * 0.8 if lower > 0 else lower * 1.2
             self.color_mapper.high = upper * 1.1
@@ -834,9 +846,11 @@ class fp_builder():
 
         # re histogram 2nd test
 
-        t2_lower, t2_upper, _ = self.do_test_stuff(t_source=self.source, h_source=self.t2_hist_source, t_test_name="test2",
+        t2_lower, t2_upper, _ = self.do_test_stuff(t_source=self.source, h_source=self.t2_hist_source,
+                                                   t_test_name="test2",
                                                    use_slider=False,
                                                    mask_in=mask)
+        print(self.second_test_name, t2_lower, t2_upper)
 
         if self.second_toggle_2.active == 0 and self.test_run != self.test_run_2:
             self.histo2.title.text = self.test_run_2 + ": " + self.second_test_name
@@ -866,7 +880,7 @@ class fp_builder():
         self.log_div.text = "Log: <br>" + "<br>".join(self.message_log)
         curdoc().add_next_tick_callback(lambda: None)
 
-    def set_test_list(self, amp_results):
+    def set_test_list(self, test_name_in, amp_results):
         """
         Update tests list. This can change in a new run. Also, some tests appear to have zero content.
         Ignore them.
@@ -877,7 +891,7 @@ class fp_builder():
         # tests seems to be able to have zero length!
         tests = [key for key, value in amp_results.items() if isinstance(value, dict) and len(value) > 0]
 
-        test_name = tests[0] if self.test_name not in tests else self.test_name
+        test_name = tests[0] if test_name_in not in tests else test_name_in
 
         for elem in tests:
             e = elem
@@ -907,6 +921,7 @@ class fp_builder():
 
         median = np.median(clipped_data)
         std = np.std(clipped_data)
+        print("Clip", name, median, std, min(clipped_data), max(clipped_data), min(t_mask), max(t_mask))
 
         lower = max(min(clipped_data), median - threshold * std)
         upper = min(max(clipped_data), median + threshold * std)
@@ -930,20 +945,23 @@ class fp_builder():
         if t_test_name == "test2":
             width_name = "t2_vbar_width"
             clip_t = self.clip_threshold_initial
+            c_name = self.second_test_name
         else:
             width_name = "vbar_width"
             clip_t = self.clip_threshold
+            c_name = self.test_name
 
         z_u = np.array(self.source_static[t_test_name])
         mask_nan = np.isnan(z_u)
         z_u[mask_nan] = self.guard_value
+        print("Entered do_test_stuff", t_test_name, z_u[0:5])
 
         raft_type = np.array(t_source.data["raft_type"])
 
         if use_slider:
             lower, upper = self.slider.value
         else:
-            lower, upper = self.clip_limits(t_test_name, z_u, clip_t)
+            lower, upper = self.clip_limits(c_name, z_u, clip_t)
 
         if mask_in is None:
             # mask is channels failing cuts. Set them to a guard value.
@@ -962,6 +980,7 @@ class fp_builder():
         elif self.type_dropdown.value != "all":
             mask_type = (raft_type != self.type_dropdown.value)
             z_u[mask_type] = self.guard_value
+            lower, upper = self.clip_limits(c_name, z_u, clip_t)
 
         t_source.data[t_test_name] = z_u
 
@@ -991,6 +1010,8 @@ class fp_builder():
             results = np.array(list(test_data[raft_ccd].values()))[::-1]
             if raft_ccd2 is not None:
                 results = np.append(results, np.array(list(test_data[raft_ccd2].values()))[::-1])
+            if len(results) != 16:
+                raise ValueError("Number of channels is not 16")
         except:
             results = np.ones(16) * self.guard_value
 
@@ -1052,6 +1073,8 @@ class fp_builder():
             results = np.array(list(test_data[raft_ccd].keys()))[::-1]
             if raft_ccd2 is not None:
                 results = np.append(results, np.array(list(test_data[raft_ccd2].keys()))[::-1])
+            if len(results) != 16:
+                raise ValueError("Number of channels is not 16")
         except:
             results = np.full(16, c)
 
@@ -1287,9 +1310,11 @@ class fp_builder():
             tn_name = self.name_aliases[t_name]
             self.test_data = self.amp_results[tn_name]
             test_data = self.test_data
+            print("Getting new test", tn_name, "first run source")
         else:
             tn_name = self.name_aliases_2[t_name]
             test_data = self.amp_results_2[tn_name]
+            print("Getting new test", tn_name, "second run source")
 
         new_test = np.empty(0)
 
@@ -1300,7 +1325,7 @@ class fp_builder():
 
                 if r in list(self.CR_layout.keys()):
                     if self.do_CR:
-                        R00_test, _, _ = self.get_CR_test(r, self.test_data)
+                        R00_test, _, _ = self.get_CR_test(r, test_data)
                         new_test = np.append(new_test, R00_test)
                     continue
 
