@@ -41,6 +41,8 @@ Usage notes:
  * fp.yaml sets up a pickle file for run E2233 to get going
  * different runs can be obtained in the run dialogue box by specifying the
    run in the form <run id>_<code version>, eg E1880_w_2025_02
+ * Most of the Run 7 runs have been pickled. They are much faster to access than querying
+   the butler.
  * select desired test from the pull-down menu
  * hover over the focal plane to see (raft, CCD, amp, test value)
  * sliders update the focal plane and histograms in real time
