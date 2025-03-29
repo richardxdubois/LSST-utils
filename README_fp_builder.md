@@ -50,7 +50,8 @@ Usage notes:
  * examine a 2nd test by turning on the second test switch. Then select the
    desired test. A scatterplot and histogram appear. It can be hidden by
    turning the switch off again.
- * You'll see a new box appear to select a 2nd run to compare to the original run. Turning off the Second run mode will return to single run mode.
+ * You'll see a new box appear to select a 2nd run to compare to the original run. 
+   Turning off the Second run mode will return to single run mode.
  * use the Exit button to terminate the app (unless you are sharing a server)
 
 Notes and caveats:
@@ -61,8 +62,9 @@ Notes and caveats:
    The Exit button shuts down the server for all.	
  * the run selection box will be invisible if you have not set up the DM
    stack or EO code
- * histograms use clipped medians to determine ranges. The threshold can be changed
-   with the Set clip sigma dialogue.
+ * histograms use clipped medians to determine ranges. SciPy's winsorize is used to 
+   eliminate extreme outliers.The threshold can be changed with the Set clip sigma dialogue.
+   Clipping can be turned off.
  * heatmap values are set to a guard value for entries that are NaNs or outside the
    slider limits, so they will appear as the blackest in the focal plane.
  * loading a new run can take a while (minutes), especially if the run is not
