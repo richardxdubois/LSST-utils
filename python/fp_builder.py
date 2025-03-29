@@ -351,7 +351,7 @@ class fp_builder():
         # select sensor type and set clip threshold
         layout_1 = column(self.type_dropdown, self.clip_select)
         # run selection via butler
-        layout_2 = row(self.run_text_box, self.run_pickle_dropdown)  #, self.good_runs_dropdown)
+        layout_2 = row(self.run_text_box, self.run_pickle_dropdown)
         # run selection via pickle file
         layout_3 = column(self.run_text_box_2, self.run_pickle_dropdown_2)
         # pick test name and slider
@@ -362,11 +362,12 @@ class fp_builder():
         # toggle 2nd histogram/scatterplot
         layout_6 = column(self.st_div, self.second_toggle)
         layout_7 = column(self.st_div_2, self.second_toggle_2)
+        layout_8 = column(self.clip_div, self.clip_toggle)
 
         # plots
         layout_9 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
 
-        layout_0 = row(self.exit_button, self.doc_button, layout_5, layout_6, layout_7)
+        layout_0 = row(self.exit_button, self.doc_button, layout_8, layout_5, layout_6, layout_7)
 
         canvas_layout = layout(layout_0,
                                row(layout_1,
@@ -427,6 +428,9 @@ class fp_builder():
         # Add TapTool
         self.taptool = TapTool()
 
+        self.clip_toggle = RadioButtonGroup(labels=["On", "Off"], active=0, visible=True)
+        self.clip_div = Div(text="Clipping", visible=True)
+
         self.clip_select = TextInput(title="Set clip sigma", value=str(self.clip_threshold), width=75)
 
         # Add a color bar
@@ -462,6 +466,8 @@ class fp_builder():
         self.second_toggle.on_change("active", self.second_callback)
         self.second_toggle_2.on_change("active", self.second_callback_2)
 
+        self.clip_toggle.on_change("active", self.clip_toggle_callback)
+
         doc_url = "https://richardxdubois.github.io/LSST-utils/README_fp_builder.md"
         self.doc_callback = CustomJS(code=f"window.open('{doc_url}', '_blank');")
 
@@ -474,6 +480,13 @@ class fp_builder():
         self.fp.add_layout(self.color_bar, 'right')
 
     # callback for Help url
+
+    def clip_toggle_callback(self, attr, old, new):
+        state = "On" if new else "Off"
+        self.clip_select.visible = (state == "Off")
+
+        # trigger a "null" callback to update to refresh with the new clipping limits
+        self.clip_select.trigger('value', self.clip_select.value, self.clip_select.value)
 
     # Define a callback to toggle the visibility of the plot and second run controls
     def second_callback(self, attr, old, new):
@@ -919,6 +932,13 @@ class fp_builder():
 
         mask = (~np.isnan(test)) & (test != self.guard_value)
         t_mask = test[mask]
+
+        if self.clip_toggle.active == 1:
+            lower = min(t_mask)
+            upper = max(t_mask)
+            self.generate_log_message(self.log_div,
+                                      f"Clipping off: set limits to {name} min, max ({lower:.2e}, {upper:.2e})")
+            return lower, upper
 
         # trying to clip big outliers
         clipped_data = winsorize(t_mask, limits=[0.0025, 0.0025])
