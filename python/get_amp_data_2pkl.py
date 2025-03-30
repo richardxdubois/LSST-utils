@@ -9,7 +9,7 @@ import os
 Pickle all LSSTCam runs available in the butler with code versions. It selects only weeklies and then the most 
 recent of those.
 """
-debug = True
+debug = False
 
 repo = "/repo/main"
 butler = daf_butler.Butler(repo)
@@ -56,8 +56,7 @@ for rv in runs:
 
     pattern = f"u/lsstccs/eo_*_{r_vers}"
 
-    if debug:
-        print(rv, r_vers, pattern)
+    print(rv, r_vers, pattern)
 
     try:
         collections = butler.registry.queryCollections(pattern)
