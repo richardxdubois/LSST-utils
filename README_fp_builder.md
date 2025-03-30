@@ -6,7 +6,7 @@ histograms of selected parameters and optiional correlation with a second
 parameter. It is a trial bit of code to see if this approach is useful.
 
 
-Setup DM stack (example of version v28.0.1):
+##  DM stack (example of version v28.0.1):
 
 source /cvmfs/sw.lsst.eu/linux-x86_64/lsst_distrib/v28.0.1/loadLSST-ext.bash
 
@@ -14,12 +14,12 @@ setup lsst_distrib
 
 setup -r ~lsstccs/prod/eo_pipe -j
 
-Invocation:
+## Invocation:
 
 bokeh serve /sdf/home/r/richard/rubin-user/gitstuff/LSST-utils/python/fp_builder.py --args --app_config /sdf/ho
 me/r/richard/rubin-user/camera/fp.yaml
 
-View the output in your local web browser:
+## View the output in your local web browser:
 
 Tunnel to the node you ran the server to access port 5006:
 
@@ -38,7 +38,7 @@ assuming sdfiana034 as the working node; of course, use your own account name)
 
 then point your local browser to localhost:5006/trial_fp_builder
 
-Usage notes:
+## Usage notes:
 
  * fp.yaml sets up a pickle file for run E2233 to get going
  * different runs can be obtained in the run dialogue box by specifying the
@@ -58,7 +58,7 @@ Usage notes:
    Turning off the Second run mode will return to single run mode.
  * use the Exit button to terminate the app (unless you are sharing a server)
 
-Notes and caveats:
+## Notes and caveats:
 
  * Due to Cyber restrictions, it is too complicated to run this in the USDF
    RSP - access to the port is restricted and involves setting up ingress.
