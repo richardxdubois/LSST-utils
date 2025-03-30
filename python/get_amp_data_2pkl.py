@@ -9,7 +9,7 @@ import os
 Pickle all LSSTCam runs available in the butler with code versions. It selects only weeklies and then the most 
 recent of those.
 """
-debug = True
+debug = False
 
 repo = "/repo/main"
 butler = daf_butler.Butler(repo)
