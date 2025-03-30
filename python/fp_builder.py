@@ -468,7 +468,7 @@ class fp_builder():
 
         self.clip_toggle.on_change("active", self.clip_toggle_callback)
 
-        doc_url = "https://richardxdubois.github.io/LSST-utils/README_fp_builder.md"
+        doc_url = "https://richardxdubois.github.io/LSST-utils/README_fp_builder"
         self.doc_callback = CustomJS(code=f"window.open('{doc_url}', '_blank');")
 
         self.doc_button.js_on_click(self.doc_callback)
