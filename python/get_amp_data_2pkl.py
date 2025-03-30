@@ -56,6 +56,9 @@ for rv in runs:
 
     pattern = f"u/lsstccs/eo_*_{r_vers}"
 
+    if debug:
+        print(rv, r_vers, pattern)
+
     try:
         collections = butler.registry.queryCollections(pattern)
 
@@ -69,6 +72,6 @@ for rv in runs:
         continue
 
     if debug:
-        print(rv, r_vers, pattern)
+        print("terminating")
         break
 
