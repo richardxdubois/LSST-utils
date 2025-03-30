@@ -9,7 +9,9 @@ parameter. It is a trial bit of code to see if this approach is useful.
 Setup DM stack (example of version v28.0.1):
 
 source /cvmfs/sw.lsst.eu/linux-x86_64/lsst_distrib/v28.0.1/loadLSST-ext.bash
+
 setup lsst_distrib
+
 setup -r ~lsstccs/prod/eo_pipe -j
 
 Invocation:
