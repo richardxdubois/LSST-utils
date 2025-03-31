@@ -351,7 +351,7 @@ class fp_builder():
         # select sensor type and set clip threshold
         layout_1 = column(self.type_dropdown, self.clip_select)
         # run selection via butler
-        layout_2 = row(self.run_text_box, self.run_pickle_dropdown)
+        layout_2 = row(self.run_pickle_dropdown, self.run_text_box)
         # run selection via pickle file
         layout_3 = column(self.run_text_box_2, self.run_pickle_dropdown_2)
         # pick test name and slider
