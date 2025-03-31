@@ -76,7 +76,7 @@ class fp_builder():
             data = yaml.safe_load(f)
 
         self.data_dir = data["data_dir"]
-        pickles_loc = "run_pickles/"
+        pickles_loc = data["run_pickles"]
         self.run_pickles_path = self.data_dir + pickles_loc
         self.in_file = self.run_pickles_path + data["in_file_name"]
 
@@ -222,7 +222,7 @@ class fp_builder():
 
                 if match:
                     E_code = f"E{match.group(1)}"  # Extract run
-                    w_code = f"w_{match.group(2)}"  # Extract DM version
+                    w_code = f"{match.group(2)}"  # Extract DM version
 
                     self.runs_versions.setdefault(E_code, [])
                     if w_code not in self.runs_versions[E_code]:
