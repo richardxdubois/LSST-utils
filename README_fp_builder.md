@@ -40,7 +40,7 @@ then point your local browser to localhost:5006/trial_fp_builder
 
 ## Usage notes:
 
- * fp.yaml sets up a pickle file for run E2233 to get going
+ * fp.yaml sets up a pickle file for run E1110 to get going
  * different runs can be obtained in the run dialogue box by specifying the
    run in the form <run id>_<code version>, eg E1880_w_2025_02
  * Most of the Run 7 runs have been pickled. They are much faster to access than querying
