@@ -221,7 +221,7 @@ class fp_builder():
                 match = re.search(pattern, r)
 
                 if match:
-                    E_code = f"E{match.group(1)}"  # Extract run
+                    E_code = f"E{match.group(1)}"  # Extract run 7 runs - run 7 runs are Exxx; run 6 are xxx
                     w_code = f"{match.group(2)}"  # Extract DM version
 
                     self.runs_versions.setdefault(E_code, [])
