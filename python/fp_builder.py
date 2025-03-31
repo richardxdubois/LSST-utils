@@ -1364,15 +1364,25 @@ class fp_builder():
 
         return new_test
 
+    # Define a custom sort key function to handle the pattern E100_version
+    def sort_key(self, s):
+        match = re.match(r'E(\d+)_(.+)', s)
+        if match:
+            num_part = int(match.group(1))
+            version_part = match.group(2)
+            return (num_part, version_part)
+        return s
+
     def find_run_pickles(self):
         """
         locate all the pickle files in the data dir
         :return:
         """
         path = Path(self.run_pickles_path)
-        self.pickled_runs = list(path.glob('*.npy'))  # '*/' for non-recursive
+        runs_list = list(path.glob('*.npy'))  # '*/' for non-recursive
 
-        self.pickled_runs = np.sort([Path(file.as_posix()).name for file in self.pickled_runs])
+        posix_runs_list = np.sort([Path(file.as_posix()).name for file in runs_list])
+        self.pickled_runs = sorted(posix_runs_list, key=self.sort_key)
 
     def get_new_run(self, run_name):
         """
