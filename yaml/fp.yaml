@@ -2,6 +2,7 @@ data_dir: "/Volumes/Data/Rubin/camera/"
 
 #in_file_name: "E2233_amps_data.npy"
 in_file_name: "E1110_w_2024_35_amps_data.npy"
+run_pickles: all_run_pickles/
 
 do_CR: True
 
