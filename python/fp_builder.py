@@ -894,12 +894,14 @@ class fp_builder():
 
                 if run_test1_name not in self.name_list:
                     run_test1_name = self.name_list[0]
-                    self.name_dropdown.value = self.test_name
-                    self.name_dropdown.options = self.name_list
-                    self.second_dropdown.value = self.test_name
-                    self.second_dropdown.options = self.name_list
                     run_test2_name = self.name_list[0]
                     self.generate_log_message(self.log_div, "list of tests has changed!")
+
+                self.name_dropdown.value = self.test_name
+                self.name_dropdown.options = self.name_list
+                self.second_dropdown.value = self.test_name
+                self.second_dropdown.options = self.name_list
+
 
                 self.name_dropdown.on_change('value', self.update)
                 self.second_dropdown.on_change('value', self.update)
