@@ -881,6 +881,7 @@ class fp_builder():
                     self.amp_results = new_amp_results
                 else:
                     return
+
                 self.tests, self.test_name, self.name_list, self.name_aliases = (
                     self.set_test_list(self.test_name, self.amp_results))
 
@@ -892,8 +893,8 @@ class fp_builder():
 
                 if run_test1_name not in self.name_list:
                     run_test1_name = self.name_list[0]
-                    self.name_dropdown.value = run_test1_name
-                    self.second_dropdown.value = run_test1_name
+                    self.name_dropdown.value = self.test_name
+                    self.second_dropdown.value = self.test_name
                     run_test2_name = self.name_list[0]
                     self.generate_log_message(self.log_div, "list of tests has changed!")
 
@@ -959,10 +960,10 @@ class fp_builder():
 
             if new_amp_results is not None:
                 self.amp_results_2 = new_amp_results
-                _, desired_test2_name, self.name_list_2, self.name_aliases_2 = (
+                _, self.test2_name, self.name_list_2, self.name_aliases_2 = (
                     self.set_test_list(self.second_test_name, self.amp_results_2))
-                self.second_test_name = run_test2_name
-                self.second_dropdown.value = run_test2_name
+                self.second_test_name = self.test2_name
+                self.second_dropdown.value = self.test2_name
                 self.second_dropdown.options = self.name_list_2
 
                 self.second_dropdown.on_change('value', self.update)
