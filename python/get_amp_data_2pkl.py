@@ -22,7 +22,6 @@ parser.add_argument('--repo', default="/repo/main", help="/repo/main or /repo/em
 args = parser.parse_args()
 
 repo = args.repo
-butler = daf_butler.Butler(repo)
 
 if args.do_calib == "yes":
 
@@ -46,6 +45,7 @@ if args.do_calib == "yes":
             amp_data["noise"][r0_name] = noise
 
             o = args.ticket_calib + ".npy"
+            print("about to write to ", o)
             with open(o, "wb") as pickle_file:
                 pickle.dump(amp_data, pickle_file)
                 print("Writing to", o)
@@ -53,6 +53,8 @@ if args.do_calib == "yes":
     except:
         print("Failed to access calibration ", args.ticket_calib)
 else:
+
+    butler = daf_butler.Butler(repo)
 
     pattern_version = f"u/lsstccs/eo_*_*"
     collections_v = butler.registry.queryCollections(pattern_version)
