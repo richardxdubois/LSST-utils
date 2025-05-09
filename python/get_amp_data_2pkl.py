@@ -32,8 +32,6 @@ if args.do_calib == "yes":
     amp_data["gain"] = {}
     amp_data["noise"] = {}
 
-    refs = butler.query_datasets('ptc', limit=None)
-
     try:
         refs = butler.query_datasets('ptc', limit=None)
         print("refs acquired: len(", len(refs), ")")
