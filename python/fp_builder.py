@@ -505,8 +505,9 @@ class fp_builder():
         self.calib_text_box = TextInput(title="Input calib from butler: DM-xxxxx", value="None")
         self.calib_dropdown = Select(title="Pick calib test", value=self.calib_list[0], options=self.calib_list)
 
-        self.calib_text_box_2 = TextInput(title="Input 2nd calib from butler: DM-xxxxx", value="None")
-        self.calib_dropdown_2 = Select(title="Pick 2nd calib test", value=self.calib_list[0], options=self.calib_list)
+        self.calib_text_box_2 = TextInput(title="Input 2nd calib from butler: DM-xxxxx", value="None", visible=False)
+        self.calib_dropdown_2 = Select(title="Pick 2nd calib test", value=self.calib_list[0],
+                                       options=self.calib_list, visible=False)
 
 
         if not self.DM_stack:
