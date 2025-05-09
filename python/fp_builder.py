@@ -1612,6 +1612,8 @@ class fp_builder():
 
                 amp_data["gain"] = {}
                 amp_data["noise"] = {}
+                amp_data["ptcTurnoff"] = {}
+                amp_data["gainUnadjusted"] = {}
 
                 try:
                     refs = butler.query_datasets('ptc', limit=None)
@@ -1619,11 +1621,17 @@ class fp_builder():
                         r0 = butler.get(r)
                         r0_name = r0._detectorName
 
-                        gains = r0.gain
-                        amp_data["gain"][r0_name] = gains
+                        gain = r0.gain
+                        amp_data["gain"][r0_name] = gain
+
+                        gainUnadjusted = r0.gainUnadjusted
+                        amp_data["gainUnadjusted"][r0_name] = gainUnadjusted
 
                         noise = r0.noise
                         amp_data["noise"][r0_name] = noise
+
+                        ptcTurnoff = r0.ptcTurnoff
+                        amp_data["ptcTurnoff"][r0_name] = ptcTurnoff
 
                     self.calib_cache[calib_name] = amp_data
                     self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
