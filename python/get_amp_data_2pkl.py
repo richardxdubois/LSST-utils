@@ -27,13 +27,14 @@ if args.do_calib == "yes":
 
     collection = 'LSSTCam/calib/' + args.ticket_calib
     butler = daf_butler.Butler(repo, collections=[collection])
-
+    print("butler set up", repo)
     amp_data = {}
     amp_data["gain"] = {}
     amp_data["noise"] = {}
 
     try:
         refs = butler.query_datasets('ptc', limit=None)
+        print("refs acquired: len(", len(refs), ")")
         for r in refs:
             r0 = butler.get(r)
             r0_name = r0._detectorName
@@ -44,11 +45,11 @@ if args.do_calib == "yes":
             noise = r0.noise
             amp_data["noise"][r0_name] = noise
 
-            o = args.ticket_calib + ".npy"
-            print("about to write to ", o)
-            with open(o, "wb") as pickle_file:
-                pickle.dump(amp_data, pickle_file)
-                print("Writing to", o)
+        o = args.ticket_calib + ".npy"
+        print("about to write to ", o)
+        with open(o, "wb") as pickle_file:
+            pickle.dump(amp_data, pickle_file)
+            print("Writing to", o)
 
     except:
         print("Failed to access calibration ", args.ticket_calib)
