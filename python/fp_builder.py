@@ -993,7 +993,7 @@ class fp_builder():
 
             rc = self.update_slider(lower, upper)
 
-        if (s and self.second_test_name != run_test2_name) or new_run or new_run2_name or ct_2:
+        if (s and self.second_test_name != run_test2_name) or new_run or new_run2_name:
             # select 2nd test. Replace "test2" in source_static and source.data
             self.generate_log_message(self.log_div, "getting new second test data: " + run_test2_name)
 
