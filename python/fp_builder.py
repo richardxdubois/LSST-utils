@@ -1599,7 +1599,7 @@ class fp_builder():
             try:     # look for pickle file
                 calib_pickle = self.data_dir + "/calib_pickles/" + calib_name + ".npy"
                 print("reading from", calib_pickle)
-                with open(self.in_file, 'rb') as f:
+                with open(calib_pickle, 'rb') as f:
                     amp_data = pickle.load(f)
                 print("amp data acquired from pickle")
                 self.calib_cache[calib_name] = amp_data
