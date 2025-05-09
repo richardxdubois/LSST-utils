@@ -387,7 +387,7 @@ class fp_builder():
                           row(self.calib_dropdown, self.calib_text_box))
         # run selection via pickle file
         layout_3 = column(row(self.run_text_box_2, self.run_pickle_dropdown_2),
-                          row(self.calib_text_box_2, self.calib_text_box_2))
+                          row(self.calib_text_box_2, self.calib_dropdown_2))
         # pick test name and slider
         layout_4 = row(column(self.name_dropdown, self.second_dropdown),
                               self.slider, self.log_div)
@@ -900,7 +900,7 @@ class fp_builder():
                 elapsed_time = end_time - start_time
 
                 self.generate_log_message(
-                    self.log_div, f"{new_run_name} loaded after {elapsed_time:.2f} seconds")
+                    self.log_div, f"{run1_test_name} loaded after {elapsed_time:.2f} seconds")
                 self.title_run_base = self.test_run
                 new_run = True
                 self.new_pickle = False
