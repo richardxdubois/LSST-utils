@@ -27,7 +27,7 @@ if args.do_calib == "yes":
 
     collection = 'LSSTCam/calib/' + args.ticket_calib
     butler = daf_butler.Butler(repo, collections=[collection])
-    print("butler set up", repo)
+    print("butler set up", repo, collection)
     amp_data = {}
     amp_data["gain"] = {}
     amp_data["noise"] = {}
