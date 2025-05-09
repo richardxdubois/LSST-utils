@@ -1600,9 +1600,11 @@ class fp_builder():
                 calib_pickle = self.data_dir + "/calib_pickles/" + calib_name + ".npy"
                 print("reading from", calib_pickle)
                 amp_data = pickle.load(calib_pickle)
+                print("amp data acquired from pickle")
                 self.calib_cache[calib_name] = amp_data
                 self.generate_log_message(self.log_div, "amp data acquired from pickle")
             except:  # get from butler
+                print("get calib from butler")
                 repo = "/repo/embargo"
                 collection = 'LSSTCam/calib/' + calib_name
                 butler = daf_butler.Butler(repo, collections=[collection])
