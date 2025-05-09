@@ -1592,34 +1592,40 @@ class fp_builder():
 
         amp_data = {}
 
-        try:
+        try:  # look in cache
             amp_data = self.calib_cache[calib_name]
             self.generate_log_message(self.log_div, "amp data acquired from cache")
         except:
-            repo = "/repo/embargo"
-            collection = 'LSSTCam/calib/' + calib_name
-            butler = daf_butler.Butler(repo, collections=[collection])
-
-            amp_data["gain"] = {}
-            amp_data["noise"] = {}
-
-            try:
-                refs = butler.query_datasets('ptc', limit=None)
-                for r in refs:
-                    r0 = butler.get(r)
-                    r0_name = r0._detectorName
-
-                    gains = r0.gain
-                    amp_data["gain"][r0_name] = gains
-
-                    noise = r0.noise
-                    amp_data["noise"][r0_name] = noise
-
+            try:     # look for pickle file
+                calib_pickle = self.data_dir + "/calib_pickles" + calib_name + ".npy"
+                amp_data = pickle.load(calib_pickle)
                 self.calib_cache[calib_name] = amp_data
-                self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
-            except:
-                self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
-                amp_data = None
+                self.generate_log_message(self.log_div, "amp data acquired from pickle")
+            except:  # get from butler
+                repo = "/repo/embargo"
+                collection = 'LSSTCam/calib/' + calib_name
+                butler = daf_butler.Butler(repo, collections=[collection])
+
+                amp_data["gain"] = {}
+                amp_data["noise"] = {}
+
+                try:
+                    refs = butler.query_datasets('ptc', limit=None)
+                    for r in refs:
+                        r0 = butler.get(r)
+                        r0_name = r0._detectorName
+
+                        gains = r0.gain
+                        amp_data["gain"][r0_name] = gains
+
+                        noise = r0.noise
+                        amp_data["noise"][r0_name] = noise
+
+                    self.calib_cache[calib_name] = amp_data
+                    self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
+                except:
+                    self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
+                    amp_data = None
 
         return amp_data
 
