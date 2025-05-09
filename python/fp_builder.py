@@ -951,7 +951,6 @@ class fp_builder():
                 self.run_text_box.value = "None"
                 self.new_pickle = True
 
-            print("Fetching new second run", self.test_run_2)
             start_time = time.time()
             if c2:
                 print("Fetching new second calib", calib_2)
@@ -967,6 +966,7 @@ class fp_builder():
                 self.second_test_name = self.test2_name
                 self.second_dropdown.value = self.test2_name
                 self.second_dropdown.options = self.name_list_2
+                run_test2_name = self.test2_name
 
                 self.second_dropdown.on_change('value', self.update)
                 self.run_pickle_dropdown_2.on_change('value', self.update)
