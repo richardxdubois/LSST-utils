@@ -999,7 +999,7 @@ class fp_builder():
             if self.second_toggle_2.active == 0:
                 self.run1_name_active = True
 
-            t2_new_test_data = self.get_new_test(run_test2_name, self.current_raft)
+            t2_new_test_data = self.get_new_test(desired_test2_name, self.current_raft)
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
