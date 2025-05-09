@@ -101,7 +101,7 @@ class fp_builder():
 
         self.amp_results = None
         self.amp_results_2 = None  # optional 2nd run for 2nd histogram
-        self.second_run_active = False
+        self.run1_name_active = False
 
         self.raft_groups = None
         self.ccd_groups = None
@@ -194,6 +194,34 @@ class fp_builder():
             self.good_runs = yaml.safe_load(f)
 
         self.good_runs_versions = [(t + "_" + self.good_runs[t]) for t in self.good_runs]
+
+        # Define the CSS for colouring the pulldown menu items as a string
+        self.good_run_css = """
+        <style>
+        .custom-select-dropdown .option-red {
+            color: red;
+        }
+        .custom-select-dropdown .option-black {
+            color: black;
+        }
+        </style>
+        """
+        self.css_div = Div(text=self.good_run_css, visible=True)
+
+        # Define CustomJS to color options
+        self.good_run_js_code = \
+            f"""
+                console.log('Entered js callback');
+                const selectEl = document.querySelector('.custom-select-dropdown select');
+                const options = selectEl.querySelectorAll('option');
+                for (let i = 0; i < options.length; i++) {{
+                    if ({self.good_runs_list}.includes(options[i].value)) {{
+                        options[i].classList.add("option-red");
+                    }} else {{
+                        options[i].classList.add("option-black");
+                    }}
+                }}
+                """
 
         if self.DM_stack:
 
@@ -351,9 +379,11 @@ class fp_builder():
         # select sensor type and set clip threshold
         layout_1 = column(self.type_dropdown, self.clip_select)
         # run selection via butler
-        layout_2 = row(self.run_pickle_dropdown, self.run_text_box)
+        layout_2 = column(row(self.run_pickle_dropdown, self.run_text_box),
+                          row(self.calib_dropdown, self.calib_text_box))
         # run selection via pickle file
-        layout_3 = column(self.run_text_box_2, self.run_pickle_dropdown_2)
+        layout_3 = column(row(self.run_text_box_2, self.run_pickle_dropdown_2),
+                          row(self.calib_text_box_2, self.calib_text_box_2))
         # pick test name and slider
         layout_4 = row(column(self.name_dropdown, self.second_dropdown),
                               self.slider, self.log_div)
@@ -367,7 +397,7 @@ class fp_builder():
         # plots
         layout_9 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
 
-        layout_0 = row(self.exit_button, self.doc_button, layout_8, layout_5, layout_6, layout_7)
+        layout_0 = row(self.css_div, self.exit_button, self.doc_button, layout_8, layout_5, layout_6, layout_7)
 
         canvas_layout = layout(layout_0,
                                row(layout_1,
@@ -375,8 +405,56 @@ class fp_builder():
                                layout_9)
 
         # Add the layout to the current document
+
+        curdoc().clear()
         curdoc().add_root(canvas_layout)
         curdoc().title = "LSSTCam focal plane EO viewer"
+        self.apply_css_classes()  # Apply CSS classes after all elements are built
+
+    def apply_css_classes(self):
+        print("Entered apply_css_classes()")
+        highlight_list = self.good_runs_versions
+        js_code = f"""
+                 console.log("Starting apply_css_classes"); // Check if this function is called
+                 //window.addEventListener('DOMContentLoaded', function() {{
+                     console.log("DOMContentLoaded event fired!"); // Check if the event listener is attached and firing
+                     const selectEls = document.querySelectorAll('.custom-select-dropdown select');
+                     console.log("selectEls:", selectEls);
+                     if (selectEls) {{
+                         selectEls.forEach(selectEl => {{
+                             console.log("Processing selectEl:", selectEl);
+                             const options = selectEl.querySelectorAll('option');
+                             console.log("options:", options);
+                             if (options) {{
+                                 options.forEach(option => {{
+                                     console.log("Checking option:", option.value);
+                                     if ({highlight_list}.includes(option.value)) {{
+                                         option.classList.add("option-red");
+                                         console.log("Added option-red to:", option.value);
+                                     }} else {{
+                                         option.classList.add("option-black");
+                                         console.log("Added option-black to:", option.value);
+                                     }}
+                                 }});
+                             }} else {{
+                                 console.log("No options found.");
+                             }}
+                         }});
+                     }} else {{
+                         console.log("No select element found.");
+                     }}
+                 //}});
+                 """
+        # Run the JS code now to style existing options
+        print("About to add the JS code to the document.")
+        #curdoc().add_next_tick_callback(lambda: curdoc().add_root(Div(text=f'<script>{js_code}</script>')))
+        curdoc().on_event('document_ready', CustomJS(code=js_code))
+
+    # Define the function to be scheduled with add_next_tick_callback
+    def trigger_js(self):
+        # Update the TextInput value to trigger the callback
+        self.css_div.text = self.css_div.text + " "
+        print("trigger_js called", self.css_div.text)
 
     def create_widgets(self):
         """
@@ -386,10 +464,21 @@ class fp_builder():
         self.log_div = Div(text="Log:<br>", width=400, height=200)
 
         self.type_dropdown = Select(title="Pick sensor", value="all", options=["all", "E2V", "ITL"])
+
         self.name_dropdown = Select(title="Pick test", value=self.test_name, options=self.name_list)
+
         self.run_pickle_dropdown = Select(title="Pick run from pickle list (fast)", value=self.in_file,
                                           options=list(self.pickled_runs),
-                                          width=300)
+                                          width=300, css_classes=["custom-select-dropdown"])
+
+        """
+        # Attach the CustomJS callback to run immediately
+        js_callback = CustomJS(code=self.good_run_js_code)
+        self.css_div.js_on_change('text', js_callback)
+        curdoc().add_root(self.css_div)
+        self.trigger_js()
+        #curdoc().add_next_tick_callback(self.trigger_js)
+        """
 
         self.second_dropdown = Select(title="Pick second test", value=self.second_test_name, options=self.name_list)
         self.second_dropdown.visible = False
@@ -408,9 +497,24 @@ class fp_builder():
         self.second_toggle_2 = RadioButtonGroup(labels=["On", "Off"], active=1, visible=False)
         self.st_div_2 = Div(text="Second run", visible=False)
 
+        # set up for calibs
+
+        self.calib_text_box = TextInput(title="Input calib from butler: DM-xxxxx", value="None")
+        self.calib_dropdown = Select(title="Pick calib test", value=self.calib_list[0], options=self.calib_list)
+
+        self.calib_text_box_2 = TextInput(title="Input 2nd calib from butler: DM-xxxxx", value="None")
+        self.calib_dropdown_2 = Select(title="Pick 2nd calib test", value=self.calib_list[0], options=self.calib_list)
+
+
         if not self.DM_stack:
             self.run_text_box.visible = False
             self.good_runs_dropdown.visible = False
+
+            self.calib_text_box.visible = False
+            self.calib_dropdown.visible = False
+            self.calib_text_box_2.visible = False
+            self.calib_dropdown_2.visible = False
+
             self.generate_log_message(self.log_div, "No DM stack or EO - run selection disabled")
 
         self.exit_button = Button(label="Exit", button_type="danger")
@@ -466,10 +570,20 @@ class fp_builder():
         self.second_toggle.on_change("active", self.second_callback)
         self.second_toggle_2.on_change("active", self.second_callback_2)
 
+        # calibrations
+
+        self.calib_dropdown.on_change('value', self.update)
+        self.calib_text_box.on_change('value', self.update)
+        self.calib_dropdown_2.on_change('value', self.update)
+        self.calib_text_box_2.on_change('value', self.update)
+
         self.clip_toggle.on_change("active", self.clip_toggle_callback)
 
         doc_url = "https://richardxdubois.github.io/LSST-utils/README_fp_builder"
-        self.doc_callback = CustomJS(code=f"window.open('{doc_url}', '_blank');")
+        self.doc_callback = CustomJS(code=
+                                     f"""
+                                     window.open('{doc_url}', '_blank');
+                                     """)
 
         self.doc_button.js_on_click(self.doc_callback)
 
@@ -662,15 +776,20 @@ class fp_builder():
         Define callback to update "source.data" ColumnDataSource via most of the widgets
         """
 
-        # Get the new range from the slider
-        selected_name = self.name_dropdown.value
-        second_name = self.second_dropdown.value
-        selected_run = self.run_text_box.value
+        # Get the new range from the slider etc
+        run1_test_name = self.name_dropdown.value
+        run1_test2_name = self.second_dropdown.value
+        run1_name = self.run_text_box.value
         run_pickle = self.run_pickle_dropdown.value
         good_run = self.good_runs_dropdown.value
 
-        selected_run_2 = self.run_text_box_2.value
+        run1_name_2 = self.run_text_box_2.value
         run_pickle_2 = self.run_pickle_dropdown_2.value
+
+        calib_1 = self.calib_text_box.value
+        calib_2 = self.calib_text_box_2.value
+        calib_test_1 = self.calib_dropdown.value
+        calib_test_2 = self.calib_dropdown_2.value
 
         if self.clip_threshold != float(self.clip_select.value):
             self.clip_threshold = float(self.clip_select.value)
@@ -684,31 +803,37 @@ class fp_builder():
         self.new_pickle = new == run_pickle
         new_good_run = new == good_run
 
+        c1 = new == calib_1
+        c2 = new == calib_2
+        ct_1 = new == calib_test_1
+        ct_2 = new == calib_test_2
+
         w2 = new == self.run_text_box_2.value
         np2 = new == self.run_pickle_dropdown_2.value
 
-        self.second_run_active = False
+        self.run1_name_active = False
 
         new_run = False
-        if (selected_run != self.test_run and w) or self.new_pickle or new_good_run or new_run:
+        if (run1_name != self.test_run and w) or self.new_pickle or new_good_run or new_run or c1:
             # new run selected - replace dict of measurements - amp_results
             if self.DM_stack or self.new_pickle:
 
                 self.good_runs_dropdown.remove_on_change('value', self.update)
                 self.run_pickle_dropdown.remove_on_change('value', self.update)
                 self.run_text_box.remove_on_change('value', self.update)
+                self.calib_text_box.remove_on_change('value', self.update)
 
                 if w:
                     if not DM_stack:
                         self.run_pickle_dropdown_2.on_change('value', self.update)
                         self.run_text_box_2.on_change('value', self.update)
                         self.generate_log_message(self.log_div,
-                                                  "DM stack or EO code unavailable. Request ignored: " + selected_run_2)
+                                                  "DM stack or EO code unavailable. Request ignored: " + run1_name_2)
                         return
 
                     new_run_name = self.name_dropdown.value
-                    kwargs = {"run_name": selected_run}
-                    self.test_run = selected_run
+                    kwargs = {"run_name": run1_name}
+                    self.test_run = run1_name
                     self.good_runs_dropdown.value = "None"
                     self.run_pickle_dropdown.value = "None"
                 elif self.new_pickle:
@@ -723,16 +848,27 @@ class fp_builder():
                     self.test_run = good_run
                     self.run_text_box.value = "None"
                     self.run_pickle_dropdown.value = "None"
+                elif c1:
+                    new_calib_name = calib_1
+                    kwargs = {"calib_name": new_calib_name}
+                    self.calib_ticket = new_calib_name
+                    self.calib_text_box.value = "None"
 
                 self.good_runs_dropdown.on_change('value', self.update)
                 self.run_pickle_dropdown.on_change('value', self.update)
                 self.run_text_box.on_change('value', self.update)
+                self.calib_text_box.on_change('value', self.update)
 
-                self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
-
-                print("Fetching new run", new_run_name)
                 start_time = time.time()
-                new_amp_results = self.get_new_run(**kwargs)
+                if c1:
+                    self.generate_log_message(self.log_div, "calib_text_box selected: " + new_calib_name)
+                    print("Fetching new calib", new_calib_name)
+                    new_amp_results = self.get_new_calib(**kwargs)
+                else:
+                    self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
+                    print("Fetching new run", new_run_name)
+                    new_amp_results = self.get_new_run(**kwargs)
+
                 if new_amp_results is not None:
                     self.amp_results = new_amp_results
                 else:
@@ -746,11 +882,11 @@ class fp_builder():
                 self.name_dropdown.remove_on_change('value', self.update)
                 self.second_dropdown.remove_on_change('value', self.update)
 
-                if selected_name not in self.name_list:
-                    selected_name = self.name_list[0]
-                    self.name_dropdown.value = selected_name
-                    self.second_dropdown.value = second_name
-                    second_name = self.name_list[0]
+                if run1_test_name not in self.name_list:
+                    run1_test_name = self.name_list[0]
+                    self.name_dropdown.value = run1_test_name
+                    self.second_dropdown.value = run1_test2_name
+                    run1_test2_name = self.name_list[0]
                     self.generate_log_message(self.log_div, "list of tests has changed!")
 
                 self.name_dropdown.on_change('value', self.update)
@@ -765,11 +901,14 @@ class fp_builder():
                 new_run = True
                 self.new_pickle = False
             else:
-                self.generate_log_message(self.log_div, "DM stack or EO code unavailable. Request ignored: " + selected_run)
+                self.generate_log_message(self.log_div, "DM stack or EO code unavailable. Request ignored: " + run1_name)
                 return
 
-        new_second_run = w2 or np2
-        if new_second_run:
+        # 2nd run changed
+
+        new_run2_name = w2 or np2 or c2
+
+        if new_run2_name:
             self.second_dropdown.remove_on_change('value', self.update)
             self.run_pickle_dropdown_2.remove_on_change('value', self.update)
             self.run_text_box_2.remove_on_change('value', self.update)
@@ -780,12 +919,21 @@ class fp_builder():
                     self.run_pickle_dropdown_2.on_change('value', self.update)
                     self.run_text_box_2.on_change('value', self.update)
                     self.generate_log_message(self.log_div,
-                                              "DM stack or EO code unavailable. Request ignored: " + selected_run_2)
+                                              "DM stack or EO code unavailable. Request ignored: " + run1_name_2)
                     return
-                kwargs = {"run_name": selected_run_2}
-                self.test_run_2 = selected_run_2
+                kwargs = {"run_name": run1_name_2}
+                self.test_run_2 = run1_name_2
                 self.run_pickle_dropdown_2.value = "None"
-                self.generate_log_message(self.log_div, "run_text_box_2 selected: " + selected_run_2)
+                self.generate_log_message(self.log_div, "run_text_box_2 selected: " + run1_name_2)
+            elif c2:
+                if not DM_stack:
+                    self.calib_text_box_2.on_change('value', self.update)
+                    self.generate_log_message(self.log_div,
+                                              "DM stack or EO code unavailable. Request ignored: " + calib_test_2)
+                    return
+                kwargs = {"calib_name": calib_test_2}
+                self.test_run_2 = calib_test_2
+                self.generate_log_message(self.log_div, "calib_text_box_2 selected: " + calib_test_2)
             else:
                 kwargs = {"run_name": run_pickle_2}
                 self.test_run_2 = run_pickle_2
@@ -794,53 +942,62 @@ class fp_builder():
 
             print("Fetching new second run", self.test_run_2)
             start_time = time.time()
-            new_amp_results = self.get_new_run(**kwargs)
+            if c2:
+                print("Fetching new second calib", calib_test_2)
+                new_amp_results = self.get_new_calib(**kwargs)
+            else:
+                print("Fetching new second run", self.test_run_2)
+                new_amp_results = self.get_new_run(**kwargs)
+
             if new_amp_results is not None:
+                desired_test2_name = run1_test2_name if d else calib_test_2
                 self.amp_results_2 = new_amp_results
-                _, second_name, self.name_list_2, self.name_aliases_2 = (
+                _, desired_test2_name, self.name_list_2, self.name_aliases_2 = (
                     self.set_test_list(self.second_test_name, self.amp_results_2))
-                self.second_test_name = second_name
-                self.second_dropdown.value = second_name
+                self.second_test_name = run1_test2_name
+                self.second_dropdown.value = run1_test2_name
                 self.second_dropdown.options = self.name_list_2
 
                 self.second_dropdown.on_change('value', self.update)
                 self.run_pickle_dropdown_2.on_change('value', self.update)
                 self.run_text_box_2.on_change('value', self.update)
 
-        if (d and selected_name != self.test_name) or new_run or clip:
+        desired_test1_name = run1_test_name if d else calib_test_1
+
+        if (d and run1_test_name != self.test_name) or new_run or clip or ct_1:
             # new test name selected. Replace "z" in source_static and source.data
             # clip the data and set the sliders to the clipped lower and upper
-            self.generate_log_message(self.log_div, "getting new test data: " + selected_name)
-            new_test_data = self.get_new_test(selected_name, self.current_raft)
-            self.second_test_name = second_name
+            self.generate_log_message(self.log_div, "getting new test data: " + desired_test1_name)
+            new_test_data = self.get_new_test(desired_test1_name, self.current_raft)
+            self.second_test_name = desired_test1_name
 
             if self.second_toggle_2.active == 0:
-                self.second_run_active = True
+                self.run1_name_active = True
 
             self.source_static["z"] = list(new_test_data)
             self.source.data["z"] = list(new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
             if not new_run:
-                self.test_name = selected_name
-            self.generate_log_message(self.log_div, "updating sliders for : " + selected_name)
+                self.test_name = run1_test_name
+            self.generate_log_message(self.log_div, "updating sliders for : " + run1_test_name)
             lower, upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
 
             rc = self.update_slider(lower, upper)
 
-        if (s and self.second_test_name != second_name) or new_run or new_second_run:
+        if (s and self.second_test_name != run1_test2_name) or new_run or new_run2_name or ct_2:
             # select 2nd test. Replace "test2" in source_static and source.data
-            self.generate_log_message(self.log_div, "getting new second test data: " + second_name)
+            self.generate_log_message(self.log_div, "getting new second test data: " + run1_test2_name)
 
             if self.second_toggle_2.active == 0:
-                self.second_run_active = True
+                self.run1_name_active = True
 
-            t2_new_test_data = self.get_new_test(second_name, self.current_raft)
+            t2_new_test_data = self.get_new_test(run1_test2_name, self.current_raft)
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
-            if not (new_run or new_second_run):
-                self.second_test_name = second_name
+            if not (new_run or run1_test_name or c1):
+                self.second_test_name = desired_test1_name
 
         # stuff done for all entries to update - histograms are remade every time
 
@@ -1332,7 +1489,7 @@ class fp_builder():
         :return:
 
         """
-        if not self.second_run_active:
+        if not self.run1_name_active:
             tn_name = self.name_aliases[t_name]
             self.test_data = self.amp_results[tn_name]
             test_data = self.test_data
@@ -1413,6 +1570,41 @@ class fp_builder():
             except:
                 self.generate_log_message(self.log_div, "Failed to retrieve " + run_name + " from butler")
                 amp_data = None
+
+        return amp_data
+
+    def get_new_calib(self, calib_name):
+        """
+        Fetch a new calib: from explicit calib ticket, from ticket list or from list of pickle files
+        :param calib_name:
+        :return:
+        """
+        self.generate_log_message(self.log_div, "Entered get_new_calib " + calib_name)
+
+        repo = "/repo/embargo"
+        collection = 'LSSTCam/calib/' + calib_name
+        butler = daf_butler.Butler(repo, collections=[collection])
+
+        amp_data = {}
+        amp_data["gain"] = {}
+        amp_data["noise"] = {}
+
+        try:
+            refs = butler.query_datasets('ptc', limit=None)
+            for r in refs:
+                r0 = butler.get(r)
+                r0_name = r0._detectorName
+
+                gains = r0.gain
+                amp_data["gain"][r0_name] = gains
+
+                noise = r0.noise
+                amp_data["noise"][r0_name] = noise
+
+            self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
+        except:
+            self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
+            amp_data = None
 
         return amp_data
 
