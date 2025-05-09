@@ -384,11 +384,9 @@ class fp_builder():
         # select sensor type and set clip threshold
         layout_1 = column(self.type_dropdown, self.clip_select)
         # run selection via butler
-        layout_2 = column(row(self.run_pickle_dropdown, self.run_text_box),
-                          row(self.calib_dropdown, self.calib_text_box))
+        layout_2 = column(row(self.run_pickle_dropdown, self.run_text_box), self.calib_text_box)
         # run selection via pickle file
-        layout_3 = column(row(self.run_text_box_2, self.run_pickle_dropdown_2),
-                          row(self.calib_text_box_2, self.calib_dropdown_2))
+        layout_3 = column(row(self.run_text_box_2, self.run_pickle_dropdown_2), row(self.calib_text_box_2))
         # pick test name and slider
         layout_4 = row(column(self.name_dropdown, self.second_dropdown),
                               self.slider, self.log_div)
@@ -516,9 +514,9 @@ class fp_builder():
             self.good_runs_dropdown.visible = False
 
             self.calib_text_box.visible = False
-            self.calib_dropdown.visible = False
+            #self.calib_dropdown.visible = False
             self.calib_text_box_2.visible = False
-            self.calib_dropdown_2.visible = False
+            #self.calib_dropdown_2.visible = False
 
             self.generate_log_message(self.log_div, "No DM stack or EO - run selection disabled")
 
@@ -577,9 +575,9 @@ class fp_builder():
 
         # calibrations
 
-        self.calib_dropdown.on_change('value', self.update)
+        #self.calib_dropdown.on_change('value', self.update)
         self.calib_text_box.on_change('value', self.update)
-        self.calib_dropdown_2.on_change('value', self.update)
+        #self.calib_dropdown_2.on_change('value', self.update)
         self.calib_text_box_2.on_change('value', self.update)
 
         self.clip_toggle.on_change("active", self.clip_toggle_callback)
@@ -617,6 +615,7 @@ class fp_builder():
             self.histo1.height = 320
             self.second_toggle_2.visible = True
             self.st_div_2.visible = True
+            self.calib_text_box_2.visible = True
         else:  # "Off"
             self.histo2.visible = False
             self.scatter12.visible = False
@@ -624,15 +623,18 @@ class fp_builder():
             self.histo1.height = 640
             self.second_toggle_2.visible = False
             self.st_div_2.visible = False
+            self.calib_text_box_2.visible = False
 
     def second_callback_2(self, attr, old, new):
 
         if self.second_toggle_2.active == 0:  # "On"
             if self.DM_stack:
                 self.run_text_box_2.visible = True
+                self.calib_text_box_2.visible = True
             self.run_pickle_dropdown_2.visible = True
         else:  # "Off"
             self.run_text_box_2.visible = False
+            self.calib_text_box_2.visible = False
             self.run_pickle_dropdown_2.visible = False
             # trigger refreshing the primary run
             if ".npy" in self.test_run:
@@ -793,8 +795,8 @@ class fp_builder():
 
         calib_1 = self.calib_text_box.value
         calib_2 = self.calib_text_box_2.value
-        calib_test_1 = self.calib_dropdown.value
-        calib_test_2 = self.calib_dropdown_2.value
+        #calib_test_1 = self.calib_dropdown.value
+        #calib_test_2 = self.calib_dropdown_2.value
 
         if self.clip_threshold != float(self.clip_select.value):
             self.clip_threshold = float(self.clip_select.value)
@@ -810,8 +812,8 @@ class fp_builder():
 
         c1 = new == calib_1
         c2 = new == calib_2
-        ct_1 = new == calib_test_1
-        ct_2 = new == calib_test_2
+        #ct_1 = new == calib_test_1
+        #t_2 = new == calib_test_2
 
         w2 = new == self.run_text_box_2.value
         np2 = new == self.run_pickle_dropdown_2.value
@@ -934,11 +936,11 @@ class fp_builder():
                 if not DM_stack:
                     self.calib_text_box_2.on_change('value', self.update)
                     self.generate_log_message(self.log_div,
-                                              "DM stack or EO code unavailable. Request ignored: " + calib_test_2)
+                                              "DM stack or EO code unavailable. Request ignored: " + calib__2)
                     return
-                kwargs = {"calib_name": calib_test_2}
-                self.test_run_2 = calib_test_2
-                self.generate_log_message(self.log_div, "calib_text_box_2 selected: " + calib_test_2)
+                kwargs = {"calib_name": calib_2}
+                self.test_run_2 = calib_2
+                self.generate_log_message(self.log_div, "calib_text_box_2 selected: " + calib_2)
             else:
                 kwargs = {"run_name": run_pickle_2}
                 self.test_run_2 = run_pickle_2
@@ -948,14 +950,13 @@ class fp_builder():
             print("Fetching new second run", self.test_run_2)
             start_time = time.time()
             if c2:
-                print("Fetching new second calib", calib_test_2)
+                print("Fetching new second calib", calib_2)
                 new_amp_results = self.get_new_calib(**kwargs)
             else:
                 print("Fetching new second run", self.test_run_2)
                 new_amp_results = self.get_new_run(**kwargs)
 
             if new_amp_results is not None:
-                desired_test2_name = run_test2_name if d else calib_test_2
                 self.amp_results_2 = new_amp_results
                 _, desired_test2_name, self.name_list_2, self.name_aliases_2 = (
                     self.set_test_list(self.second_test_name, self.amp_results_2))
@@ -967,14 +968,12 @@ class fp_builder():
                 self.run_pickle_dropdown_2.on_change('value', self.update)
                 self.run_text_box_2.on_change('value', self.update)
 
-        desired_test1_name = run_test1_name if (d or w) else calib_test_1
-
-        if (d and run_test1_name != self.test_name) or new_run or clip or ct_1:
+        if (d and run_test1_name != self.test_name) or new_run or clip:
             # new test name selected. Replace "z" in source_static and source.data
             # clip the data and set the sliders to the clipped lower and upper
-            self.generate_log_message(self.log_div, "getting new test data: " + desired_test1_name)
-            new_test_data = self.get_new_test(desired_test1_name, self.current_raft)
-            self.second_test_name = desired_test1_name
+            self.generate_log_message(self.log_div, "getting new test data: " + run_test1_name)
+            new_test_data = self.get_new_test(run_test1_name, self.current_raft)
+            self.second_test_name = run_test1_name
 
             if self.second_toggle_2.active == 0:
                 self.run1_name_active = True
@@ -994,17 +993,15 @@ class fp_builder():
             # select 2nd test. Replace "test2" in source_static and source.data
             self.generate_log_message(self.log_div, "getting new second test data: " + run_test2_name)
 
-            desired_test2_name = calib_test_2 if ct_2 else run_test2_name
-
             if self.second_toggle_2.active == 0:
                 self.run1_name_active = True
 
-            t2_new_test_data = self.get_new_test(desired_test2_name, self.current_raft)
+            t2_new_test_data = self.get_new_test(run_test2_name, self.current_raft)
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
             if not (new_run or run_test1_name or c1):
-                self.second_test_name = desired_test1_name
+                self.second_test_name = run_test1_name
 
         # stuff done for all entries to update - histograms are remade every time
 
@@ -1613,6 +1610,7 @@ class fp_builder():
                     noise = r0.noise
                     amp_data["noise"][r0_name] = noise
 
+                self.calib_cache[calib_name] = amp_data
                 self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
             except:
                 self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
