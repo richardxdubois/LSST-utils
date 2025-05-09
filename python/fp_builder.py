@@ -641,7 +641,7 @@ class fp_builder():
             if ".npy" in self.test_run:
                 self.run_pickle_dropdown.value = self.test_run
             else:
-                self.name_dropdown.value - self.test_run
+                self.name_dropdown.value = self.test_run
 
     # Define a callback to update the div whenever the checkbox state changes
     def slider_checkbox_callback(self, attr, old, new):
@@ -861,7 +861,7 @@ class fp_builder():
                     kwargs = {"calib_name": new_calib_name}
                     self.test_run = new_calib_name
                     self.calib_ticket = new_calib_name
-                    self.calib_text_box.value = "None"
+                    self.calib_text_box.value = self.calib_ticket
 
                 self.good_runs_dropdown.on_change('value', self.update)
                 self.run_pickle_dropdown.on_change('value', self.update)
