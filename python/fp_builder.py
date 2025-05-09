@@ -144,6 +144,10 @@ class fp_builder():
             }
         }
 
+        # calibrations params
+
+        self.calib_list = ["gain", "noise"]
+
         # get the cached pickle file of amp results and pick an initial test to set up on
 
         with open(self.in_file, 'rb') as f:
