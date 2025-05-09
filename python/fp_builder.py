@@ -859,6 +859,7 @@ class fp_builder():
                 elif c1:
                     new_calib_name = calib_1
                     kwargs = {"calib_name": new_calib_name}
+                    self.test_run = new_calib_name
                     self.calib_ticket = new_calib_name
                     self.calib_text_box.value = "None"
 
@@ -940,7 +941,7 @@ class fp_builder():
                 if not DM_stack:
                     self.calib_text_box_2.on_change('value', self.update)
                     self.generate_log_message(self.log_div,
-                                              "DM stack or EO code unavailable. Request ignored: " + calib__2)
+                                              "DM stack or EO code unavailable. Request ignored: " + calib_2)
                     return
                 kwargs = {"calib_name": calib_2}
                 self.test_run_2 = calib_2
