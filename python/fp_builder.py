@@ -1593,7 +1593,7 @@ class fp_builder():
         try:
             amp_data = self.calib_cache[calib_name]
             self.generate_log_message(self.log_div, "amp data acquired from cache")
-        except KeyError:
+        except:
             repo = "/repo/embargo"
             collection = 'LSSTCam/calib/' + calib_name
             butler = daf_butler.Butler(repo, collections=[collection])
