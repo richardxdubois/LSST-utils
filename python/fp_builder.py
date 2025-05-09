@@ -147,6 +147,7 @@ class fp_builder():
         # calibrations params
 
         self.calib_list = ["gain", "noise"]
+        self.calib_cache = None
 
         # get the cached pickle file of amp results and pick an initial test to set up on
 
@@ -1587,30 +1588,35 @@ class fp_builder():
         """
         self.generate_log_message(self.log_div, "Entered get_new_calib " + calib_name)
 
-        repo = "/repo/embargo"
-        collection = 'LSSTCam/calib/' + calib_name
-        butler = daf_butler.Butler(repo, collections=[collection])
-
         amp_data = {}
-        amp_data["gain"] = {}
-        amp_data["noise"] = {}
 
         try:
-            refs = butler.query_datasets('ptc', limit=None)
-            for r in refs:
-                r0 = butler.get(r)
-                r0_name = r0._detectorName
+            amp_data = self.calib_cache[calib_name]
+            self.generate_log_message(self.log_div, "amp data acquired from cache")
+        except KeyError:
+            repo = "/repo/embargo"
+            collection = 'LSSTCam/calib/' + calib_name
+            butler = daf_butler.Butler(repo, collections=[collection])
 
-                gains = r0.gain
-                amp_data["gain"][r0_name] = gains
+            amp_data["gain"] = {}
+            amp_data["noise"] = {}
 
-                noise = r0.noise
-                amp_data["noise"][r0_name] = noise
+            try:
+                refs = butler.query_datasets('ptc', limit=None)
+                for r in refs:
+                    r0 = butler.get(r)
+                    r0_name = r0._detectorName
 
-            self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
-        except:
-            self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
-            amp_data = None
+                    gains = r0.gain
+                    amp_data["gain"][r0_name] = gains
+
+                    noise = r0.noise
+                    amp_data["noise"][r0_name] = noise
+
+                self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
+            except:
+                self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
+                amp_data = None
 
         return amp_data
 
