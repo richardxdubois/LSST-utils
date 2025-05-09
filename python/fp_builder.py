@@ -994,7 +994,7 @@ class fp_builder():
             # select 2nd test. Replace "test2" in source_static and source.data
             self.generate_log_message(self.log_div, "getting new second test data: " + run_test2_name)
 
-            desired_test2_name = calib_test_1 if ct_2 else run_test2_name
+            desired_test2_name = calib_test_2 if ct_2 else run_test2_name
 
             if self.second_toggle_2.active == 0:
                 self.run1_name_active = True
