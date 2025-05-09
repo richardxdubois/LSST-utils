@@ -15,7 +15,7 @@ debug = False
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--do_calib', default="yes", help="yes for calibs, no for EO")
-parser.add_argument('--ticket_calib', default="DM-05336", help="DM ticket for calibration")
+parser.add_argument('--ticket_calib', default="DM-50336", help="DM ticket for calibration")
 parser.add_argument('--repo', default="/repo/main", help="/repo/main or /repo/embargo")
 
 
@@ -29,8 +29,11 @@ if args.do_calib == "yes":
     butler = daf_butler.Butler(repo, collections=[collection])
     print("butler set up", repo, collection)
     amp_data = {}
+
     amp_data["gain"] = {}
     amp_data["noise"] = {}
+    amp_data["ptcTurnoff"] = {}
+    amp_data["gainUnadjusted"] = {}
 
     try:
         refs = butler.query_datasets('ptc', limit=None)
@@ -39,11 +42,17 @@ if args.do_calib == "yes":
             r0 = butler.get(r)
             r0_name = r0._detectorName
 
-            gains = r0.gain
-            amp_data["gain"][r0_name] = gains
+            gain = r0.gain
+            amp_data["gain"][r0_name] = gain
+
+            gainUnadjusted = r0.gainUnadjusted
+            amp_data["gainUnadjusted"][r0_name] = gainUnadjusted
 
             noise = r0.noise
             amp_data["noise"][r0_name] = noise
+
+            ptcTurnoff = r0.ptcTurnoff
+            amp_data["ptcTurnoff"][r0_name] = ptcTurnoff
 
         o = args.ticket_calib + ".npy"
         print("about to write to ", o)
