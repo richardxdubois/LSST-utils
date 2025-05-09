@@ -782,12 +782,12 @@ class fp_builder():
 
         # Get the new range from the slider etc
         run1_test_name = self.name_dropdown.value
-        run1_test2_name = self.second_dropdown.value
+        run_test2_name = self.second_dropdown.value
         run1_name = self.run_text_box.value
         run_pickle = self.run_pickle_dropdown.value
         good_run = self.good_runs_dropdown.value
 
-        run1_name_2 = self.run_text_box_2.value
+        run2_name = self.run_text_box_2.value
         run_pickle_2 = self.run_pickle_dropdown_2.value
 
         calib_1 = self.calib_text_box.value
@@ -832,7 +832,7 @@ class fp_builder():
                         self.run_pickle_dropdown_2.on_change('value', self.update)
                         self.run_text_box_2.on_change('value', self.update)
                         self.generate_log_message(self.log_div,
-                                                  "DM stack or EO code unavailable. Request ignored: " + run1_name_2)
+                                                  "DM stack or EO code unavailable. Request ignored: " + run2_name)
                         return
 
                     new_run_name = self.name_dropdown.value
@@ -889,8 +889,8 @@ class fp_builder():
                 if run1_test_name not in self.name_list:
                     run1_test_name = self.name_list[0]
                     self.name_dropdown.value = run1_test_name
-                    self.second_dropdown.value = run1_test2_name
-                    run1_test2_name = self.name_list[0]
+                    self.second_dropdown.value = run_test2_name
+                    run_test2_name = self.name_list[0]
                     self.generate_log_message(self.log_div, "list of tests has changed!")
 
                 self.name_dropdown.on_change('value', self.update)
@@ -923,12 +923,12 @@ class fp_builder():
                     self.run_pickle_dropdown_2.on_change('value', self.update)
                     self.run_text_box_2.on_change('value', self.update)
                     self.generate_log_message(self.log_div,
-                                              "DM stack or EO code unavailable. Request ignored: " + run1_name_2)
+                                              "DM stack or EO code unavailable. Request ignored: " + run2_name)
                     return
-                kwargs = {"run_name": run1_name_2}
-                self.test_run_2 = run1_name_2
+                kwargs = {"run_name": run2_name}
+                self.test_run_2 = run2_name
                 self.run_pickle_dropdown_2.value = "None"
-                self.generate_log_message(self.log_div, "run_text_box_2 selected: " + run1_name_2)
+                self.generate_log_message(self.log_div, "run_text_box_2 selected: " + run2_name)
             elif c2:
                 if not DM_stack:
                     self.calib_text_box_2.on_change('value', self.update)
@@ -954,12 +954,12 @@ class fp_builder():
                 new_amp_results = self.get_new_run(**kwargs)
 
             if new_amp_results is not None:
-                desired_test2_name = run1_test2_name if d else calib_test_2
+                desired_test2_name = run_test2_name if d else calib_test_2
                 self.amp_results_2 = new_amp_results
                 _, desired_test2_name, self.name_list_2, self.name_aliases_2 = (
                     self.set_test_list(self.second_test_name, self.amp_results_2))
-                self.second_test_name = run1_test2_name
-                self.second_dropdown.value = run1_test2_name
+                self.second_test_name = run_test2_name
+                self.second_dropdown.value = run_test2_name
                 self.second_dropdown.options = self.name_list_2
 
                 self.second_dropdown.on_change('value', self.update)
@@ -989,14 +989,16 @@ class fp_builder():
 
             rc = self.update_slider(lower, upper)
 
-        if (s and self.second_test_name != run1_test2_name) or new_run or new_run2_name or ct_2:
+        if (s and self.second_test_name != run_test2_name) or new_run or new_run2_name or ct_2:
             # select 2nd test. Replace "test2" in source_static and source.data
-            self.generate_log_message(self.log_div, "getting new second test data: " + run1_test2_name)
+            self.generate_log_message(self.log_div, "getting new second test data: " + run_test2_name)
+
+            desired_test2_name = calib_test_1 if ct_2 else run_test2_name
 
             if self.second_toggle_2.active == 0:
                 self.run1_name_active = True
 
-            t2_new_test_data = self.get_new_test(run1_test2_name, self.current_raft)
+            t2_new_test_data = self.get_new_test(run_test2_name, self.current_raft)
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
