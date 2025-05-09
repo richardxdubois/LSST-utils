@@ -782,7 +782,7 @@ class fp_builder():
         """
 
         # Get the new range from the slider etc
-        run1_test_name = self.name_dropdown.value
+        run_test1_name = self.name_dropdown.value
         run_test2_name = self.second_dropdown.value
         run1_name = self.run_text_box.value
         run_pickle = self.run_pickle_dropdown.value
@@ -887,10 +887,10 @@ class fp_builder():
                 self.name_dropdown.remove_on_change('value', self.update)
                 self.second_dropdown.remove_on_change('value', self.update)
 
-                if run1_test_name not in self.name_list:
-                    run1_test_name = self.name_list[0]
-                    self.name_dropdown.value = run1_test_name
-                    self.second_dropdown.value = run1_test_name
+                if run_test1_name not in self.name_list:
+                    run_test1_name = self.name_list[0]
+                    self.name_dropdown.value = run_test1_name
+                    self.second_dropdown.value = run_test1_name
                     run_test2_name = self.name_list[0]
                     self.generate_log_message(self.log_div, "list of tests has changed!")
 
@@ -901,7 +901,7 @@ class fp_builder():
                 elapsed_time = end_time - start_time
 
                 self.generate_log_message(
-                    self.log_div, f"{run1_test_name} loaded after {elapsed_time:.2f} seconds")
+                    self.log_div, f"{run_test1_name} loaded after {elapsed_time:.2f} seconds")
                 self.title_run_base = self.test_run
                 new_run = True
                 self.new_pickle = False
@@ -967,9 +967,9 @@ class fp_builder():
                 self.run_pickle_dropdown_2.on_change('value', self.update)
                 self.run_text_box_2.on_change('value', self.update)
 
-        desired_test1_name = run1_test_name if d else calib_test_1
+        desired_test1_name = run_test1_name if (d or w) else calib_test_1
 
-        if (d and run1_test_name != self.test_name) or new_run or clip or ct_1:
+        if (d and run_test1_name != self.test_name) or new_run or clip or ct_1:
             # new test name selected. Replace "z" in source_static and source.data
             # clip the data and set the sliders to the clipped lower and upper
             self.generate_log_message(self.log_div, "getting new test data: " + desired_test1_name)
@@ -984,8 +984,8 @@ class fp_builder():
             self.source.data["test2"] = self.source_static["test2"]
 
             if not new_run:
-                self.test_name = run1_test_name
-            self.generate_log_message(self.log_div, "updating sliders for : " + run1_test_name)
+                self.test_name = run_test1_name
+            self.generate_log_message(self.log_div, "updating sliders for : " + run_test1_name)
             lower, upper = self.clip_limits(self.test_name, new_test_data, self.clip_threshold)
 
             rc = self.update_slider(lower, upper)
@@ -1003,7 +1003,7 @@ class fp_builder():
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
-            if not (new_run or run1_test_name or c1):
+            if not (new_run or run_test1_name or c1):
                 self.second_test_name = desired_test1_name
 
         # stuff done for all entries to update - histograms are remade every time
