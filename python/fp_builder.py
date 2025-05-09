@@ -1597,7 +1597,8 @@ class fp_builder():
             self.generate_log_message(self.log_div, "amp data acquired from cache")
         except:
             try:     # look for pickle file
-                calib_pickle = self.data_dir + "/calib_pickles" + calib_name + ".npy"
+                calib_pickle = self.data_dir + "/calib_pickles/" + calib_name + ".npy"
+                print("reading from", calib_pickle)
                 amp_data = pickle.load(calib_pickle)
                 self.calib_cache[calib_name] = amp_data
                 self.generate_log_message(self.log_div, "amp data acquired from pickle")
