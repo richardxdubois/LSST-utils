@@ -553,16 +553,19 @@ class fp_builder():
         """
         Define (almost) all the callbacks for the widgets. Most invoke self.update
         """
+        self.run_text_box.on_change('value', self.update)
+        self.run_pickle_dropdown.on_change('value', self.update)
+        self.good_runs_dropdown.on_change('value', self.update)
+        self.calib_text_box.on_change('value', self.update)
+
+        self.run_text_box_2.on_change('value', self.update)
+
         self.name_dropdown.on_change('value', self.update)
         self.second_dropdown.on_change('value', self.update)
-        self.run_text_box.on_change('value', self.update)
         # Attach the callback to the slider and dropdown
         self.clip_select.on_change('value', self.update)
         self.type_dropdown.on_change('value', self.update)
-        self.run_pickle_dropdown.on_change('value', self.update)
-        self.good_runs_dropdown.on_change('value', self.update)
 
-        self.run_text_box_2.on_change('value', self.update)
         self.run_pickle_dropdown_2.on_change('value', self.update)
 
         # Attach the callback to the checkbox's active property
@@ -577,7 +580,6 @@ class fp_builder():
         # calibrations
 
         #self.calib_dropdown.on_change('value', self.update)
-        self.calib_text_box.on_change('value', self.update)
         #self.calib_dropdown_2.on_change('value', self.update)
         self.calib_text_box_2.on_change('value', self.update)
 
@@ -616,7 +618,8 @@ class fp_builder():
             self.histo1.height = 320
             self.second_toggle_2.visible = True
             self.st_div_2.visible = True
-            self.calib_text_box_2.visible = True
+            if self.DM_stack:
+                self.calib_text_box_2.visible = True
         else:  # "Off"
             self.histo2.visible = False
             self.scatter12.visible = False
@@ -813,110 +816,104 @@ class fp_builder():
 
         c1 = new == calib_1
         c2 = new == calib_2
-        #ct_1 = new == calib_test_1
-        #t_2 = new == calib_test_2
 
         w2 = new == self.run_text_box_2.value
         np2 = new == self.run_pickle_dropdown_2.value
 
         self.run1_name_active = False
 
-        new_run = False
-        if (run1_name != self.test_run and w) or self.new_pickle or new_good_run or new_run or c1:
+        new_run = (run1_name != self.test_run and w) or self.new_pickle or new_good_run or c1
+
+        if new_run:
             # new run selected - replace dict of measurements - amp_results
-            if self.DM_stack or self.new_pickle:
 
-                self.good_runs_dropdown.remove_on_change('value', self.update)
-                self.run_pickle_dropdown.remove_on_change('value', self.update)
-                self.run_text_box.remove_on_change('value', self.update)
-                self.calib_text_box.remove_on_change('value', self.update)
+            self.good_runs_dropdown.remove_on_change('value', self.update)
+            self.run_pickle_dropdown.remove_on_change('value', self.update)
+            self.run_text_box.remove_on_change('value', self.update)
+            self.calib_text_box.remove_on_change('value', self.update)
 
-                if w:
-                    if not DM_stack:
-                        self.run_pickle_dropdown_2.on_change('value', self.update)
-                        self.run_text_box_2.on_change('value', self.update)
-                        self.generate_log_message(self.log_div,
-                                                  "DM stack or EO code unavailable. Request ignored: " + run2_name)
-                        return
+            if w:  # input from butler
 
-                    new_run_name = self.name_dropdown.value
-                    kwargs = {"run_name": run1_name}
-                    self.test_run = run1_name
-                    self.good_runs_dropdown.value = "None"
-                    self.run_pickle_dropdown.value = "None"
-                elif self.new_pickle:
-                    new_run_name = run_pickle
-                    kwargs = {"run_name": run_pickle}
-                    self.test_run = run_pickle
-                    self.run_text_box.value = "None"
-                    self.good_runs_dropdown.value = "None"
-                elif new_good_run:
-                    new_run_name = good_run
-                    kwargs = {"run_name": good_run}
-                    self.test_run = good_run
-                    self.run_text_box.value = "None"
-                    self.run_pickle_dropdown.value = "None"
-                elif c1:
-                    new_calib_name = calib_1
-                    kwargs = {"calib_name": new_calib_name}
-                    self.test_run = new_calib_name
-                    self.calib_ticket = new_calib_name
-                    self.calib_text_box.value = self.calib_ticket
+                new_run_name = self.name_dropdown.value
+                kwargs = {"run_name": run1_name}
+                self.test_run = run1_name
+                self.good_runs_dropdown.value = "None"
+                self.run_pickle_dropdown.value = "None"
 
-                self.good_runs_dropdown.on_change('value', self.update)
-                self.run_pickle_dropdown.on_change('value', self.update)
-                self.run_text_box.on_change('value', self.update)
-                self.calib_text_box.on_change('value', self.update)
+            elif self.new_pickle:  # input from pickle file
 
-                start_time = time.time()
-                if c1:
-                    self.generate_log_message(self.log_div, "calib_text_box selected: " + new_calib_name)
-                    print("Fetching new calib", new_calib_name)
-                    new_amp_results = self.get_new_calib(**kwargs)
-                else:
-                    self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
-                    print("Fetching new run", new_run_name)
-                    new_amp_results = self.get_new_run(**kwargs)
+                new_run_name = run_pickle
+                kwargs = {"run_name": run_pickle}
+                self.test_run = run_pickle
+                self.run_text_box.value = "None"
+                self.good_runs_dropdown.value = "None"
 
-                if new_amp_results is not None:
-                    self.amp_results = new_amp_results
-                else:
-                    return
+            elif new_good_run:  # input from good runs list
 
-                self.tests, self.test_name, self.name_list, self.name_aliases = (
-                    self.set_test_list(self.test_name, self.amp_results))
+                new_run_name = good_run
+                kwargs = {"run_name": good_run}
+                self.test_run = good_run
+                self.run_text_box.value = "None"
+                self.run_pickle_dropdown.value = "None"
 
-                # fix up the test dropdown menus, including potentially that the current test is not
-                # in the new run. Need to turn off their callbacks first.
+            elif c1:  # calibration from cache, pickle or butler
 
-                self.name_dropdown.remove_on_change('value', self.update)
-                self.second_dropdown.remove_on_change('value', self.update)
+                new_calib_name = calib_1
+                kwargs = {"calib_name": new_calib_name}
+                self.test_run = new_calib_name
+                self.calib_ticket = new_calib_name
+                self.calib_text_box.value = self.calib_ticket
 
-                if run_test1_name not in self.name_list:
-                    run_test1_name = self.name_list[0]
-                    run_test2_name = self.name_list[0]
-                    self.generate_log_message(self.log_div, "list of tests has changed!")
+            self.good_runs_dropdown.on_change('value', self.update)
+            self.run_pickle_dropdown.on_change('value', self.update)
+            self.run_text_box.on_change('value', self.update)
+            self.calib_text_box.on_change('value', self.update)
 
-                self.name_dropdown.value = self.test_name
-                self.name_dropdown.options = self.name_list
-                self.second_dropdown.value = self.test_name
-                self.second_dropdown.options = self.name_list
-
-
-                self.name_dropdown.on_change('value', self.update)
-                self.second_dropdown.on_change('value', self.update)
-
-                end_time = time.time()
-                elapsed_time = end_time - start_time
-
-                self.generate_log_message(
-                    self.log_div, f"{run_test1_name} loaded after {elapsed_time:.2f} seconds")
-                self.title_run_base = self.test_run
-                new_run = True
-                self.new_pickle = False
+            start_time = time.time()
+            if c1:
+                self.generate_log_message(self.log_div, "calib_text_box selected: " + new_calib_name)
+                print("Fetching new calib", new_calib_name)
+                new_amp_results = self.get_new_calib(**kwargs)
             else:
-                self.generate_log_message(self.log_div, "DM stack or EO code unavailable. Request ignored: " + run1_name)
+                self.generate_log_message(self.log_div, "run_text_box selected: " + new_run_name)
+                print("Fetching new run", new_run_name)
+                new_amp_results = self.get_new_run(**kwargs)
+
+            if new_amp_results is not None:
+                self.amp_results = new_amp_results
+            else:
                 return
+
+            self.tests, self.test_name, self.name_list, self.name_aliases = (
+                self.set_test_list(self.test_name, self.amp_results))
+
+            # fix up the test dropdown menus, including potentially that the current test is not
+            # in the new run. Need to turn off their callbacks first.
+
+            self.name_dropdown.remove_on_change('value', self.update)
+            self.second_dropdown.remove_on_change('value', self.update)
+
+            if run_test1_name not in self.name_list:
+                run_test1_name = self.name_list[0]
+                run_test2_name = self.name_list[0]
+                self.generate_log_message(self.log_div, "list of tests has changed!")
+
+            self.name_dropdown.value = self.test_name
+            self.name_dropdown.options = self.name_list
+            self.second_dropdown.value = self.test_name
+            self.second_dropdown.options = self.name_list
+
+            self.name_dropdown.on_change('value', self.update)
+            self.second_dropdown.on_change('value', self.update)
+
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+
+            self.generate_log_message(
+                self.log_div, f"{run_test1_name} loaded after {elapsed_time:.2f} seconds")
+            self.title_run_base = self.test_run
+            new_run = True
+            self.new_pickle = False
 
         # 2nd run changed
 
@@ -929,22 +926,11 @@ class fp_builder():
             self.new_pickle = False
 
             if w2:
-                if not DM_stack:
-                    self.run_pickle_dropdown_2.on_change('value', self.update)
-                    self.run_text_box_2.on_change('value', self.update)
-                    self.generate_log_message(self.log_div,
-                                              "DM stack or EO code unavailable. Request ignored: " + run2_name)
-                    return
                 kwargs = {"run_name": run2_name}
                 self.test_run_2 = run2_name
                 self.run_pickle_dropdown_2.value = "None"
                 self.generate_log_message(self.log_div, "run_text_box_2 selected: " + run2_name)
             elif c2:
-                if not DM_stack:
-                    self.calib_text_box_2.on_change('value', self.update)
-                    self.generate_log_message(self.log_div,
-                                              "DM stack or EO code unavailable. Request ignored: " + calib_2)
-                    return
                 kwargs = {"calib_name": calib_2}
                 self.test_run_2 = calib_2
                 self.generate_log_message(self.log_div, "calib_text_box_2 selected: " + calib_2)
@@ -962,6 +948,12 @@ class fp_builder():
                 print("Fetching new second run", self.test_run_2)
                 new_amp_results = self.get_new_run(**kwargs)
 
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+
+            self.generate_log_message(
+                self.log_div, f"{run_test2_name} loaded after {elapsed_time:.2f} seconds")
+
             if new_amp_results is not None:
                 self.amp_results_2 = new_amp_results
                 _, self.test2_name, self.name_list_2, self.name_aliases_2 = (
@@ -975,7 +967,7 @@ class fp_builder():
                 self.run_pickle_dropdown_2.on_change('value', self.update)
                 self.run_text_box_2.on_change('value', self.update)
 
-        if (d and run_test1_name != self.test_name) or new_run or clip:
+        if (d and run_test1_name != self.test_name) or new_run or clip:  # change of test or new run
             # new test name selected. Replace "z" in source_static and source.data
             # clip the data and set the sliders to the clipped lower and upper
             self.generate_log_message(self.log_div, "getting new test data: " + run_test1_name)
@@ -1007,6 +999,7 @@ class fp_builder():
             self.source_static["test2"] = list(t2_new_test_data)
             self.source.data["test2"] = self.source_static["test2"]
 
+            self.second_test_name = run_test2_name
             if not (new_run or run_test1_name or c1):
                 self.second_test_name = run_test1_name
 
