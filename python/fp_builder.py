@@ -641,6 +641,7 @@ class fp_builder():
             self.calib_text_box_2.visible = False
             self.run_pickle_dropdown_2.visible = False
             self.second_dropdown.options = self.name_dropdown.options
+            self.second_dropdown.value = self.name_dropdown.value
             # trigger refreshing the primary run
             if ".npy" in self.test_run:
                 self.run_pickle_dropdown.value = self.test_run
