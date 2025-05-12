@@ -47,19 +47,14 @@ if args.do_calib == "yes":
                 r0_name = r0._detectorName
 
                 for test in inputs[series]:
-                    #print(test)
                     try:
                         g = getattr(r0, test)
-                        amp_data.setdefault(r0_name, {})
-                        amp_data[r0_name][test] = g
-                        #print("added test to amp_data", len(g), g)
+                        amp_data.setdefault(test, {})
+                        amp_data[test][r0_name] = g
                     except AttributeError:  # test not available in this calibration
                         pass
-                #break
-
         except:
             print("Failed to access calibration ", args.ticket_calib)
-        #break
 
     o = args.ticket_calib + ".npy"
     print("about to write to ", o)
