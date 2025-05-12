@@ -38,6 +38,7 @@ if args.do_calib == "yes":
     amp_data = {}
 
     for series in inputs:
+        print("getting", series)
         try:
             refs = butler.query_datasets(series, limit=None)
             print("refs acquired: len(", len(refs), ")")
