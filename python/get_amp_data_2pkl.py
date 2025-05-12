@@ -50,6 +50,7 @@ if args.do_calib == "yes":
                     #print(test)
                     try:
                         g = getattr(r0, test)
+                        amp_data.setdefault(r0_name, {})
                         amp_data[r0_name][test] = g
                         #print("added test to amp_data", len(g), g)
                     except AttributeError:  # test not available in this calibration
