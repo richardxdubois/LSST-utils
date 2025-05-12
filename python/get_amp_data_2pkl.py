@@ -31,7 +31,7 @@ if args.do_calib == "yes":
 
     inputs = {}
 
-    inputs["ptc'"] = ["gain", "noise", "ptcTurnoff", "gainUnadjusted"]
+    inputs["ptc"] = ["gain", "noise", "ptcTurnoff", "gainUnadjusted"]
     inputs["cti"] = ["globalCti", "parallelCtiTurnoff", "parallelCtiTurnoffSamplingErr",
                      "serialCtiTurnoff", "serialCtiTurnoffSamplingErr"]
 
