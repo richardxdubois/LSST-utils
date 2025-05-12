@@ -54,14 +54,15 @@ if args.do_calib == "yes":
                     except AttributeError:  # test not available in this calibration
                         pass
 
-            o = args.ticket_calib + ".npy"
-            print("about to write to ", o)
-            with open(o, "wb") as pickle_file:
-                pickle.dump(amp_data, pickle_file)
-                print("Writing to", o)
-
         except:
             print("Failed to access calibration ", args.ticket_calib)
+
+    o = args.ticket_calib + ".npy"
+    print("about to write to ", o)
+    with open(o, "wb") as pickle_file:
+        pickle.dump(amp_data, pickle_file)
+        print("Writing to", o)
+
 else:
 
     butler = daf_butler.Butler(repo)
