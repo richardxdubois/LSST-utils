@@ -25,43 +25,42 @@ repo = args.repo
 
 if args.do_calib == "yes":
 
-    collection = 'LSSTCam/calib/' + args.ticket_calib
+    collection = 'LSSTCam/' + args.ticket_calib     # tickets require calib/DM-xxxxx; defaults are just defaults
     butler = daf_butler.Butler(repo, collections=[collection])
     print("butler set up", repo, collection)
+
+    inputs = {}
+
+    inputs["ptc'"] = ["gain", "noise", "ptcTurnoff", "gainUnadjusted"]
+    inputs["cti"] = ["globalCti", "parallelCtiTurnoff", "parallelCtiTurnoffSamplingErr",
+                     "serialCtiTurnoff", "serialCtiTurnoffSamplingErr"]
+
     amp_data = {}
 
-    amp_data["gain"] = {}
-    amp_data["noise"] = {}
-    amp_data["ptcTurnoff"] = {}
-    amp_data["gainUnadjusted"] = {}
+    for series in inputs:
+        try:
+            refs = butler.query_datasets(series, limit=None)
+            print("refs acquired: len(", len(refs), ")")
+            for r in refs:
+                r0 = butler.get(r)
+                r0_name = r0._detectorName
 
-    try:
-        refs = butler.query_datasets('ptc', limit=None)
-        print("refs acquired: len(", len(refs), ")")
-        for r in refs:
-            r0 = butler.get(r)
-            r0_name = r0._detectorName
+                for test in inputs[series]:
 
-            gain = r0.gain
-            amp_data["gain"][r0_name] = gain
+                    try:
+                        g = getattr(r0, test)
+                        amp_data[test] = g
+                    except AttributeError:  # test not available in this calibration
+                        pass
 
-            gainUnadjusted = r0.gainUnadjusted
-            amp_data["gainUnadjusted"][r0_name] = gainUnadjusted
+            o = args.ticket_calib + ".npy"
+            print("about to write to ", o)
+            with open(o, "wb") as pickle_file:
+                pickle.dump(amp_data, pickle_file)
+                print("Writing to", o)
 
-            noise = r0.noise
-            amp_data["noise"][r0_name] = noise
-
-            ptcTurnoff = r0.ptcTurnoff
-            amp_data["ptcTurnoff"][r0_name] = ptcTurnoff
-
-        o = args.ticket_calib + ".npy"
-        print("about to write to ", o)
-        with open(o, "wb") as pickle_file:
-            pickle.dump(amp_data, pickle_file)
-            print("Writing to", o)
-
-    except:
-        print("Failed to access calibration ", args.ticket_calib)
+        except:
+            print("Failed to access calibration ", args.ticket_calib)
 else:
 
     butler = daf_butler.Butler(repo)
