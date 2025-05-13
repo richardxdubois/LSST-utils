@@ -1,9 +1,9 @@
 # Instructions for running the trial fp builder bokeh server app 2025-03-12
 
-Purpose of the app is to provide exploration of the Run7 EO test campaign,
+Purpose of the app is to provide exploration of per-amp calibrations and the Run7 EO test campaign,
 using heatmaps of parameters across the full focal plane, coupled with
 histograms of selected parameters and optiional correlation with a second
-parameter. It is a trial bit of code to see if this approach is useful.
+parameter.
 
 
 ##  DM stack (example of version v28.0.1):
@@ -41,6 +41,8 @@ then point your local browser to localhost:5006/trial_fp_builder
 ## Usage notes:
 
  * fp.yaml sets up a pickle file for run E1110 to get going
+ * calibrations can be selected from the calibrations run text box. As of this writing, "defaults" and "DM-50336" are
+   available as pickle files for quicker access; butler fetching is quite slow.
  * different runs can be obtained in the run dialogue box by specifying the
    run in the form <run id>_<code version>, eg E1880_w_2025_02
  * Most of the Run 7 runs have been pickled. They are much faster to access than querying
