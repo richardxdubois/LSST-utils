@@ -46,7 +46,8 @@ then point your local browser to localhost:5006/trial_fp_builder
  * different runs can be obtained in the run dialogue box by specifying the
    run in the form <run id>_<code version>, eg E1880_w_2025_02
  * Most of the Run 7 runs have been pickled. They are much faster to access than querying
-   the butler.
+   the butler. Currently, run 6 runs have not been pickled and their format is
+   (eg)13551_<code_version>
  * select desired test from the pull-down menu
  * hover over the focal plane to see (raft, CCD, amp, test value)
  * sliders update the focal plane and histograms in real time
