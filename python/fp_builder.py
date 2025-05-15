@@ -400,7 +400,8 @@ class fp_builder():
         # plots
         layout_9 = row(self.fp, column(self.histo1, self.scatter12, self.histo2))
 
-        layout_0 = row(self.css_div, self.exit_button, self.doc_button, layout_8, layout_5, layout_6, layout_7)
+        layout_0 = row(self.css_div, self.exit_button, self.doc_button,
+                       layout_8, layout_5, layout_6, layout_7)
 
         canvas_layout = layout(layout_0,
                                row(layout_1,
@@ -579,8 +580,6 @@ class fp_builder():
 
         # calibrations
 
-        #self.calib_dropdown.on_change('value', self.update)
-        #self.calib_dropdown_2.on_change('value', self.update)
         self.calib_text_box_2.on_change('value', self.update)
 
         self.clip_toggle.on_change("active", self.clip_toggle_callback)
@@ -726,7 +725,7 @@ class fp_builder():
         if self.current_raft is None:
             # switch from fp to either CR or main fp raft
             self.current_raft = raft_value
-            if self.do_CR and self.current_raft in list(self.CR_layout.keys()):
+            if self.labels=="On" and self.current_raft in list(self.CR_layout.keys()):
                 self.source.data = dict(x=self.source_dict_CR["x"], y=self.source_dict_CR["y"], z=self.source_dict_CR["z"],
                                    ccd=self.source_dict_CR["ccd"], raft=self.source_dict_CR["raft"], amp=self.source_dict_CR["amp"],
                                    angle=self.source_dict_CR["angle"], raft_type=self.source_dict_CR["raft_type"])
@@ -1604,37 +1603,42 @@ class fp_builder():
             except:  # get from butler
                 print("get calib from butler")
                 repo = "/repo/embargo"
-                collection = 'LSSTCam/calib/' + calib_name
+
+                if calib_name == "defaults":
+                    collection = 'LSSTCam/' + calib_name
+                else:
+                    collection = 'LSSTCam/calib/' + calib_name
+
                 butler = daf_butler.Butler(repo, collections=[collection])
 
-                amp_data["gain"] = {}
-                amp_data["noise"] = {}
-                amp_data["ptcTurnoff"] = {}
-                amp_data["gainUnadjusted"] = {}
+                inputs = {}
 
-                try:
-                    refs = butler.query_datasets('ptc', limit=None)
-                    for r in refs:
-                        r0 = butler.get(r)
-                        r0_name = r0._detectorName
+                inputs["ptc"] = ["gain", "noise", "ptcTurnoff", "gainUnadjusted"]
+                inputs["cti"] = ["globalCti", "parallelCtiTurnoff", "parallelCtiTurnoffSamplingErr",
+                                 "serialCtiTurnoff", "serialCtiTurnoffSamplingErr"]
 
-                        gain = r0.gain
-                        amp_data["gain"][r0_name] = gain
+                amp_data = {}
 
-                        gainUnadjusted = r0.gainUnadjusted
-                        amp_data["gainUnadjusted"][r0_name] = gainUnadjusted
+                for series in inputs:
+                    try:
+                        refs = butler.query_datasets(series, limit=None)
+                        for r in refs:
+                            r0 = butler.get(r)
+                            r0_name = r0._detectorName
 
-                        noise = r0.noise
-                        amp_data["noise"][r0_name] = noise
+                            for test in inputs[series]:
+                                try:
+                                    g = getattr(r0, test)
+                                    amp_data.setdefault(test, {})
+                                    amp_data[test][r0_name] = g
+                                except AttributeError:  # test not available in this calibration
+                                    pass
 
-                        ptcTurnoff = r0.ptcTurnoff
-                        amp_data["ptcTurnoff"][r0_name] = ptcTurnoff
-
-                    self.calib_cache[calib_name] = amp_data
-                    self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
-                except:
-                    self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
-                    amp_data = None
+                        self.calib_cache[calib_name] = amp_data
+                        self.generate_log_message(self.log_div, "new_calib: new amp data acquired")
+                    except:
+                        self.generate_log_message(self.log_div, "Failed to retrieve " + calib_name + " from butler")
+                        amp_data = None
 
         return amp_data
 
