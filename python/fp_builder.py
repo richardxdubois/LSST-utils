@@ -16,7 +16,7 @@ from bokeh.models.widgets import DataTable, TableColumn, Div, NumberFormatter
 from bokeh.models.formatters import PrintfTickFormatter, BasicTickFormatter
 from bokeh.models import (RangeSlider, Rect, HoverTool, ColorBar, LinearColorMapper, ColumnDataSource, Select, Button,
                           TextInput, TapTool, RadioButtonGroup, Range1d, CDSView, BooleanFilter, CheckboxButtonGroup,
-                          CustomJS)
+                          CustomJS, GlobalInlineStyleSheet)
 from bokeh.plotting import figure, output_file, reset_output, show, save, curdoc
 from bokeh.layouts import row, layout, column
 
@@ -411,48 +411,9 @@ class fp_builder():
         # Add the layout to the current document
 
         curdoc().clear()
+
         curdoc().add_root(canvas_layout)
         curdoc().title = "LSSTCam focal plane EO viewer"
-        self.apply_css_classes()  # Apply CSS classes after all elements are built
-
-    def apply_css_classes(self):
-        print("Entered apply_css_classes()")
-        highlight_list = self.good_runs_versions
-        js_code = f"""
-                 console.log("Starting apply_css_classes"); // Check if this function is called
-                 //window.addEventListener('DOMContentLoaded', function() {{
-                     console.log("DOMContentLoaded event fired!"); // Check if the event listener is attached and firing
-                     const selectEls = document.querySelectorAll('.custom-select-dropdown select');
-                     console.log("selectEls:", selectEls);
-                     if (selectEls) {{
-                         selectEls.forEach(selectEl => {{
-                             console.log("Processing selectEl:", selectEl);
-                             const options = selectEl.querySelectorAll('option');
-                             console.log("options:", options);
-                             if (options) {{
-                                 options.forEach(option => {{
-                                     console.log("Checking option:", option.value);
-                                     if ({highlight_list}.includes(option.value)) {{
-                                         option.classList.add("option-red");
-                                         console.log("Added option-red to:", option.value);
-                                     }} else {{
-                                         option.classList.add("option-black");
-                                         console.log("Added option-black to:", option.value);
-                                     }}
-                                 }});
-                             }} else {{
-                                 console.log("No options found.");
-                             }}
-                         }});
-                     }} else {{
-                         console.log("No select element found.");
-                     }}
-                 //}});
-                 """
-        # Run the JS code now to style existing options
-        print("About to add the JS code to the document.")
-        #curdoc().add_next_tick_callback(lambda: curdoc().add_root(Div(text=f'<script>{js_code}</script>')))
-        curdoc().on_event('document_ready', CustomJS(code=js_code))
 
     # Define the function to be scheduled with add_next_tick_callback
     def trigger_js(self):
@@ -474,15 +435,6 @@ class fp_builder():
         self.run_pickle_dropdown = Select(title="Pick run from pickle list (fast)", value=self.in_file,
                                           options=list(self.pickled_runs),
                                           width=300, css_classes=["custom-select-dropdown"])
-
-        """
-        # Attach the CustomJS callback to run immediately
-        js_callback = CustomJS(code=self.good_run_js_code)
-        self.css_div.js_on_change('text', js_callback)
-        curdoc().add_root(self.css_div)
-        self.trigger_js()
-        #curdoc().add_next_tick_callback(self.trigger_js)
-        """
 
         self.second_dropdown = Select(title="Pick second test", value=self.second_test_name, options=self.name_list)
         self.second_dropdown.visible = False
@@ -510,15 +462,12 @@ class fp_builder():
         self.calib_dropdown_2 = Select(title="Pick 2nd calib test", value=self.calib_list[0],
                                        options=self.calib_list, visible=False)
 
-
         if not self.DM_stack:
             self.run_text_box.visible = False
             self.good_runs_dropdown.visible = False
 
             self.calib_text_box.visible = False
-            #self.calib_dropdown.visible = False
             self.calib_text_box_2.visible = False
-            #self.calib_dropdown_2.visible = False
 
             self.generate_log_message(self.log_div, "No DM stack or EO - run selection disabled")
 
